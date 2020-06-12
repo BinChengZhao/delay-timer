@@ -1,86 +1,13 @@
-///timer,时间轮
-/// 未来我会将这个库，实现用于rust-cron
-/// someting i will wrote chinese ,someting i will wrote english
-/// I wanna wrote bilingual language show doc...
-/// there ara same content.
-/// FIXME: try it.
-/// 
-/// 
-use std::collections::VecDeque;
-pub struct Timer {
-    wheelQueue: VecDeque<i32>,
-}
+#[allow(dead_code)]
+pub mod timer;
 
-struct Slot {
-    tasks: Vec<task>,
-}
+#[macro_use]
+extern crate lazy_static;
 
-impl Timer {
-    pub fn new() -> Self {
-        Timer {
-            wheelQueue: VecDeque::with_capacity(3600),
-        }
-    }
-
-    pub fn add_task(&mut self, task: task) {
-        // task.frequency;
-        // self.wheelQueue.push_back(task);
-    }
-
-    ///here,I wrote so poorly, greet you give directions.
-    fn elapse(&mut self) {
-        // instant  1s
-        //runing
-        //not runing 1s ,Duration - runing time
-        //sleep  ,then loop
-        //if that overtime , i run it not block
-    }
-
-    fn schedule(&self) {}
-
-    pub fn start(&self) {}
-}
-
-//TODO: 这里得改
-//FIXME:
-pub struct repeated_period(u32, u32, u32, u32, u32);
-pub enum Frequency {
-    Once,
-    repeated(repeated_period),
-    CountDown(u32, repeated_period),
-}
-
-pub struct task {
-    frequency: Frequency,
-    body: Box<Fn() + 'static>,
-    cylinder_line: u32,
-}
-
-impl task {
-   pub fn new(frequency: Frequency, body: Box<Fn() + 'static>, cylinder_line: u32) -> Self {
-        task {
-            frequency,
-            body,
-            cylinder_line,
-        }
-    }
-}
-
-//wheelQueue  里面的结构，维护一个数组， 第一个是最快要执行的
-//每个轮子上，标记还有几圈执行，跟它的任务  ，与它的执行频次
-//调度完之后插到新的 slot 中，并标记好圈数
-
-// [[task1,quan=>1,emun=>repeat,quality=>50s,]]
-
-trait TimerTrait {
-    fn add_task(&mut self, task: i32) {
-        //   todo!();
-    }
-}
-
+//先写出来库，未来在cron中 基于async-std,把 timer的调度给包装起来
 #[cfg(test)]
 mod tests {
-    use crate::Timer;
+    use crate::timer;
     use std::collections::VecDeque;
 
     #[test]
@@ -111,12 +38,33 @@ mod tests {
 
     #[test]
     fn run() {
-        let mut timer = Timer::new();
-        timer.add_task(1);
-        timer.add_task(2);
-        timer.add_task(2);
+        let (send, recv) = channel();
+        let mut timer = Timer::new(send);
 
+        // timer.add_task(1);
+        // timer.add_task(2);
+        // timer.add_task(2);
+
+        //like  timer.schedule(sender);
+        //let   new::excutor(reciver);
+        //excutor can many
+
+        //timer要锁住，支持多个线程使用
+        //一个线程使用timer不断吐给管道任务
+        //一个线程，已事件驱动的方式运行，当有需要时，给timer增加任务
+        //后续支持取消任务
+        //每个任务有一个ID，支持通过ID取消
         timer.schedule();
+        //after schedule, also can add_task
+        //so new timer should give a sender
+        //in schedule, it will steady supply task to channel
+        //have one excutor run  task
+
+        // timer.add_task(1);
+        // timer.add_task(2);
+        // timer.add_task(2);
+
+        //
 
         assert_eq!("task1 resut", "expect task1 resut");
         assert_eq!("task2 resut", "expect task2 resut");
@@ -125,10 +73,11 @@ mod tests {
 
     #[test]
     fn add_task() {
-        let mut timer = Timer::new();
-        timer.add_task(1);
-        timer.add_task(2);
-        timer.add_task(3);
+        let (send, recv) = channel();
+        let mut timer = Timer::new(send);
+        // timer.add_task(1);
+        // timer.add_task(2);
+        // timer.add_task(3);
 
         timer.schedule();
 
