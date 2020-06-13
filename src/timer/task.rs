@@ -9,7 +9,6 @@ pub struct TaskMark {
     slot_mark: u32,
 }
 
-
 impl TaskMark {
     fn new(task_id: u32) -> Self {
         TaskMark {
@@ -45,11 +44,28 @@ impl Frequency {
         };
     }
 
-    fn next_alarm_timestamp(&mut self) -> () {
-        // return match self {
-        //     Frequency::repeated(ref clock) => clock.next().unwrap().timestamp(),
-        //     Frequency::CountDown(_, ref clock) => clock.next().unwrap().timestamp(),
-        // };
+    fn next_alarm_timestamp(&mut self) -> i64 {
+        match self {
+            Frequency::CountDown(_, ref mut clock) => clock.next().unwrap().timestamp(),
+            Frequency::repeated(ref mut clock) => clock.next().unwrap().timestamp(),
+        }
+    }
+
+    #[warn(unused_parens)]
+    fn down_count(&mut self) {
+        match self {
+            Frequency::CountDown(ref mut exec_count, _) => {
+                *exec_count = (*exec_count - 1u32);
+            }
+            Frequency::repeated(_) => {}
+        };
+    }
+
+    fn is_down_over(&mut self) -> bool {
+        match self {
+            Frequency::CountDown(0, _) => true,
+            _ => false,
+        }
     }
 }
 
@@ -60,9 +76,9 @@ pub struct TaskBuilder {
 
 //TASK 执行完了，支持找新的Slot
 pub struct Task {
-    task_id: u32,
+    pub task_id: u32,
     frequency: Frequency,
-    body: Box<Fn() + 'static>,
+    pub body: Box<Fn() + 'static>,
     cylinder_line: u32,
     valid: bool,
 }
@@ -135,18 +151,48 @@ impl Task {
         }
     }
 
-    pub fn is_valid(&mut self) -> bool {
+    //down_count_and_set_vaild,will return new vaild status.
+    pub fn down_count_and_set_vaild(&mut self) -> bool {
+        self.down_count();
+        self.down_count_and_set_vaild();
+        self.is_valid()
+    }
+
+    //down_exec_count
+    pub fn down_count(&mut self) {
+        self.frequency.down_count();
+    }
+
+    //set_valid_by_count_down
+    pub fn set_valid_by_count_down(&mut self) {
+        self.valid = self.frequency.is_down_over();
+    }
+
+    //sub_cylinder_line
+    pub fn sub_cylinder_line(&mut self) {
+        self.cylinder_line -= 1;
+    }
+
+    //check is ready
+    pub fn is_already(&self) -> bool {
+        self.cylinder_line == 0
+    }
+
+    //is_can_running
+    pub fn is_can_running(&self) -> bool {
+        if self.is_valid() {
+            return self.is_already();
+        }
+        return false;
+    }
+
+    //is_valid
+    pub fn is_valid(&self) -> bool {
         self.valid
     }
 
-    pub fn set_valid_status(&mut self) {
-        let valid = match self.frequency {
-            Frequency::CountDown(0, _) => false,
-            _ => true,
-        };
-
-        self.valid = valid;
+    //get_next_exec_timestamp
+    pub fn get_next_exec_timestamp(&mut self) -> i64 {
+        self.frequency.next_alarm_timestamp()
     }
-
-    pub fn get_next_exec_timestamp(&mut self) {}
 }
