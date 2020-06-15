@@ -151,6 +151,7 @@ impl Task {
         }
     }
 
+    //swap slot loction ,do this
     //down_count_and_set_vaild,will return new vaild status.
     pub fn down_count_and_set_vaild(&mut self) -> bool {
         self.down_count();
@@ -168,9 +169,16 @@ impl Task {
         self.valid = self.frequency.is_down_over();
     }
 
+    pub fn set_cylinder_line(&mut self, cylinder_line: u32) {
+        self.cylinder_line = cylinder_line;
+    }
+
+    //single slot foreach do this.
     //sub_cylinder_line
-    pub fn sub_cylinder_line(&mut self) {
+    //return is can_running?
+    pub fn sub_cylinder_line(&mut self) -> bool {
         self.cylinder_line -= 1;
+        self.is_can_running()
     }
 
     //check is ready

@@ -2,7 +2,6 @@ use super::task::Task;
 use std::collections::HashMap;
 
 //Slot 基于 链表做一个有序，如果头部执行了，直接插入其它SLOT
-//如果，新增 则根据圈数 找链表可以插入的节点插入就可以了
 //支持一次遍历，全部的圈数-1
 pub struct Slot {
     task_map: HashMap<u32, Task>,
@@ -26,10 +25,15 @@ impl Slot {
     //check并减cylinder_line，
     //返回现在要运行的，TaskOwned的集合
     //cylinder_line == 0
-    pub fn arrival_time_tasks() {
+    pub fn arrival_time_tasks(&mut self) -> Vec<u32> {
+        let mut task_id_vec = vec![];
 
-        //重task 中 clone 闭包，发送到外面
-        //内部重新计算圈数
-        //发送给Timer 让他去决定插到哪里
+        for (_, task) in self.task_map.iter_mut() {
+            if task.sub_cylinder_line() {
+                task_id_vec.push(task.task_id);
+            }
+        }
+
+        task_id_vec
     }
 }
