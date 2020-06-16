@@ -181,6 +181,13 @@ impl Task {
         self.is_can_running()
     }
 
+    pub fn check_arrived(&mut self) -> bool {
+        if self.cylinder_line == 0 {
+            return self.is_can_running();
+        }
+        self.sub_cylinder_line()
+    }
+
     //check is ready
     pub fn is_already(&self) -> bool {
         self.cylinder_line == 0

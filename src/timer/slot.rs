@@ -29,7 +29,7 @@ impl Slot {
         let mut task_id_vec = vec![];
 
         for (_, task) in self.task_map.iter_mut() {
-            if task.sub_cylinder_line() {
+            if task.check_arrived() {
                 task_id_vec.push(task.task_id);
             }
         }

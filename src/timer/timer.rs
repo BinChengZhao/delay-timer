@@ -28,6 +28,7 @@ type FnSender = Sender<Box<Fn() + 'static>>;
 pub struct Timer {
     wheelQueue: Vec<Slot>,
     TaskSender: TaskSender,
+    secondHand: usize,
 }
 
 //不在调度者里面执行任务，不然时间会不准
@@ -37,6 +38,7 @@ impl Timer {
         Timer {
             wheelQueue: Vec::with_capacity(DEFAULT_TIMER_SLOT_COUNT as usize),
             TaskSender,
+            secondHand: 0,
         }
     }
 
@@ -48,31 +50,62 @@ impl Timer {
 
     //add task to wheelQueue  slot
     pub fn add_task(&mut self, mut task: Task) {
-        let exec_time = task.get_next_exec_timestamp();
-        let time_seed: usize = (get_timestamp() - (exec_time as u64)) as usize;
+        let exec_time = task.get_next_exec_timestamp() as u64;
+        let time_seed: usize = (exec_time - get_timestamp()) as usize;
         let slot_seed: usize = (time_seed as usize) % DEFAULT_TIMER_SLOT_COUNT;
 
         task.set_cylinder_line((time_seed / DEFAULT_TIMER_SLOT_COUNT) as u32);
 
+        println!(
+            "task_id:{}, next_time:{}, slot_seed:{}",
+            task.task_id, exec_time, slot_seed
+        );
         self.wheelQueue[slot_seed].add_task(task);
     }
 
-    ///here,I wrote so poorly, greet you give directions.
-    fn elapse(&mut self) {
-        let one_second = Duration::new(1, 0);
-        loop {
-            let now = Instant::now();
+    pub fn next_position(&mut self) {
+        self.secondHand = self.secondHand + 1 % DEFAULT_TIMER_SLOT_COUNT;
+    }
 
-            let passed = now.elapsed();
-            sleep(one_second - passed);
-        }
-        // instant  1s
-        //runing
-        //取出任务，丢到管道
-        //重新整梨及时，task 找对用的slot
+    ///here,I wrote so poorly, greet you give directions.
+    pub fn elapse(&mut self) {
         //not runing 1s ,Duration - runing time
         //sleep  ,then loop
         //if that overtime , i run it not block
+        let one_second = Duration::new(1, 0);
+
+        loop {
+            let instant = Instant::now();
+            let task_ids = self.wheelQueue[self.secondHand].arrival_time_tasks();
+            println!("run : go : go: {}", self.secondHand);
+            for task_id in task_ids {
+                let mut task = self.wheelQueue[self.secondHand]
+                    .remove_task(task_id)
+                    .unwrap();
+                (task.body)();
+
+                //下一次执行时间
+                let timestamp = task.get_next_exec_timestamp() as usize;
+
+                //时间差+当前的分针
+                //比如 时间差是 7260，目前分针再 3599，7260+3599 = 10859
+                //， 从 当前 3599 走碰见三次，再第59个格子
+                let step = timestamp - (get_timestamp() as usize) + self.secondHand;
+                let quan = step / DEFAULT_TIMER_SLOT_COUNT;
+                task.set_cylinder_line(quan as u32);
+                let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
+                println!(
+                    "task_id:{}, next_time:{}, slot_seed:{}, quan:{}",
+                    task.task_id, step, slot_seed, quan
+                );
+
+                self.wheelQueue[slot_seed].add_task(task);
+            }
+
+            sleep(one_second - instant.elapsed());
+
+            self.next_position();
+        }
     }
 
     fn schedule(&mut self) {}
