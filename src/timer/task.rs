@@ -16,10 +16,14 @@ impl TaskMark {
             slot_mark: 0,
         }
     }
+
+    pub fn get_slot_mark(&self) -> u32 {
+        self.slot_mark
+    }
 }
 
 lazy_static! {
-    static ref TASKMAP: Mutex<HashMap<u32, TaskMark>> = {
+    pub static ref TASKMAP: Mutex<HashMap<u32, TaskMark>> = {
         let mut m = HashMap::new();
         Mutex::new(m)
     };
@@ -55,7 +59,7 @@ impl Frequency {
     fn down_count(&mut self) {
         match self {
             Frequency::CountDown(ref mut exec_count, _) => {
-                *exec_count = (*exec_count - 1u32);
+                *exec_count = *exec_count - 1u32;
             }
             Frequency::repeated(_) => {}
         };
@@ -63,8 +67,8 @@ impl Frequency {
 
     fn is_down_over(&mut self) -> bool {
         match self {
-            Frequency::CountDown(0, _) => true,
-            _ => false,
+            Frequency::CountDown(0, _) => false,
+            _ => true,
         }
     }
 }
@@ -155,17 +159,17 @@ impl Task {
     //down_count_and_set_vaild,will return new vaild status.
     pub fn down_count_and_set_vaild(&mut self) -> bool {
         self.down_count();
-        self.down_count_and_set_vaild();
+        self.set_valid_by_count_down();
         self.is_valid()
     }
 
     //down_exec_count
-    pub fn down_count(&mut self) {
+    fn down_count(&mut self) {
         self.frequency.down_count();
     }
 
     //set_valid_by_count_down
-    pub fn set_valid_by_count_down(&mut self) {
+    fn set_valid_by_count_down(&mut self) {
         self.valid = self.frequency.is_down_over();
     }
 

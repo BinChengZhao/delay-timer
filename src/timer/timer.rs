@@ -49,7 +49,7 @@ impl Timer {
     }
 
     //add task to wheelQueue  slot
-    pub fn add_task(&mut self, mut task: Task) {
+    pub fn add_task(&mut self, mut task: Task) -> Option<Task> {
         let exec_time = task.get_next_exec_timestamp() as u64;
         let time_seed: usize = (exec_time - get_timestamp()) as usize;
         let slot_seed: usize = (time_seed as usize) % DEFAULT_TIMER_SLOT_COUNT;
@@ -60,7 +60,7 @@ impl Timer {
             "task_id:{}, next_time:{}, slot_seed:{}",
             task.task_id, exec_time, slot_seed
         );
-        self.wheelQueue[slot_seed].add_task(task);
+        self.wheelQueue[slot_seed].add_task(task)
     }
 
     pub fn next_position(&mut self) {
@@ -68,7 +68,7 @@ impl Timer {
     }
 
     ///here,I wrote so poorly, greet you give directions.
-    pub fn elapse(&mut self) {
+    pub fn schedule(&mut self) {
         //not runing 1s ,Duration - runing time
         //sleep  ,then loop
         //if that overtime , i run it not block
@@ -83,6 +83,13 @@ impl Timer {
                     .remove_task(task_id)
                     .unwrap();
                 (task.body)();
+
+                let task_valid = task.down_count_and_set_vaild();
+                println!("task_id:{}, valid:{}", task.task_id, task_valid);
+                if !task_valid {
+                    drop(task);
+                    continue;
+                }
 
                 //下一次执行时间
                 let timestamp = task.get_next_exec_timestamp() as usize;
@@ -108,7 +115,20 @@ impl Timer {
         }
     }
 
-    fn schedule(&mut self) {}
+    pub fn remove_task(&mut self, task_id: u32) -> Option<Task> {
+        use crate::timer::task::{TaskMark, TASKMAP};
+
+        let mut m = TASKMAP.lock().unwrap();
+        let task_mark: Option<&TaskMark> = m.get(&task_id);
+
+        if task_mark.is_some() {
+            let t = task_mark.unwrap();
+            let slot_mark = t.get_slot_mark();
+            return self.wheelQueue[slot_mark as usize].remove_task(task_id);
+        }
+
+        None
+    }
 
     pub fn start(&mut self) {}
 
@@ -129,5 +149,3 @@ pub fn get_timestamp() -> u64 {
 //wheelQueue  里面的结构，维护一个数组， 第一个是最快要执行的
 //每个轮子上，标记还有几圈执行，跟它的任务  ，与它的执行频次
 //调度完之后插到新的 slot 中，并标记好圈数
-
-// [[task1,quan=>1,emun=>repeat,quality=>50s,]]
