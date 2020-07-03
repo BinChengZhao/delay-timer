@@ -7,9 +7,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+smol = "0.1.12"
+futures = "0.3.5"
 cron_clock = "0.6.3"
 lazy_static = "1.4.0"
 
 [dev-dependencies]
 smol = "0.1.12"
 futures = "0.3.5"
+surf = "1.0.3"

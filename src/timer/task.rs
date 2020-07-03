@@ -1,6 +1,8 @@
 use cron_clock::schedule::{Schedule, ScheduleIteratorOwned};
 use cron_clock::Utc;
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Mutex;
 
@@ -79,10 +81,36 @@ pub struct TaskBuilder {
 }
 
 //TASK 执行完了，支持找新的Slot
+//放一个普通函数的，比如执行命令 cat a.txt ，生成子进程
+//然后拿着child的子进程句柄，异步的把标准输出写到一个文件（这个文件可以自定义，也可以我们写）
+//用async的方式，不断try_wait ,如果没有完成则重新丢进去 try_wait
+//如果完成了，直接使用child的标准输出/错误，读出来写到文件
+//还可以在try的过程中，不断地对比是否超时，超时了直接kill掉
+type SafeBoxFn = Box<dyn Fn() + 'static + Send + Sync>;
 pub struct Task {
     pub task_id: u32,
     frequency: Frequency,
-    pub body: Box<Fn() + 'static>,
+    pub body: SafeBoxFn,
+    cylinder_line: u32,
+    valid: bool,
+}
+
+type BoxFn = Box<dyn Fn(i32) -> Pin<Box<dyn Future<Output = i32>>>>;
+
+//放闭包生成future的，在本地线程可以并发调用
+pub struct TaskAsyncLocal {
+    pub task_id: u32,
+    frequency: Frequency,
+    pub body: BoxFn,
+    cylinder_line: u32,
+    valid: bool,
+}
+
+//内置一个函数指针，调用时自动spwan到，work-stealing。
+pub struct TaskAsync {
+    pub task_id: u32,
+    frequency: Frequency,
+    pub body: fn(),
     cylinder_line: u32,
     valid: bool,
 }
@@ -109,7 +137,7 @@ impl<'a> TaskBuilder {
 
     pub fn spawn<F>(self, body: F) -> Task
     where
-        F: Fn() + 'static,
+        F: Fn() + 'static + Send + Sync,
     {
         let Frequency;
         let expression_str: &str;
@@ -145,7 +173,7 @@ impl<'a> TaskBuilder {
 }
 
 impl Task {
-    pub fn new(task_id: u32, frequency: Frequency, body: Box<Fn() + 'static>) -> Task {
+    pub fn new(task_id: u32, frequency: Frequency, body: SafeBoxFn) -> Task {
         Task {
             task_id,
             frequency,

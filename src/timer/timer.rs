@@ -17,27 +17,36 @@ use std::time::{Duration, Instant, SystemTime};
 const DEFAULT_TIMER_SLOT_COUNT: usize = 3600;
 
 type TimeExpression = Schedule;
+pub type TimerEventSender = Sender<TimerEvent>;
+pub type TimerEventReceiver = Receiver<TimerEvent>;
 type TaskReceiver = Receiver<Task>;
 type TaskSender = Sender<Task>;
 type FnReceiver = Receiver<Box<Fn() + 'static>>;
 type FnSender = Sender<Box<Fn() + 'static>>;
+
+pub enum TimerEvent {
+    Stop,
+    AddTask(Task),
+    RemoveTask(u32),
+    CancelTask(u32),
+}
 
 //add channel
 //explore on time task
 // 暴漏一个 接收方，让读取任务
 pub struct Timer {
     wheelQueue: Vec<Slot>,
-    TaskSender: TaskSender,
+    TimerEventReceiver: TimerEventReceiver,
     secondHand: usize,
 }
 
 //不在调度者里面执行任务，不然时间会不准
 //just provice api and struct ,less is more.
 impl Timer {
-    pub fn new(TaskSender: TaskSender) -> Self {
+    pub fn new(TimerEventReceiver: TimerEventReceiver) -> Self {
         Timer {
             wheelQueue: Vec::with_capacity(DEFAULT_TIMER_SLOT_COUNT as usize),
-            TaskSender,
+            TimerEventReceiver,
             secondHand: 0,
         }
     }
@@ -46,6 +55,12 @@ impl Timer {
         for _ in 0..DEFAULT_TIMER_SLOT_COUNT {
             self.wheelQueue.push(Slot::new());
         }
+    }
+
+    fn _handle_event(&mut self) {
+        // TODO: recv can happen error.
+        self.TimerEventReceiver.try_recv();
+        todo!();
     }
 
     //add task to wheelQueue  slot
@@ -68,6 +83,10 @@ impl Timer {
     }
 
     ///here,I wrote so poorly, greet you give directions.
+    /// schedule：
+    ///    first. add ||　remove task 。
+    ///    second.spawn task .
+    ///    thirid sleed 1- (run duration).
     pub fn schedule(&mut self) {
         //not runing 1s ,Duration - runing time
         //sleep  ,then loop
@@ -76,6 +95,7 @@ impl Timer {
 
         loop {
             let instant = Instant::now();
+            //TODO: AddTask
             let task_ids = self.wheelQueue[self.secondHand].arrival_time_tasks();
             println!("run : go : go: {}", self.secondHand);
             for task_id in task_ids {
