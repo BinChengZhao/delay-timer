@@ -36,17 +36,17 @@ pub enum TimerEvent {
 // 暴漏一个 接收方，让读取任务
 pub struct Timer {
     wheelQueue: Vec<Slot>,
-    TimerEventReceiver: TimerEventReceiver,
+    timer_event_receiver: TimerEventReceiver,
     secondHand: usize,
 }
 
 //不在调度者里面执行任务，不然时间会不准
 //just provice api and struct ,less is more.
 impl Timer {
-    pub fn new(TimerEventReceiver: TimerEventReceiver) -> Self {
+    pub fn new(timer_event_receiver: TimerEventReceiver) -> Self {
         Timer {
             wheelQueue: Vec::with_capacity(DEFAULT_TIMER_SLOT_COUNT as usize),
-            TimerEventReceiver,
+            timer_event_receiver,
             secondHand: 0,
         }
     }
@@ -58,9 +58,26 @@ impl Timer {
     }
 
     fn _handle_event(&mut self) {
+        use std::sync::mpsc::TryRecvError;
         // TODO: recv can happen error.
-        self.TimerEventReceiver.try_recv();
-        todo!();
+        let eventResult = self.timer_event_receiver.try_recv();
+        let event;
+        match eventResult {
+            Ok(event_value) => {
+                event = event_value;
+            }
+            Err(TryRecvError::Empty) => return,
+            Err(TryRecvError::Disconnected) => panic!("Disconnected"),
+        }
+
+        //TODO:CancelTask, Is cancel once when task is running;
+        //I should storage processChild in somewhere, When cancel event hanple i will kill child.
+        match event {
+            TimerEvent::Stop => panic!("i'm stop"),
+            TimerEvent::AddTask(task) => self.add_task(task),
+            TimerEvent::RemoveTask(task_id) => self.remove_task(task_id),
+            TimerEvent::CancelTask(task_id) => todo!(),
+        };
     }
 
     //add task to wheelQueue  slot
@@ -95,13 +112,15 @@ impl Timer {
 
         loop {
             let instant = Instant::now();
-            //TODO: AddTask
+            self._handle_event();
             let task_ids = self.wheelQueue[self.secondHand].arrival_time_tasks();
             println!("run : go : go: {}", self.secondHand);
             for task_id in task_ids {
                 let mut task = self.wheelQueue[self.secondHand]
                     .remove_task(task_id)
                     .unwrap();
+
+                //TODO:Task should run in another where.
                 (task.body)();
 
                 let task_valid = task.down_count_and_set_vaild();
@@ -149,12 +168,6 @@ impl Timer {
 
         None
     }
-
-    pub fn start(&mut self) {}
-
-    //发送给Timer 让他去决定插到哪里
-    //返回一组 任务ID
-    //让调度这去，remove 跟 add
 }
 
 pub fn get_timestamp() -> u64 {
