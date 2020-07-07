@@ -51,6 +51,7 @@ impl Frequency {
     }
 
     fn next_alarm_timestamp(&mut self) -> i64 {
+        //TODO:handle error
         match self {
             Frequency::CountDown(_, ref mut clock) => clock.next().unwrap().timestamp(),
             Frequency::repeated(ref mut clock) => clock.next().unwrap().timestamp(),

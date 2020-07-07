@@ -5,6 +5,7 @@ pub mod timer;
 #[macro_use]
 extern crate lazy_static;
 
+//TODO:接入线程池，能后自动管理线程的异常重启
 mod example {
 
     //TODO: TDD.

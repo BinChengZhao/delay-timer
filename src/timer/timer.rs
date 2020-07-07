@@ -9,6 +9,7 @@ use super::task::Task;
 ///
 use cron_clock::schedule::Schedule;
 
+use smol::Timer as SmolTimer;
 use std::collections::LinkedList;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::sleep;
@@ -44,45 +45,62 @@ pub struct Timer {
 //just provice api and struct ,less is more.
 impl Timer {
     pub fn new(timer_event_receiver: TimerEventReceiver) -> Self {
-        Timer {
+        let mut timer = Timer {
             wheelQueue: Vec::with_capacity(DEFAULT_TIMER_SLOT_COUNT as usize),
             timer_event_receiver,
             secondHand: 0,
-        }
+        };
+
+        timer.init();
+        timer
     }
 
-    pub fn init(&mut self) {
+    fn init(&mut self) {
         for _ in 0..DEFAULT_TIMER_SLOT_COUNT {
             self.wheelQueue.push(Slot::new());
         }
     }
 
-    fn _handle_event(&mut self) {
+    //_handle_event
+    fn handle_event(&mut self) {
         use std::sync::mpsc::TryRecvError;
-        // TODO: recv can happen error.
-        let eventResult = self.timer_event_receiver.try_recv();
-        let event;
-        match eventResult {
-            Ok(event_value) => {
-                event = event_value;
+        let mut event_result;
+        let mut events: Vec<TimerEvent> = Vec::new();
+
+        loop {
+            // TODO: recv can happen error.
+            event_result = self.timer_event_receiver.try_recv();
+            match event_result {
+                Ok(event_value) => {
+                    events.push(event_value);
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => panic!("Disconnected"),
             }
-            Err(TryRecvError::Empty) => return,
-            Err(TryRecvError::Disconnected) => panic!("Disconnected"),
         }
 
         //TODO:CancelTask, Is cancel once when task is running;
         //I should storage processChild in somewhere, When cancel event hanple i will kill child.
-        match event {
-            TimerEvent::Stop => panic!("i'm stop"),
-            TimerEvent::AddTask(task) => self.add_task(task),
-            TimerEvent::RemoveTask(task_id) => self.remove_task(task_id),
-            TimerEvent::CancelTask(task_id) => todo!(),
-        };
+        for event in events {
+            match event {
+                TimerEvent::Stop => panic!("i'm stop"),
+                TimerEvent::AddTask(task) => self.add_task(task),
+                TimerEvent::RemoveTask(task_id) => self.remove_task(task_id),
+                TimerEvent::CancelTask(task_id) => todo!(),
+            };
+        }
     }
 
     //add task to wheelQueue  slot
     pub fn add_task(&mut self, mut task: Task) -> Option<Task> {
         let exec_time = task.get_next_exec_timestamp() as u64;
+        println!(
+            "task_id:{}, next_time:{}, get_timestamp:{}",
+            task.task_id,
+            exec_time,
+            get_timestamp()
+        );
+        //TODO:exec_time IS LESS THAN TIMESTAMP.
         let time_seed: usize = (exec_time - get_timestamp()) as usize;
         let slot_seed: usize = (time_seed as usize) % DEFAULT_TIMER_SLOT_COUNT;
 
@@ -112,7 +130,7 @@ impl Timer {
 
         loop {
             let instant = Instant::now();
-            self._handle_event();
+            self.handle_event();
             let task_ids = self.wheelQueue[self.secondHand].arrival_time_tasks();
             println!("run : go : go: {}", self.secondHand);
             for task_id in task_ids {
@@ -150,6 +168,57 @@ impl Timer {
 
             sleep(one_second - instant.elapsed());
 
+            self.next_position();
+        }
+    }
+
+    pub async fn async_schedule(&mut self) {
+        //not runing 1s ,Duration - runing time
+        //sleep  ,then loop
+        //if that overtime , i run it not block
+
+        let mut now;
+        let mut when;
+        loop {
+            now = Instant::now();
+            when = now + Duration::from_secs(1);
+            self.handle_event();
+            let task_ids = self.wheelQueue[self.secondHand].arrival_time_tasks();
+            println!("run : go : go: {}", self.secondHand);
+            for task_id in task_ids {
+                let mut task = self.wheelQueue[self.secondHand]
+                    .remove_task(task_id)
+                    .unwrap();
+
+                //TODO:Task should run in another where.
+                (task.body)();
+
+                let task_valid = task.down_count_and_set_vaild();
+                println!("task_id:{}, valid:{}", task.task_id, task_valid);
+                if !task_valid {
+                    drop(task);
+                    continue;
+                }
+
+                //下一次执行时间
+                let timestamp = task.get_next_exec_timestamp() as usize;
+
+                //时间差+当前的分针
+                //比如 时间差是 7260，目前分针再 3599，7260+3599 = 10859
+                //， 从 当前 3599 走碰见三次，再第59个格子
+                let step = timestamp - (get_timestamp() as usize) + self.secondHand;
+                let quan = step / DEFAULT_TIMER_SLOT_COUNT;
+                task.set_cylinder_line(quan as u32);
+                let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
+                println!(
+                    "task_id:{}, next_time:{}, slot_seed:{}, quan:{}",
+                    task.task_id, step, slot_seed, quan
+                );
+
+                self.wheelQueue[slot_seed].add_task(task);
+            }
+
+            SmolTimer::at(when).await;
             self.next_position();
         }
     }
