@@ -1,23 +1,21 @@
 use super::timer::{
     task::Task,
-    timer::{Timer, TimerEvent, TimerEventReceiver, TimerEventSender},
+    timer_core::{Timer, TimerEvent, TimerEventSender},
 };
-use futures::future;
+use anyhow::{Context, Result};
 use std::{
     collections::{HashMap, LinkedList},
-    sync::mpsc::{channel, Receiver, Sender},
-    thread,
+    sync::mpsc::channel,
 };
 use threadpool::ThreadPool;
 
-//TODO:结构体的内部字段，命名一致都用小写下划线
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
 }
 
-//taskTrace-全局的句柄
+//TaskTrace-全局的句柄
 //当进程消亡，跟异步任务drop的时候对应的链表也减少，如果没值则删除k/v
-struct taskTrace<T: DelayTimerTask> {
+struct TaskTrace<T: DelayTimerTask> {
     inner: HashMap<u32, LinkedList<T>>,
 }
 
@@ -49,7 +47,7 @@ impl DelayTimer {
     }
 
     pub fn add_task(&mut self, task: Task) {
-        self.seed_timer_event(TimerEvent::AddTask(task));
+        self.seed_timer_event(TimerEvent::AddTask(Box::new(task)));
     }
 
     pub fn remove_task(&mut self, task_id: u32) {
@@ -60,8 +58,15 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::CancelTask(task_id));
     }
 
-    fn seed_timer_event(&mut self, event: TimerEvent) {
-        //TODO: handle error here;
-        self.timer_event_sender.send(event);
+    fn seed_timer_event(&mut self, event: TimerEvent) -> Result<()> {
+        self.timer_event_sender
+            .send(event)
+            .with_context(|| format!("Failed Send Event from seed_timer_event"))
+    }
+}
+
+impl Default for DelayTimer {
+    fn default() -> Self {
+        Self::new()
     }
 }

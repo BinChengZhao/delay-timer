@@ -1,4 +1,4 @@
-use delay_timer::timer::timer::get_timestamp;
+use delay_timer::timer::timer_core::get_timestamp;
 use futures::future;
 use smol::{Task, Timer};
 use std::{

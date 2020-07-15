@@ -1,6 +1,9 @@
+#![feature(split_inclusive)]
+#![feature(str_strip)]
+// #[allow(dead_code)]
 pub mod delay_timer;
-#[allow(dead_code)]
 pub mod timer;
+pub mod utils;
 
 #[macro_use]
 extern crate lazy_static;

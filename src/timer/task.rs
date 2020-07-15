@@ -26,58 +26,58 @@ impl TaskMark {
 
 lazy_static! {
     pub static ref TASKMAP: Mutex<HashMap<u32, TaskMark>> = {
-        let mut m = HashMap::new();
+        let m = HashMap::new();
         Mutex::new(m)
     };
 }
 
-pub enum frequency {
+pub enum Frequency {
     Once(&'static str),
-    repeated(&'static str),
+    Repeated(&'static str),
     CountDown(u32, &'static str),
 }
 
-pub enum Frequency {
-    repeated(ScheduleIteratorOwned<Utc>),
+pub enum FrequencyInner {
+    Repeated(ScheduleIteratorOwned<Utc>),
     CountDown(u32, ScheduleIteratorOwned<Utc>),
 }
 
-impl Frequency {
+impl FrequencyInner {
     fn residual_time(&self) -> u32 {
-        return match self {
-            Frequency::repeated(_) => u32::MAX,
-            Frequency::CountDown(ref time, _) => *time,
-        };
+        match self {
+            FrequencyInner::Repeated(_) => u32::MAX,
+            FrequencyInner::CountDown(ref time, _) => *time,
+        }
     }
 
     fn next_alarm_timestamp(&mut self) -> i64 {
         //TODO:handle error
         match self {
-            Frequency::CountDown(_, ref mut clock) => clock.next().unwrap().timestamp(),
-            Frequency::repeated(ref mut clock) => clock.next().unwrap().timestamp(),
+            FrequencyInner::CountDown(_, ref mut clock) => clock.next().unwrap().timestamp(),
+            FrequencyInner::Repeated(ref mut clock) => clock.next().unwrap().timestamp(),
         }
     }
 
     #[warn(unused_parens)]
     fn down_count(&mut self) {
         match self {
-            Frequency::CountDown(ref mut exec_count, _) => {
-                *exec_count = *exec_count - 1u32;
+            FrequencyInner::CountDown(ref mut exec_count, _) => {
+                *exec_count -= 1u32;
             }
-            Frequency::repeated(_) => {}
+            FrequencyInner::Repeated(_) => {}
         };
     }
 
     fn is_down_over(&mut self) -> bool {
         match self {
-            Frequency::CountDown(0, _) => false,
+            FrequencyInner::CountDown(0, _) => false,
             _ => true,
         }
     }
 }
 
 pub struct TaskBuilder {
-    frequency: Option<frequency>,
+    frequency: Option<Frequency>,
     task_id: u32,
 }
 
@@ -90,7 +90,7 @@ pub struct TaskBuilder {
 type SafeBoxFn = Box<dyn Fn() + 'static + Send + Sync>;
 pub struct Task {
     pub task_id: u32,
-    frequency: Frequency,
+    frequency: FrequencyInner,
     pub body: SafeBoxFn,
     cylinder_line: u32,
     valid: bool,
@@ -101,7 +101,7 @@ type BoxFn = Box<dyn Fn(i32) -> Pin<Box<dyn Future<Output = i32>>>>;
 //放闭包生成future的，在本地线程可以并发调用
 pub struct TaskAsyncLocal {
     pub task_id: u32,
-    frequency: Frequency,
+    frequency: FrequencyInner,
     pub body: BoxFn,
     cylinder_line: u32,
     valid: bool,
@@ -110,7 +110,7 @@ pub struct TaskAsyncLocal {
 //内置一个函数指针，调用时自动spwan到，work-stealing。
 pub struct TaskAsync {
     pub task_id: u32,
-    frequency: Frequency,
+    frequency: FrequencyInner,
     pub body: fn(),
     cylinder_line: u32,
     valid: bool,
@@ -120,6 +120,12 @@ enum RepeatType {
     Num(u32),
     Always,
 }
+impl Default for TaskBuilder{
+    fn default() -> Self{
+        Self::new()
+    }
+}
+
 
 impl<'a> TaskBuilder {
     pub fn new() -> TaskBuilder {
@@ -129,7 +135,7 @@ impl<'a> TaskBuilder {
         }
     }
 
-    pub fn set_frequency(&mut self, frequency: frequency) {
+    pub fn set_frequency(&mut self, frequency: Frequency) {
         self.frequency = Some(frequency);
     }
     pub fn set_task_id(&mut self, task_id: u32) {
@@ -140,8 +146,7 @@ impl<'a> TaskBuilder {
     where
         F: Fn() + 'static + Send + Sync,
     {
-        let Frequency;
-        let expression_str: &str;
+        let frequency_inner;
 
         let mut m = TASKMAP.lock().unwrap();
         m.insert(self.task_id, TaskMark::new(self.task_id));
@@ -152,9 +157,9 @@ impl<'a> TaskBuilder {
 
         //通过输入的模式匹配，表达式与重复类型
         let (expression_str, repeat_type) = match self.frequency.unwrap() {
-            frequency::Once(expression_str) => (expression_str, RepeatType::Num(1)),
-            frequency::repeated(expression_str) => (expression_str, RepeatType::Always),
-            frequency::CountDown(exec_count, expression_str) => {
+            Frequency::Once(expression_str) => (expression_str, RepeatType::Num(1)),
+            Frequency::Repeated(expression_str) => (expression_str, RepeatType::Always),
+            Frequency::CountDown(exec_count, expression_str) => {
                 (expression_str, RepeatType::Num(exec_count))
             }
         };
@@ -163,18 +168,18 @@ impl<'a> TaskBuilder {
         let schedule = Schedule::from_str(expression_str).unwrap();
         let taskschedule = schedule.upcoming_owned(Utc);
 
-        //根据重复类型，构建TaskFrequency模式
-        Frequency = match repeat_type {
-            RepeatType::Always => Frequency::repeated(taskschedule),
-            RepeatType::Num(repeat_count) => Frequency::CountDown(repeat_count, taskschedule),
+        //根据重复类型，构建TaskFrequencyInner模式
+        frequency_inner = match repeat_type {
+            RepeatType::Always => FrequencyInner::Repeated(taskschedule),
+            RepeatType::Num(repeat_count) => FrequencyInner::CountDown(repeat_count, taskschedule),
         };
 
-        Task::new(self.task_id, Frequency, Box::new(body))
+        Task::new(self.task_id, frequency_inner, Box::new(body))
     }
 }
 
 impl Task {
-    pub fn new(task_id: u32, frequency: Frequency, body: SafeBoxFn) -> Task {
+    pub fn new(task_id: u32, frequency: FrequencyInner, body: SafeBoxFn) -> Task {
         Task {
             task_id,
             frequency,
@@ -231,7 +236,7 @@ impl Task {
         if self.is_valid() {
             return self.is_already();
         }
-        return false;
+        false
     }
 
     //is_valid
