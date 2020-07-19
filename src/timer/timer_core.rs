@@ -191,6 +191,7 @@ impl Timer {
                     .unwrap();
 
                 //TODO:Task should run in another where.
+                //因为有可能是，计算量大的闭包。。
                 (task.body)();
 
                 let task_valid = task.down_count_and_set_vaild();

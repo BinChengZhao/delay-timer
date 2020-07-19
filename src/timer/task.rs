@@ -120,12 +120,11 @@ enum RepeatType {
     Num(u32),
     Always,
 }
-impl Default for TaskBuilder{
-    fn default() -> Self{
+impl Default for TaskBuilder {
+    fn default() -> Self {
         Self::new()
     }
 }
-
 
 impl<'a> TaskBuilder {
     pub fn new() -> TaskBuilder {
