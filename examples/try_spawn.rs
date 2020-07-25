@@ -12,6 +12,8 @@ fn main() {
         println!("i'm thread alive.")
     });
 
+    // drop can't stop thread or process
+    // just detach that.
     drop(process);
     drop(thread);
 

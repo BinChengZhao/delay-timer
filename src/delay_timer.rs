@@ -3,25 +3,20 @@ use super::timer::{
     timer_core::{Timer, TimerEvent, TimerEventSender},
 };
 use anyhow::{Context, Result};
-use std::{
-    collections::{HashMap, LinkedList},
-    sync::mpsc::channel,
-};
+use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 
+//FIXME: Relace Generics into Enum.
+//Backupground Description :
+// I have a Type Task<T> that's a smallest type. (Task<T>{task_id:i32, body:Box<dyn Fn -> T>})
+// Slot<T> => Timer<T> => DelayTimer<T> all of these type base on Task<T>.
+// That's the problem , I want Unified handling Task<Child>  Task<SmolTask>  in Timer
+// But, If i store Task<Child> In Timer filst  I can't store Task<SmolTask> in next time,
+// Because Rust compiler get T is Child so DelayTimer<T> => DelayTimer<Child>
+// Then any other T instance can't store.
+// So, I plan to Replace Generics into Enum.
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
-}
-
-//TaskTrace-全局的句柄
-//当进程消亡，跟异步任务drop的时候对应的链表也减少，如果没值则删除k/v
-struct TaskTrace<T: DelayTimerTask> {
-    inner: HashMap<u32, LinkedList<T>>,
-}
-
-//取消都是走异步的
-trait DelayTimerTask {
-    fn cancel(self);
 }
 
 //TODO:来一个hashMqp  task_id => child-handle-linklist
@@ -46,16 +41,16 @@ impl DelayTimer {
         DelayTimer { timer_event_sender }
     }
 
-    pub fn add_task(&mut self, task: Task) {
-        self.seed_timer_event(TimerEvent::AddTask(Box::new(task)));
+    pub fn add_task(&mut self, task: Task) -> Result<()> {
+        self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
-    pub fn remove_task(&mut self, task_id: u32) {
-        self.seed_timer_event(TimerEvent::RemoveTask(task_id));
+    pub fn remove_task(&mut self, task_id: u32) -> Result<()> {
+        self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
-    pub fn cancel_task(&mut self, task_id: u32) {
-        self.seed_timer_event(TimerEvent::CancelTask(task_id));
+    pub fn cancel_task(&mut self, task_id: u32) -> Result<()> {
+        self.seed_timer_event(TimerEvent::CancelTask(task_id))
     }
 
     fn seed_timer_event(&mut self, event: TimerEvent) -> Result<()> {

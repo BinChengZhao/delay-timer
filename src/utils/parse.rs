@@ -3,6 +3,7 @@ pub mod shell_command {
     use std::fs::{File, OpenOptions};
     use std::iter::Iterator;
     use std::mem;
+    use std::path::Path;
     use std::process::{Child, Command, Stdio};
 
     use std::collections::LinkedList;
@@ -19,7 +20,7 @@ pub mod shell_command {
         while let Some(mut command) = commands.next() {
             //没有制定标准输出的重定向，默认给记下来
 
-            //FIXME:priority.
+            //TODO:priority.
             // process_body eq command.......
             // let process_body = sub_command.next().ok_or(anyhow!("have no process body."));
             //如果有重定向，则翻转取最后的字符串作为重定向地址
@@ -126,8 +127,8 @@ pub mod shell_command {
         //就可以利用？抛出任何类型实现了std::error::Error的错误
         //anyhow::Error是与std::error::Error兼容的
 
-        use std::path::Path;
         //Path::new("foo.txt").as_os_str()
+        //TODO:I need record that open file error because filename has a whitespace i don't trim.
         let os_filename = Path::new(filename.trim()).as_os_str();
         println!("stdio_file:{:?}", file_tmp);
         println!("filename:{:?}", filename);

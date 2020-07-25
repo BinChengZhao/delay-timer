@@ -1,3 +1,6 @@
+use super::runtime_trace::task_handle::{
+    DelayTaskHandlerBox, DelayTaskHandlerBoxBuilder, TaskTrace,
+};
 use super::slot::Slot;
 use super::task::Task;
 ///timer,时间轮
@@ -5,8 +8,6 @@ use super::task::Task;
 /// someting i will wrote chinese ,someting i will wrote english
 /// I wanna wrote bilingual language show doc...
 /// there ara same content.
-/// FIXME: try it.
-///
 use cron_clock::schedule::Schedule;
 
 use smol::Timer as SmolTimer;
@@ -26,10 +27,12 @@ type FnSender = Sender<Box<dyn Fn() + 'static>>;
 
 //TODO:warning: large size difference between variants
 pub enum TimerEvent {
-    Stop,
+    StopTimer,
     AddTask(Box<Task>),
     RemoveTask(u32),
     CancelTask(u32),
+    StopTask(u32),
+    //TODO: CAHNGEE.
 }
 
 //add channel
@@ -81,12 +84,27 @@ impl Timer {
 
         //TODO:CancelTask, Is cancel once when task is running;
         //I should storage processChild in somewhere, When cancel event hanple i will kill child.
+
+        //TODO:
+        //cancel is exit running task.
+        //stop is suspension of execution(set vaild).
+        //user delete task , node should remove.
+
+        //any `Task`  i can set `valid`  for that stop.
+
+        //if get cancel signal is sync task like 'spwan process' i can kill that, async i can cancel.
+        //I think i can save async/sync handel in TaskTrace.
         for event in events {
             match event {
-                TimerEvent::Stop => panic!("i'm stop"),
+                TimerEvent::StopTimer => {
+                    //TODO: DONE all of runing tasks.
+                    //clear queue.
+                    panic!("i'm stop")
+                }
                 TimerEvent::AddTask(task) => self.add_task(*task),
                 TimerEvent::RemoveTask(task_id) => self.remove_task(task_id),
                 TimerEvent::CancelTask(_task_id) => todo!(),
+                TimerEvent::StopTask(_task_id) => todo!(),
             };
         }
     }
@@ -122,60 +140,17 @@ impl Timer {
     ///    first. add ||　remove task 。
     ///    second.spawn task .
     ///    thirid sleed 1- (run duration).
-    pub fn schedule(&mut self) {
-        //not runing 1s ,Duration - runing time
-        //sleep  ,then loop
-        //if that overtime , i run it not block
-        let one_second = Duration::new(1, 0);
-
-        loop {
-            let instant = Instant::now();
-            self.handle_event();
-            let task_ids = self.wheel_queue[self.second_hand].arrival_time_tasks();
-            println!("run : go : go: {}", self.second_hand);
-            for task_id in task_ids {
-                let mut task = self.wheel_queue[self.second_hand]
-                    .remove_task(task_id)
-                    .unwrap();
-
-                //TODO:Task should run in another where.
-                (task.body)();
-
-                let task_valid = task.down_count_and_set_vaild();
-                println!("task_id:{}, valid:{}", task.task_id, task_valid);
-                if !task_valid {
-                    drop(task);
-                    continue;
-                }
-
-                //下一次执行时间
-                let timestamp = task.get_next_exec_timestamp() as usize;
-
-                //时间差+当前的分针
-                //比如 时间差是 7260，目前分针再 3599，7260+3599 = 10859
-                //， 从 当前 3599 走碰见三次，再第59个格子
-                let step = timestamp - (get_timestamp() as usize) + self.second_hand;
-                let quan = step / DEFAULT_TIMER_SLOT_COUNT;
-                task.set_cylinder_line(quan as u32);
-                let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
-                println!(
-                    "task_id:{}, next_time:{}, slot_seed:{}, quan:{}",
-                    task.task_id, step, slot_seed, quan
-                );
-
-                self.wheel_queue[slot_seed].add_task(task);
-            }
-
-            sleep(one_second - instant.elapsed());
-
-            self.next_position();
-        }
-    }
 
     pub async fn async_schedule(&mut self) {
         //not runing 1s ,Duration - runing time
         //sleep  ,then loop
         //if that overtime , i run it not block
+
+        use smol::Task as SmolTask;
+        use std::process::Child;
+        //TODO: can't both in there.
+        let mut _task_trace = TaskTrace::new();
+        // let mut _task_trace1 = TaskTrace::<SmolTask>::new();
 
         let mut now;
         let mut when;
@@ -184,7 +159,7 @@ impl Timer {
             when = now + Duration::from_secs(1);
             self.handle_event();
             let task_ids = self.wheel_queue[self.second_hand].arrival_time_tasks();
-            println!("run : go : go: {}", self.second_hand);
+            println!("Timer-second_hand: {}", self.second_hand);
             for task_id in task_ids {
                 let mut task = self.wheel_queue[self.second_hand]
                     .remove_task(task_id)
