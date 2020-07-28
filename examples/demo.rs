@@ -7,16 +7,20 @@ use delay_timer::{
     },
 };
 use smol::Task as SmolTask;
+use std::fs::OpenOptions;
 use std::io::Write;
+use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
 use surf;
+use smol::{Task, Timer};
+
 
 fn main() {
     struct MyUnit;
 
     impl DelayTaskHandler for MyUnit {
-        fn stop(&mut self) -> Result<()> {
+        fn stop(self:Box<Self>) -> Result<()> {
             Ok(())
         }
     }
@@ -27,9 +31,6 @@ fn main() {
         println!("task 1 ,1s run");
         Box::new(MyUnit) as Box<dyn DelayTaskHandler>
     };
-
-    use std::fs::OpenOptions;
-    use std::process::Command;
 
     //TODO:来一个简便函数，像thread::spawn() 一样，便捷生成任务。
     task_builder.set_frequency(Frequency::Repeated("* * * * * * *"));
@@ -72,17 +73,7 @@ fn main() {
 
     let mut task_builder = TaskBuilder::default();
     let body = || {
-        println!("async--spawn");
-        let mut file = OpenOptions::new()
-            .append(true)
-            .write(true)
-            .create(true)
-            .open("./async.txt")
-            .unwrap();
-        file.write_all(b"hello").unwrap();
-
         let smol_task = SmolTask::spawn(async {
-
             for i in 1..10 {
                 let s = format!("https://httpbin.org/get?id={}", i);
                 SmolTask::spawn(async {
@@ -100,15 +91,15 @@ fn main() {
                     ()
                 })
                 .detach();
-            }
+                Timer::after(Duration::from_secs(1)).await;
 
-            // Ok(())
-        }).detach();
+            };
+            Ok(())
 
-        // Box::new(smol_task) as Box<dyn DelayTaskHandler>
-        Box::new(MyUnit) as Box<dyn DelayTaskHandler>
+        });
+        println!("task-async-spwan");
+        Box::new(smol_task) as Box<dyn DelayTaskHandler>
 
-        //TODO: Async Task should be fire by .await.
     };
 
     task_builder.set_frequency(Frequency::CountDown(5, "0/2 * * * * * *"));

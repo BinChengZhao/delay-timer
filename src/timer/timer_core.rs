@@ -150,7 +150,6 @@ impl Timer {
         use std::process::Child;
         //TODO: can't both in there.
         let mut _task_trace = TaskTrace::new();
-        // let mut _task_trace1 = TaskTrace::<SmolTask>::new();
 
         let mut now;
         let mut when;
@@ -167,7 +166,17 @@ impl Timer {
 
                 //TODO:Task should run in another where.
                 //因为有可能是，计算量大的闭包。。
-                (task.body)();
+                //TODO:_tmp build handler box
+                let mut delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
+                delay_task_handler_box_builder.set_task_id(task_id);
+
+                let _tmp_task_record_id = task.get_next_exec_timestamp() as u64;
+                delay_task_handler_box_builder.set_record_id(_tmp_task_record_id);
+
+                let task_handler_box = (task.body)();
+                let _tmp_task_handler_box =delay_task_handler_box_builder.spawn(task_handler_box);
+                _task_trace.insert(task_id, _tmp_task_handler_box);
+
 
                 let task_valid = task.down_count_and_set_vaild();
                 println!("task_id:{}, valid:{}", task.task_id, task_valid);

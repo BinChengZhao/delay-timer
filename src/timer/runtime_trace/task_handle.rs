@@ -40,7 +40,7 @@ impl TaskTrace {
 
 //I export that trait for that crate user.
 pub trait DelayTaskHandler {
-    fn stop(&mut self) -> Result<()>;
+    fn stop(self:Box<Self>) -> Result<()>;
 }
 
 // The problem of storage diffrent type in  DelayTaskHandlerBox  was solved through dyn DelayTaskHandler.
@@ -49,7 +49,7 @@ pub trait DelayTaskHandler {
 // generics Type will single state just store one type in TaskTrace.
 // Multi-DelayTaskHandlerBox record_id can same, because one task can spawn Multi-process.
 pub(crate) struct DelayTaskHandlerBox {
-    task_handler: Box<dyn DelayTaskHandler>,
+    task_handler: Option<Box<dyn DelayTaskHandler>>,
     task_id: u32,
     record_id: u64,
     start_time: u32,
@@ -57,7 +57,11 @@ pub(crate) struct DelayTaskHandlerBox {
 
 impl Drop for DelayTaskHandlerBox {
     fn drop(&mut self) {
-        self.task_handler.stop();
+        if let Some(mut task_handler) = self.task_handler.take(){
+            //使用trait 对象，不能直接传所有权，因为大小不确定
+            //所以我用Box包装一下
+            task_handler.stop();
+        }
     }
 }
 
@@ -81,7 +85,7 @@ impl DelayTaskHandlerBoxBuilder {
 
     pub fn spawn(self, task_handler: Box<DelayTaskHandler>) -> DelayTaskHandlerBox {
         DelayTaskHandlerBox {
-            task_handler,
+            task_handler: Some(task_handler),
             task_id: self.task_id,
             record_id: self.record_id,
             start_time: self.start_time,
@@ -105,7 +109,7 @@ impl DelayTaskHandlerBox {
 //TODO:Maybe i can implementation a proc macro.
 
 impl DelayTaskHandler for Child {
-    fn stop(&mut self) -> Result<()> {
+    fn stop(mut self : Box<Self>) -> Result<()> {
         //to anyhow:Result
         self.kill()?;
         Ok(())
@@ -114,7 +118,9 @@ impl DelayTaskHandler for Child {
 
 //When SmolTask is dropped, async task is cancel.
 impl DelayTaskHandler for SmolTask<Result<()>> {
-    fn stop(&mut self) -> Result<()> {
+    fn stop(self: Box<Self>) -> Result<()> {
+        drop(self);
+        println!("bye bye  i'm  async");
         Ok(())
     }
 }

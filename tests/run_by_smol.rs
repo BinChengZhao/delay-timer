@@ -1,10 +1,21 @@
 use delay_timer::timer::timer_core::get_timestamp;
+use delay_timer::{
+    delay_timer::DelayTimer,
+    timer::{
+        runtime_trace::task_handle::DelayTaskHandler,
+        task::{Frequency, TaskBuilder},
+    },
+};
 use futures::future;
 use smol::{Task, Timer};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::process::Command;
 use std::{
     thread,
     time::{Duration, Instant},
 };
+
 #[test]
 fn it_works() {
     //TODO: ONE THREAD , IS  serial.（一个线程的情况）
@@ -255,17 +266,6 @@ fn test_child_process() {
     use std::io;
     use std::process::{ChildStdout, Command, Stdio};
 
-    ///父进程拿着子进程的标准输出，copy到新的文件（会阻塞）
-    // let child = Command::new("ping")
-    // .args(&["-n", "10", "baidu.com"])
-    // .stdout(Stdio::piped())
-    // .spawn().unwrap();
-    ///
-
-    // println!("{:?}", child);
-    // let mut f = File::create("./test1.log").unwrap();
-    // io::copy(&mut child.stdout.unwrap(), &mut f).unwrap();
-
     /// 子进程挂上一个文件，做自己的标准输出,父进程跑自己的不阻塞
     let f = File::create("./foo.log").unwrap();
     // from_raw_fd is only considered unsafe if the file is used for mmap
@@ -292,4 +292,56 @@ fn test_child_process() {
     //https://www.e-learn.cn/topic/3203603
     //php a.php | sed *** >> a.txt  这是通过shell解析的命令，原生的程序不可以这么写
     //https://stackoverflow.com/questions/31666936/execute-a-shell-command
+}
+
+#[test]
+fn test_cancel() {
+    use smol::{Task, Timer};
+    use std::time::Duration;
+
+    let body = || {
+        println!("async-test-spawn");
+        let task2 =  Task::spawn(async {
+            for i in 1..10 {
+                Timer::after(Duration::from_secs(1)).await;
+                let s = format!("https://httpbin.org/get?id={}", i);
+                println!("{}", s);
+                Task::spawn(async {
+                    println!("{}", s);
+
+                    let mut res = surf::get(s).await.unwrap();
+                    let body_str = res.body_string().await.unwrap();
+                    let mut file = OpenOptions::new()
+                        .append(true)
+                        .write(true)
+                        .create(true)
+                        .open("./async-test.txt")
+                        .unwrap();
+                    file.write_all(body_str.as_bytes()).unwrap();
+                    ()
+                })
+                .detach();
+            }
+            Ok(())
+        });
+        Box::new(task2) as Box<dyn DelayTaskHandler>
+
+    };
+
+    smol::run(async {
+        let task = Task::spawn(async {
+            loop {
+                println!("Even though I'm in an infinite loop, you can still cancel me!");
+                Timer::after(Duration::from_secs(1)).await;
+            }
+        });
+
+        let mut task_2 = body();
+
+        Timer::after(Duration::from_secs(3)).await;
+        task.cancel().await;
+        task_2.stop();
+        Timer::after(Duration::from_secs(1)).await;
+
+    });
 }
