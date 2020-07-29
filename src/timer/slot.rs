@@ -1,8 +1,7 @@
 use super::task::Task;
 use std::collections::HashMap;
 
-//Slot 基于 链表做一个有序，如果头部执行了，直接插入其它SLOT
-//支持一次遍历，全部的圈数-1
+//Slot is based on HashMap, It easy to add it and find it.
 pub struct Slot {
     task_map: HashMap<u32, Task>,
 }

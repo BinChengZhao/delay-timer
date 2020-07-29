@@ -301,7 +301,7 @@ fn test_cancel() {
 
     let body = || {
         println!("async-test-spawn");
-        let task2 =  Task::spawn(async {
+        let task2 = Task::spawn(async {
             for i in 1..10 {
                 Timer::after(Duration::from_secs(1)).await;
                 let s = format!("https://httpbin.org/get?id={}", i);
@@ -325,7 +325,6 @@ fn test_cancel() {
             Ok(())
         });
         Box::new(task2) as Box<dyn DelayTaskHandler>
-
     };
 
     smol::run(async {
@@ -340,8 +339,7 @@ fn test_cancel() {
 
         Timer::after(Duration::from_secs(3)).await;
         task.cancel().await;
-        task_2.stop();
+        task_2.quit();
         Timer::after(Duration::from_secs(1)).await;
-
     });
 }

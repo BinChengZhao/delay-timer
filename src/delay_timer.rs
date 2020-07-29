@@ -49,8 +49,8 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
-    pub fn cancel_task(&mut self, task_id: u32) -> Result<()> {
-        self.seed_timer_event(TimerEvent::CancelTask(task_id))
+    pub fn cancel_task(&mut self, task_id: u32, record_id: u64) -> Result<()> {
+        self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 
     fn seed_timer_event(&mut self, event: TimerEvent) -> Result<()> {

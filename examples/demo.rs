@@ -5,22 +5,22 @@ use delay_timer::{
         runtime_trace::task_handle::DelayTaskHandler,
         task::{Frequency, TaskBuilder},
     },
+    utils::functions::create_delay_task_handler,
 };
 use smol::Task as SmolTask;
+use smol::{Task, Timer};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
 use surf;
-use smol::{Task, Timer};
-
 
 fn main() {
     struct MyUnit;
 
     impl DelayTaskHandler for MyUnit {
-        fn stop(self:Box<Self>) -> Result<()> {
+        fn quit(self: Box<Self>) -> Result<()> {
             Ok(())
         }
     }
@@ -44,7 +44,7 @@ fn main() {
             .arg("-v")
             .spawn()
             .expect("Failed to execute command");
-        Box::new(child) as Box<dyn DelayTaskHandler>
+        create_delay_task_handler(child)
     };
     task_builder.set_frequency(Frequency::Repeated("0/5 * * * * * *"));
     task_builder.set_task_id(2);
@@ -54,7 +54,7 @@ fn main() {
     let mut task_builder = TaskBuilder::default();
     let body = || {
         println!("task 3 ,3s run, altogether 3times");
-        Box::new(MyUnit) as Box<dyn DelayTaskHandler>
+        create_delay_task_handler(MyUnit)
     };
     task_builder.set_frequency(Frequency::CountDown(3, "0/3 * * * * * *"));
     task_builder.set_task_id(3);
@@ -64,7 +64,7 @@ fn main() {
     let mut task_builder = TaskBuilder::default();
     let body = || {
         println!("task 4 ,4s run, altogether 4times");
-        Box::new(MyUnit) as Box<dyn DelayTaskHandler>
+        create_delay_task_handler(MyUnit)
     };
     task_builder.set_frequency(Frequency::CountDown(4, "0/4 * * * * * *"));
     task_builder.set_task_id(3);
@@ -92,14 +92,11 @@ fn main() {
                 })
                 .detach();
                 Timer::after(Duration::from_secs(1)).await;
-
-            };
+            }
             Ok(())
-
         });
         println!("task-async-spwan");
-        Box::new(smol_task) as Box<dyn DelayTaskHandler>
-
+        create_delay_task_handler(smol_task)
     };
 
     task_builder.set_frequency(Frequency::CountDown(5, "0/2 * * * * * *"));
@@ -107,7 +104,11 @@ fn main() {
     let task = task_builder.spawn(body);
 
     delay_timer.add_task(task);
+
     loop {
+        
+        //infact loop is always run wait client send task-event.
         sleep(Duration::new(1, 0));
+        delay_timer.cancel_task(5, 25);
     }
 }

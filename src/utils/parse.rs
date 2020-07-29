@@ -57,7 +57,7 @@ pub mod shell_command {
             output.args(args).stdin(stdin);
 
             let process;
-            let mut end_flag = if check_redirect_result.is_some() {
+            let end_flag = if check_redirect_result.is_some() {
                 println!("check_redirect_result : {:?}", check_redirect_result);
                 let stdout = check_redirect_result.unwrap()?;
                 process = output.stdout(stdout).spawn()?;
@@ -112,7 +112,9 @@ pub mod shell_command {
     //确认有重定向文件后，解析命令 ‘>’  之前的就是命令
     fn _remove_angle_bracket_command(command: &str) -> Result<&str> {
         let mut sub_command_inner = command.trim().split('>');
-        sub_command_inner.next().ok_or(anyhow!("can't parse ...."))
+        sub_command_inner
+            .next()
+            .ok_or_else(|| anyhow!("can't parse ...."))
     }
 
     fn create_stdio_file(angle_bracket: &str, filename: &str) -> Result<File> {

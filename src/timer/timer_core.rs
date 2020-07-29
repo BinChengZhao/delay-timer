@@ -1,6 +1,4 @@
-use super::runtime_trace::task_handle::{
-    DelayTaskHandlerBox, DelayTaskHandlerBoxBuilder, TaskTrace,
-};
+use super::runtime_trace::task_handle::{DelayTaskHandlerBoxBuilder, TaskTrace};
 use super::slot::Slot;
 use super::task::Task;
 ///timer,时间轮
@@ -10,29 +8,24 @@ use super::task::Task;
 /// there ara same content.
 use cron_clock::schedule::Schedule;
 
+use anyhow::Result;
 use smol::Timer as SmolTimer;
+use std::sync::mpsc::TryRecvError;
 use std::sync::mpsc::{Receiver, Sender};
-use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime};
 
 const DEFAULT_TIMER_SLOT_COUNT: usize = 3600;
 
-type TimeExpression = Schedule;
 pub type TimerEventSender = Sender<TimerEvent>;
 pub type TimerEventReceiver = Receiver<TimerEvent>;
-type TaskReceiver = Receiver<Task>;
-type TaskSender = Sender<Task>;
-type FnReceiver = Receiver<Box<dyn Fn() + 'static>>;
-type FnSender = Sender<Box<dyn Fn() + 'static>>;
 
 //TODO:warning: large size difference between variants
 pub enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
     RemoveTask(u32),
-    CancelTask(u32),
+    CancelTask(u32, u64),
     StopTask(u32),
-    //TODO: CAHNGEE.
 }
 
 //add channel
@@ -42,6 +35,7 @@ pub struct Timer {
     wheel_queue: Vec<Slot>,
     timer_event_receiver: TimerEventReceiver,
     second_hand: usize,
+    task_trace: TaskTrace,
 }
 
 //不在调度者里面执行任务，不然时间会不准
@@ -52,6 +46,7 @@ impl Timer {
             wheel_queue: Vec::with_capacity(DEFAULT_TIMER_SLOT_COUNT as usize),
             timer_event_receiver,
             second_hand: 0,
+            task_trace: TaskTrace::default(),
         };
 
         timer.init();
@@ -66,11 +61,11 @@ impl Timer {
 
     //_handle_event
     fn handle_event(&mut self) {
-        use std::sync::mpsc::TryRecvError;
         let mut event_result;
         let mut events: Vec<TimerEvent> = Vec::new();
 
         loop {
+            //TODO:may can use  async channel;
             // TODO: recv can happen error.
             event_result = self.timer_event_receiver.try_recv();
             match event_result {
@@ -101,16 +96,23 @@ impl Timer {
                     //clear queue.
                     panic!("i'm stop")
                 }
-                TimerEvent::AddTask(task) => self.add_task(*task),
-                TimerEvent::RemoveTask(task_id) => self.remove_task(task_id),
-                TimerEvent::CancelTask(_task_id) => todo!(),
+                TimerEvent::AddTask(task) => {
+                    self.add_task(*task);
+                }
+                TimerEvent::RemoveTask(task_id) => {
+                    self.remove_task(task_id);
+                }
+                //TODO: handler error.
+                TimerEvent::CancelTask(_task_id, _record_id) => {
+                    self.cancel_task(_task_id, _record_id);
+                }
                 TimerEvent::StopTask(_task_id) => todo!(),
             };
         }
     }
 
     //add task to wheel_queue  slot
-    pub fn add_task(&mut self, mut task: Task) -> Option<Task> {
+    fn add_task(&mut self, mut task: Task) -> Option<Task> {
         let exec_time = task.get_next_exec_timestamp() as u64;
         println!(
             "task_id:{}, next_time:{}, get_timestamp:{}",
@@ -131,6 +133,24 @@ impl Timer {
         self.wheel_queue[slot_seed].add_task(task)
     }
 
+    fn remove_task(&mut self, task_id: u32) -> Option<Task> {
+        use crate::timer::task::{TaskMark, TASKMAP};
+
+        let m = TASKMAP.lock().unwrap();
+        let task_mark: Option<&TaskMark> = m.get(&task_id);
+
+        if let Some(t) = task_mark {
+            let slot_mark = t.get_slot_mark();
+            return self.wheel_queue[slot_mark as usize].remove_task(task_id);
+        }
+
+        None
+    }
+
+    pub fn cancel_task(&mut self, task_id: u32, record_id: u64) -> Option<Result<()>> {
+        self.task_trace.quit_one_task_handler(task_id, record_id)
+    }
+
     pub fn next_position(&mut self) {
         self.second_hand += 1 % DEFAULT_TIMER_SLOT_COUNT;
     }
@@ -145,11 +165,6 @@ impl Timer {
         //not runing 1s ,Duration - runing time
         //sleep  ,then loop
         //if that overtime , i run it not block
-
-        use smol::Task as SmolTask;
-        use std::process::Child;
-        //TODO: can't both in there.
-        let mut _task_trace = TaskTrace::new();
 
         let mut now;
         let mut when;
@@ -170,13 +185,12 @@ impl Timer {
                 let mut delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
                 delay_task_handler_box_builder.set_task_id(task_id);
 
-                let _tmp_task_record_id = task.get_next_exec_timestamp() as u64;
+                let _tmp_task_record_id = (task_id * task_id) as u64;
                 delay_task_handler_box_builder.set_record_id(_tmp_task_record_id);
 
                 let task_handler_box = (task.body)();
-                let _tmp_task_handler_box =delay_task_handler_box_builder.spawn(task_handler_box);
-                _task_trace.insert(task_id, _tmp_task_handler_box);
-
+                let _tmp_task_handler_box = delay_task_handler_box_builder.spawn(task_handler_box);
+                self.task_trace.insert(task_id, _tmp_task_handler_box);
 
                 let task_valid = task.down_count_and_set_vaild();
                 println!("task_id:{}, valid:{}", task.task_id, task_valid);
@@ -206,20 +220,6 @@ impl Timer {
             SmolTimer::at(when).await;
             self.next_position();
         }
-    }
-
-    pub fn remove_task(&mut self, task_id: u32) -> Option<Task> {
-        use crate::timer::task::{TaskMark, TASKMAP};
-
-        let m = TASKMAP.lock().unwrap();
-        let task_mark: Option<&TaskMark> = m.get(&task_id);
-
-        if let Some(t) = task_mark {
-            let slot_mark = t.get_slot_mark();
-            return self.wheel_queue[slot_mark as usize].remove_task(task_id);
-        }
-
-        None
     }
 }
 

@@ -36,11 +36,46 @@ impl TaskTrace {
             }
         }
     }
+
+    //linkedlist is ordered by record_id, if input record_id is small than linkedlist first record_id
+    //that is no task_handler can cancel  or record_id bigger than last record_id.
+    //one record_id may be used for many handler.
+    pub(crate) fn quit_one_task_handler(
+        &mut self,
+        task_id: u32,
+        record_id: u64,
+    ) -> Option<Result<()>> {
+        if !self.inner.get(&task_id).is_some() {
+            return None;
+        }
+
+        let task_handler_list = self.inner.get_mut(&task_id).unwrap();
+
+        let filter_collection =
+            task_handler_list.drain_filter(|handler_box| handler_box.record_id == record_id);
+
+        let (filter_collection_count, _) = filter_collection.size_hint();
+
+        if filter_collection_count == 0 {
+            return None;
+        }
+
+        let mut handlers_quit_result = Some(Ok(()));
+
+        for mut task_handler_box in filter_collection {
+            let handler_quit_result = task_handler_box.quit();
+            if handler_quit_result.is_err() {
+                handlers_quit_result = Some(handler_quit_result);
+            }
+        }
+
+        handlers_quit_result
+    }
 }
 
 //I export that trait for that crate user.
-pub trait DelayTaskHandler {
-    fn stop(self:Box<Self>) -> Result<()>;
+pub trait DelayTaskHandler: Send + Sync {
+    fn quit(self: Box<Self>) -> Result<()>;
 }
 
 // The problem of storage diffrent type in  DelayTaskHandlerBox  was solved through dyn DelayTaskHandler.
@@ -57,10 +92,10 @@ pub(crate) struct DelayTaskHandlerBox {
 
 impl Drop for DelayTaskHandlerBox {
     fn drop(&mut self) {
-        if let Some(mut task_handler) = self.task_handler.take(){
+        if let Some(task_handler) = self.task_handler.take() {
             //使用trait 对象，不能直接传所有权，因为大小不确定
             //所以我用Box包装一下
-            task_handler.stop();
+            task_handler.quit();
         }
     }
 }
@@ -83,7 +118,7 @@ impl DelayTaskHandlerBoxBuilder {
         self.start_time = start_time;
     }
 
-    pub fn spawn(self, task_handler: Box<DelayTaskHandler>) -> DelayTaskHandlerBox {
+    pub fn spawn(self, task_handler: Box<dyn DelayTaskHandler>) -> DelayTaskHandlerBox {
         DelayTaskHandlerBox {
             task_handler: Some(task_handler),
             task_id: self.task_id,
@@ -103,13 +138,21 @@ impl DelayTaskHandlerBox {
     pub fn get_start_time(&mut self) -> u32 {
         self.start_time
     }
+
+    fn quit(&mut self) -> Result<()> {
+        if let Some(task_handler) = self.task_handler.take() {
+            return task_handler.quit();
+        }
+
+        Ok(())
+    }
 }
 
 //Deafult implementation for Child and SmolTask
 //TODO:Maybe i can implementation a proc macro.
 
 impl DelayTaskHandler for Child {
-    fn stop(mut self : Box<Self>) -> Result<()> {
+    fn quit(mut self: Box<Self>) -> Result<()> {
         //to anyhow:Result
         self.kill()?;
         Ok(())
@@ -118,8 +161,11 @@ impl DelayTaskHandler for Child {
 
 //When SmolTask is dropped, async task is cancel.
 impl DelayTaskHandler for SmolTask<Result<()>> {
-    fn stop(self: Box<Self>) -> Result<()> {
-        drop(self);
+    fn quit(self: Box<Self>) -> Result<()> {
+        SmolTask::spawn(async {
+            self.cancel().await;
+        })
+        .detach();
         println!("bye bye  i'm  async");
         Ok(())
     }
