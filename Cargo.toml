@@ -13,6 +13,8 @@ cron_clock = "0.6.3"
 lazy_static = "1.4.0"
 anyhow = "1.0.31"
 threadpool = "1.8.1"
+rs-snowflake = "0.2.0"
+async-channel = "1.4.0"
 
 [dev-dependencies]
 smol = "0.1.12"

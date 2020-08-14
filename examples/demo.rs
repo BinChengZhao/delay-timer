@@ -106,7 +106,6 @@ fn main() {
     delay_timer.add_task(task);
 
     loop {
-        
         //infact loop is always run wait client send task-event.
         sleep(Duration::new(1, 0));
         delay_timer.cancel_task(5, 25);

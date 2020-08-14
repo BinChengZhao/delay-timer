@@ -6,7 +6,7 @@ use super::task::Task;
 /// someting i will wrote chinese ,someting i will wrote english
 /// I wanna wrote bilingual language show doc...
 /// there ara same content.
-use cron_clock::schedule::Schedule;
+use snowflake::SnowflakeIdBucket;
 
 use anyhow::Result;
 use smol::Timer as SmolTimer;
@@ -24,7 +24,7 @@ pub enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
     RemoveTask(u32),
-    CancelTask(u32, u64),
+    CancelTask(u32, i64),
     StopTask(u32),
 }
 
@@ -147,7 +147,7 @@ impl Timer {
         None
     }
 
-    pub fn cancel_task(&mut self, task_id: u32, record_id: u64) -> Option<Result<()>> {
+    pub fn cancel_task(&mut self, task_id: u32, record_id: i64) -> Option<Result<()>> {
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 
@@ -168,6 +168,9 @@ impl Timer {
 
         let mut now;
         let mut when;
+
+        //TODO:auto-get nodeid and machineid.
+        let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
         loop {
             now = Instant::now();
             when = now + Duration::from_secs(1);
@@ -185,8 +188,7 @@ impl Timer {
                 let mut delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
                 delay_task_handler_box_builder.set_task_id(task_id);
 
-                let _tmp_task_record_id = (task_id * task_id) as u64;
-                delay_task_handler_box_builder.set_record_id(_tmp_task_record_id);
+                delay_task_handler_box_builder.set_record_id(snowflakeid_bucket.get_id());
 
                 let task_handler_box = (task.body)();
                 let _tmp_task_handler_box = delay_task_handler_box_builder.spawn(task_handler_box);

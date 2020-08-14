@@ -43,7 +43,7 @@ impl TaskTrace {
     pub(crate) fn quit_one_task_handler(
         &mut self,
         task_id: u32,
-        record_id: u64,
+        record_id: i64,
     ) -> Option<Result<()>> {
         if !self.inner.get(&task_id).is_some() {
             return None;
@@ -86,7 +86,8 @@ pub trait DelayTaskHandler: Send + Sync {
 pub(crate) struct DelayTaskHandlerBox {
     task_handler: Option<Box<dyn DelayTaskHandler>>,
     task_id: u32,
-    record_id: u64,
+    ///Globally unique ID.
+    record_id: i64,
     start_time: u32,
 }
 
@@ -103,7 +104,7 @@ impl Drop for DelayTaskHandlerBox {
 #[derive(Default)]
 pub(crate) struct DelayTaskHandlerBoxBuilder {
     task_id: u32,
-    record_id: u64,
+    record_id: i64,
     start_time: u32,
 }
 
@@ -111,7 +112,7 @@ impl DelayTaskHandlerBoxBuilder {
     pub fn set_task_id(&mut self, task_id: u32) {
         self.task_id = task_id;
     }
-    pub fn set_record_id(&mut self, record_id: u64) {
+    pub fn set_record_id(&mut self, record_id: i64) {
         self.record_id = record_id;
     }
     pub fn set_start_time(&mut self, start_time: u32) {
@@ -132,7 +133,7 @@ impl DelayTaskHandlerBox {
     pub fn get_task_id(&mut self) -> u32 {
         self.task_id
     }
-    pub fn get_record_id(&mut self) -> u64 {
+    pub fn get_record_id(&mut self) -> i64 {
         self.record_id
     }
     pub fn get_start_time(&mut self) -> u32 {

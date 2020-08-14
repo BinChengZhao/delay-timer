@@ -1,8 +1,16 @@
-use super::timer::{
-    task::Task,
-    timer_core::{Timer, TimerEvent, TimerEventSender},
+use super::{
+    timer::{
+        task::Task,
+        timer_core::{Timer, TimerEvent, TimerEventSender},
+    },
+    utils::convenience,
 };
+
+#[cfg(feature = "status-report")]
+use super::utils::status_report::StatusReport;
+
 use anyhow::{Context, Result};
+use smol::Task as SmolTask;
 use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 
@@ -41,6 +49,31 @@ impl DelayTimer {
         DelayTimer { timer_event_sender }
     }
 
+    // if open "status-report", then register task 3s auto-run report
+    #[cfg(feature = "status-report")]
+    pub fn set_status_reporter(&mut self, status_report: impl StatusReport) -> Result<()> {
+        let mut task_builder = TaskBuilder::default();
+
+        let body = move || {
+            SmolTask::spawn(async {
+                let report_result = status_report.report().await;
+
+                if report_result.is_err() {
+                    status_report.help();
+                }
+            })
+            .detach();
+
+            convenience::create_delay_task_handler(MyUnit)
+        };
+
+        task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
+        task_builder.set_task_id(0);
+        let task = task_builder.spawn(body);
+
+        self.add_task(task)
+    }
+
     pub fn add_task(&mut self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
@@ -49,7 +82,7 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
-    pub fn cancel_task(&mut self, task_id: u32, record_id: u64) -> Result<()> {
+    pub fn cancel_task(&mut self, task_id: u32, record_id: i64) -> Result<()> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 
