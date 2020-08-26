@@ -15,6 +15,7 @@ anyhow = "1.0.31"
 threadpool = "1.8.1"
 rs-snowflake = "0.2.0"
 async-channel = "1.4.0"
+async-mutex = "1.1.5"
 
 [dev-dependencies]
 smol = "0.1.12"

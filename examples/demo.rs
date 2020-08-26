@@ -8,7 +8,7 @@ use delay_timer::{
     utils::functions::create_delay_task_handler,
 };
 use smol::Task as SmolTask;
-use smol::{Task, Timer};
+use smol::Timer;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
@@ -59,7 +59,7 @@ fn main() {
     task_builder.set_frequency(Frequency::CountDown(3, "0/3 * * * * * *"));
     task_builder.set_task_id(3);
     let _task = task_builder.spawn(body);
-    delay_timer.add_task(_task);
+    delay_timer.add_task(_task).unwrap();
 
     let mut task_builder = TaskBuilder::default();
     let body = || {
@@ -103,7 +103,7 @@ fn main() {
     task_builder.set_task_id(5);
     let task = task_builder.spawn(body);
 
-    delay_timer.add_task(task);
+    delay_timer.add_task(task).unwrap();
 
     loop {
         //infact loop is always run wait client send task-event.

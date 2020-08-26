@@ -2,20 +2,15 @@
 // if open feature status-report, then compile that mod .
 // mapping
 // #[cfg(feature="status-report")]
-// mod status_report{}
-// pub struct statusReporter {
+use async_channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 
-// }
-
-struct Survival {}
-
-struct T<F> {
-    survival: Survival,
-    report_fn: F,
-}
 #[cfg(feature = "status-report")]
-pub trait statusReport: Send + Sync + 'static {
-    type situation = Result<bool>;
+pub trait StatusReport: Send + Sync + 'static {
+    type Situation = Result<Self::Normal, Self::Exception>;
+    type Normal = bool;
+    type Exception = String;
+
+    // type
 
     // new a delaytimer::Task to run it....!
 
@@ -32,11 +27,11 @@ pub trait statusReport: Send + Sync + 'static {
     /// } ).detach();
     ///
     /// ```
-    async fn report(&mut self, t: T) -> Self::situation {
+    async fn report(&mut self, t: AsyncReceiver<i32>) -> Self::situation {
 
         // t is alies of LinkedList<record> or Vec<record> or ...T<record>
     }
 
     // if report error or world destory... call help ..... call user....
-    async fn help() {}
+    async fn help(&mut self, expression: Self::Exception) {}
 }

@@ -4,11 +4,10 @@ use cron_clock::Utc;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Mutex;
-
 //TaskMark is use to remove/stop the task.
 pub struct TaskMark {
-    task_id: u32,
-    slot_mark: u32,
+    pub(crate) task_id: u32,
+    slot_mark: usize,
 }
 
 pub enum TaskType {
@@ -17,25 +16,20 @@ pub enum TaskType {
 }
 
 impl TaskMark {
-    fn new(task_id: u32) -> Self {
+    pub(crate) fn new(task_id: u32, slot_mark: usize) -> Self {
         TaskMark {
             task_id,
-            slot_mark: 0,
+            slot_mark: slot_mark,
         }
     }
 
-    pub fn get_slot_mark(&self) -> u32 {
+    pub fn get_slot_mark(&self) -> usize {
         self.slot_mark
     }
-}
 
-//TODO: Maybe that's can optimize.(We can add/del/set TaskMark in Timer.async_schedule)
-//TASKMAP is use to storage all TaskMark for check.
-lazy_static! {
-    pub static ref TASKMAP: Mutex<HashMap<u32, TaskMark>> = {
-        let m = HashMap::new();
-        Mutex::new(m)
-    };
+    pub fn set_slot_mark(&mut self, slot_mark: usize) {
+        self.slot_mark = slot_mark;
+    }
 }
 
 #[derive(Debug)]
@@ -121,13 +115,6 @@ impl<'a> TaskBuilder {
         F: Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
         let frequency_inner;
-
-        let mut m = TASKMAP.lock().unwrap();
-        m.insert(self.task_id, TaskMark::new(self.task_id));
-
-        //我需要将 使用task_id关联任务，放到一个全局的hash表
-        //两个作用，task_id 跟 Task 一一对应
-        //在hash表上会存着，Task当前处在的Slot
 
         //通过输入的模式匹配，表达式与重复类型
         let (expression_str, repeat_type) = match self.frequency.unwrap() {
