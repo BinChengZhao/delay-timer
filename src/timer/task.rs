@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Mutex;
 //TaskMark is use to remove/stop the task.
+#[derive(Default)]
 pub struct TaskMark {
-    pub(crate) task_id: u32,
+    pub(crate) task_id: usize,
     slot_mark: usize,
 }
 
@@ -16,7 +17,7 @@ pub enum TaskType {
 }
 
 impl TaskMark {
-    pub(crate) fn new(task_id: u32, slot_mark: usize) -> Self {
+    pub(crate) fn new(task_id: usize, slot_mark: usize) -> Self {
         TaskMark {
             task_id,
             slot_mark: slot_mark,
@@ -81,16 +82,16 @@ impl FrequencyInner {
 #[derive(Debug, Default)]
 pub struct TaskBuilder {
     frequency: Option<Frequency>,
-    task_id: u32,
+    task_id: usize,
 }
 
 //TASK 执行完了，支持找新的Slot
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 pub struct Task {
-    pub task_id: u32,
+    pub task_id: usize,
     frequency: FrequencyInner,
     pub body: SafeBoxFn,
-    cylinder_line: u32,
+    cylinder_line: usize,
     valid: bool,
 }
 
@@ -106,7 +107,7 @@ impl<'a> TaskBuilder {
     pub fn set_frequency(&mut self, frequency: Frequency) {
         self.frequency = Some(frequency);
     }
-    pub fn set_task_id(&mut self, task_id: u32) {
+    pub fn set_task_id(&mut self, task_id: usize) {
         self.task_id = task_id;
     }
 
@@ -140,7 +141,7 @@ impl<'a> TaskBuilder {
 }
 
 impl Task {
-    pub fn new(task_id: u32, frequency: FrequencyInner, body: SafeBoxFn) -> Task {
+    pub fn new(task_id: usize, frequency: FrequencyInner, body: SafeBoxFn) -> Task {
         Task {
             task_id,
             frequency,
@@ -168,7 +169,7 @@ impl Task {
         self.valid = self.frequency.is_down_over();
     }
 
-    pub fn set_cylinder_line(&mut self, cylinder_line: u32) {
+    pub fn set_cylinder_line(&mut self, cylinder_line: usize) {
         self.cylinder_line = cylinder_line;
     }
 
@@ -206,7 +207,7 @@ impl Task {
     }
 
     //get_next_exec_timestamp
-    pub fn get_next_exec_timestamp(&mut self) -> i64 {
-        self.frequency.next_alarm_timestamp()
+    pub fn get_next_exec_timestamp(&mut self) -> usize {
+        self.frequency.next_alarm_timestamp() as usize
     }
 }

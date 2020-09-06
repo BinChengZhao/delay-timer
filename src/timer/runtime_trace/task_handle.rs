@@ -11,7 +11,7 @@ use std::process::Child;
 
 #[derive(Default)]
 pub(crate) struct TaskTrace {
-    inner: HashMap<u32, LinkedList<DelayTaskHandlerBox>>,
+    inner: HashMap<usize, LinkedList<DelayTaskHandlerBox>>,
 }
 
 impl TaskTrace {
@@ -21,7 +21,7 @@ impl TaskTrace {
         }
     }
 
-    pub(crate) fn insert(&mut self, task_id: u32, task_handler_box: DelayTaskHandlerBox) {
+    pub(crate) fn insert(&mut self, task_id: usize, task_handler_box: DelayTaskHandlerBox) {
         //entry is amazing!
         self.inner
             .entry(task_id)
@@ -42,7 +42,7 @@ impl TaskTrace {
     //one record_id may be used for many handler.
     pub(crate) fn quit_one_task_handler(
         &mut self,
-        task_id: u32,
+        task_id: usize,
         record_id: i64,
     ) -> Option<Result<()>> {
         if !self.inner.get(&task_id).is_some() {
@@ -85,7 +85,7 @@ pub trait DelayTaskHandler: Send + Sync {
 // Multi-DelayTaskHandlerBox record_id can same, because one task can spawn Multi-process.
 pub(crate) struct DelayTaskHandlerBox {
     task_handler: Option<Box<dyn DelayTaskHandler>>,
-    task_id: u32,
+    task_id: usize,
     ///Globally unique ID.
     record_id: i64,
     start_time: u32,
@@ -103,13 +103,13 @@ impl Drop for DelayTaskHandlerBox {
 
 #[derive(Default)]
 pub(crate) struct DelayTaskHandlerBoxBuilder {
-    task_id: u32,
+    task_id: usize,
     record_id: i64,
     start_time: u32,
 }
 
 impl DelayTaskHandlerBoxBuilder {
-    pub fn set_task_id(&mut self, task_id: u32) {
+    pub fn set_task_id(&mut self, task_id: usize) {
         self.task_id = task_id;
     }
     pub fn set_record_id(&mut self, record_id: i64) {
@@ -130,7 +130,7 @@ impl DelayTaskHandlerBoxBuilder {
 }
 
 impl DelayTaskHandlerBox {
-    pub fn get_task_id(&mut self) -> u32 {
+    pub fn get_task_id(&mut self) -> usize {
         self.task_id
     }
     pub fn get_record_id(&mut self) -> i64 {

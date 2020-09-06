@@ -1,7 +1,11 @@
 use super::{
     timer::{
+        event_handle::{EventHandle, SharedTaskFlagMap, SharedTaskWheel},
         task::{Frequency, Task},
-        timer_core::{Timer, TimerEvent, TimerEventSender},
+        timer_core::{
+            SencondHand, Timer, TimerEvent, TimerEventReceiver, TimerEventSender,
+            DEFAULT_TIMER_SLOT_COUNT,
+        },
     },
     utils::convenience,
 };
@@ -16,7 +20,9 @@ use anyhow::{Context, Result};
 use async_channel::{unbounded, Receiver as AsyncReceiver, Sender as AsyncSender};
 use smol::Task as SmolTask;
 use std::sync::mpsc::channel;
+use std::sync::{atomic::AtomicUsize, Arc};
 use threadpool::ThreadPool;
+use waitmap::WaitMap;
 
 //FIXME: Relace Generics into Enum.
 //Backupground Description :
@@ -43,9 +49,25 @@ impl Default for DelayTimer {
 //可以取消任务，child-handle 可以是进程句柄 - 也可以是异步句柄， 用linklist 是因为，可能任务支持同时多个并行
 impl DelayTimer {
     pub fn new() -> DelayTimer {
-        let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
-        let mut timer = Timer::new(timer_event_receiver);
+        let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
+        let task_flag_map = Arc::new(WaitMap::new());
+        let second_hand = Arc::new(AtomicUsize::new(0));
 
+        //TODO: remove that.
+        let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
+        let mut timer = Timer::new(
+            wheel_queue.clone(),
+            task_flag_map.clone(),
+            timer_event_sender.clone(),
+        );
+
+        //what is `ascription`.
+        let mut event_handle = EventHandle::new(
+            wheel_queue,
+            task_flag_map,
+            second_hand,
+            timer_event_receiver,
+        );
         // run register_features_fn
 
         //features include these fn:
@@ -58,14 +80,17 @@ impl DelayTimer {
         // set_recycle_task be restrain execution time 300ms.
 
         // Use threadpool can replenishes the pool if any worker threads panic.
-        let pool = ThreadPool::new(1);
-
-        //sync schedule
-        // thread::spawn(move || timer.schedule());
+        let pool = ThreadPool::new(2);
 
         pool.execute(move || {
             smol::run(async {
                 timer.async_schedule().await;
+            })
+        });
+
+        pool.execute(move || {
+            smol::run(async {
+                event_handle.handle_event().await;
             })
         });
 
@@ -126,11 +151,11 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
-    pub fn remove_task(&mut self, task_id: u32) -> Result<()> {
+    pub fn remove_task(&mut self, task_id: usize) -> Result<()> {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
-    pub fn cancel_task(&mut self, task_id: u32, record_id: i64) -> Result<()> {
+    pub fn cancel_task(&mut self, task_id: usize, record_id: i64) -> Result<()> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 

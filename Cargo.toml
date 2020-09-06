@@ -16,8 +16,14 @@ threadpool = "1.8.1"
 rs-snowflake = "0.2.0"
 async-channel = "1.4.0"
 async-mutex = "1.1.5"
+waitmap = "1.1.0"
+
 
 [dev-dependencies]
 smol = "0.1.12"
 futures = "0.3.5"
 surf = "1.0.3"
+
+[dev-dependencies.async-std]
+version = "1.6.3"
+features = ["attributes"]

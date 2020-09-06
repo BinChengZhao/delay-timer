@@ -1,6 +1,7 @@
 #![feature(split_inclusive)]
 #![feature(str_strip)]
 #![feature(drain_filter)]
+#![feature(no_more_cas)]
 // #[allow(dead_code)]
 pub mod delay_timer;
 pub mod timer;
