@@ -17,8 +17,7 @@ use super::utils::{
     convenience::functions::create_default_delay_task_handler, status_report::StatusReport,
 };
 use anyhow::{Context, Result};
-use async_channel::{unbounded, Receiver as AsyncReceiver, Sender as AsyncSender};
-use smol::Task as SmolTask;
+use smol::channel::{unbounded, Receiver as AsyncReceiver, Sender as AsyncSender};
 use std::sync::mpsc::channel;
 use std::sync::{atomic::AtomicUsize, Arc};
 use threadpool::ThreadPool;
@@ -83,13 +82,13 @@ impl DelayTimer {
         let pool = ThreadPool::new(2);
 
         pool.execute(move || {
-            smol::run(async {
+            smol::block_on(async {
                 timer.async_schedule().await;
             })
         });
 
         pool.execute(move || {
-            smol::run(async {
+            smol::block_on(async {
                 event_handle.handle_event().await;
             })
         });
@@ -106,7 +105,7 @@ impl DelayTimer {
         let mut task_builder = TaskBuilder::default();
 
         let body = move || {
-            SmolTask::spawn(async move {
+            smol::spawn(async move {
                 //TODO:bind a time-out-futures run maximum 200ms.
                 ()
             })

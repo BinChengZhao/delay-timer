@@ -163,7 +163,7 @@ impl DelayTaskHandler for Child {
 //When SmolTask is dropped, async task is cancel.
 impl DelayTaskHandler for SmolTask<Result<()>> {
     fn quit(self: Box<Self>) -> Result<()> {
-        SmolTask::spawn(async {
+        smol::spawn(async {
             self.cancel().await;
         })
         .detach();

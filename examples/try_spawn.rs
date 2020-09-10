@@ -2,6 +2,11 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 fn main() {
+    let child = Command::new("php")
+        .arg("-v")
+        .spawn()
+        .expect("Failed to execute command");
+
     let mut process = Command::new("php")
         .arg(r"F:\rust\owner\delayTimer\examples\try_spawn.php")
         .spawn()

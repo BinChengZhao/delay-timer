@@ -22,8 +22,8 @@ fn it_works() {
     //TODO: sleep let it block, i should try aother waiting method.
     //（thread::sleep，会阻塞执行的工作线程）
 
-    // No need to `run()`, now we can just block on the main future.
-    smol::run(async {
+    // No need to `block_on()`, now we can just block on the main future.
+    smol::block_on(async {
         let task = Task::spawn(async {
             thread::sleep(Duration::new(2, 0));
             println!("thread::sleep  会阻塞执行线程!{}", get_timestamp());
@@ -44,8 +44,8 @@ fn its_works() {
     //TODO: sleep let it block, i should try aother waiting method.
     //（async fn sleep， 不会阻塞线程，因为他是一个状态机，poll了一下，没到时间就poll下一个）
 
-    // No need to `run()`, now we can just block on the main future.
-    smol::run(async {
+    // No need to `block_on()`, now we can just block on the main future.
+    smol::block_on(async {
         async fn sleep(dur: Duration) {
             Timer::after(dur).await;
         }
@@ -69,10 +69,10 @@ fn that_works() {
     //两个线程去跑，一个阻塞了，另一个不阻塞的线程拿到另一个任务也去阻塞跑
 
     // A pending future is one that simply yields forever.
-    thread::spawn(|| smol::run(future::pending::<()>()));
+    thread::spawn(|| smol::block_on(future::pending::<()>()));
 
-    // No need to `run()`, now we can just block on the main future.
-    smol::run(async {
+    // No need to `block_on()`, now we can just block on the main future.
+    smol::block_on(async {
         let task = Task::spawn(async {
             thread::sleep(Duration::new(2, 0));
             println!("咱俩一块阻塞跑!{}", get_timestamp());
@@ -162,7 +162,7 @@ fn tasks_works() {
     let t2 = (task.body)(2);
 
     use smol::Task as SmolTask;
-    smol::run(async {
+    smol::block_on(async {
         let task = SmolTask::local(t1);
         // let task1 = SmolTask::spawn(async{(task.body)(2)});
 
@@ -214,7 +214,7 @@ fn test_sync() {
         valid: bool,
     }
 
-    thread::spawn(|| smol::run(future::pending::<()>()));
+    thread::spawn(|| smol::block_on(future::pending::<()>()));
 
     fn sync_task() {
         smol::Task::spawn(async {
@@ -248,7 +248,7 @@ fn test_sync() {
         Ok(())
     }
 
-    smol::run(async {
+    smol::block_on(async {
         let a = smol::Task::spawn(surft());
         a.unwrap().await;
 
@@ -327,7 +327,7 @@ fn test_cancel() {
         Box::new(task2) as Box<dyn DelayTaskHandler>
     };
 
-    smol::run(async {
+    smol::block_on(async {
         let task = Task::spawn(async {
             loop {
                 println!("Even though I'm in an infinite loop, you can still cancel me!");

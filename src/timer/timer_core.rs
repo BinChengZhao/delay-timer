@@ -4,7 +4,7 @@ pub(crate) use super::runtime_trace::task_handle::DelayTaskHandlerBox;
 use super::runtime_trace::task_handle::{DelayTaskHandlerBoxBuilder, TaskTrace};
 pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
-pub(crate) use async_channel::{Receiver as AsyncReceiver, RecvError, Sender as AsyncSender};
+pub(crate) use smol::channel::{Receiver as AsyncReceiver, RecvError, Sender as AsyncSender};
 ///timer,时间轮
 /// 未来我会将这个库，实现用于rust-cron
 /// someting i will wrote chinese ,someting i will wrote english
@@ -14,7 +14,6 @@ use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
 use anyhow::Result;
-use async_mutex::Mutex as AsyncMutex;
 use smol::Timer as SmolTimer;
 use std::collections::HashMap;
 use std::sync::{
@@ -55,7 +54,6 @@ pub(crate) enum TimerEvent {
 //add channel
 //explore on time task
 // 暴漏一个 接收方，让读取任务
-//TODO: Maybe AsyncMutex<Timer.wheel_queue> for handle_event.
 pub struct Timer {
     wheel_queue: SharedTaskWheel,
     task_flag_map: SharedTaskFlagMap,
@@ -125,21 +123,32 @@ impl Timer {
             second_hand = self.next_position();
             now = Instant::now();
             when = now + Duration::from_secs(1);
-            let task_ids = self
-                .wheel_queue
-                .get_mut(&second_hand)
-                .unwrap()
-                .value_mut()
-                .arrival_time_tasks();
-            println!("Timer-second_hand: {}", second_hand);
-            for task_id in task_ids {
-                if let Some(mut task) = self
+
+            let task_ids;
+
+            {
+                task_ids = self
                     .wheel_queue
                     .get_mut(&second_hand)
                     .unwrap()
                     .value_mut()
-                    .remove_task(task_id)
+                    .arrival_time_tasks();
+            }
+
+            println!("timer-core:Timer-second_hand: {}", second_hand);
+            for task_id in task_ids {
+                let task_option: Option<Task>;
+
                 {
+                    task_option = self
+                        .wheel_queue
+                        .get_mut(&second_hand)
+                        .unwrap()
+                        .value_mut()
+                        .remove_task(task_id);
+                }
+
+                if let Some(mut task) = task_option {
                     let mut delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
                     delay_task_handler_box_builder.set_task_id(task_id);
 
@@ -150,7 +159,7 @@ impl Timer {
                         delay_task_handler_box_builder.spawn(task_handler_box);
 
                     let task_valid = task.down_count_and_set_vaild();
-                    println!("task_id:{}, valid:{}", task.task_id, task_valid);
+                    println!("timer-core:task_id:{}, valid:{}", task.task_id, task_valid);
                     if !task_valid {
                         drop(task);
                         continue;
@@ -168,23 +177,29 @@ impl Timer {
                     let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
 
                     println!(
-                        "task_id:{}, next_time:{}, slot_seed:{}, quan:{}",
+                        "timer-core:task_id:{}, next_time:{}, slot_seed:{}, quan:{}",
                         task.task_id, step, slot_seed, quan
                     );
 
                     self.timer_event_sender
-                        .send(TimerEvent::AppendTaskHandle(task_id, _tmp_task_handler_box));
-                    self.task_flag_map
-                        .get_mut(&task_id)
-                        .unwrap()
-                        .value_mut()
-                        .set_slot_mark(slot_seed);
+                        .send(TimerEvent::AppendTaskHandle(task_id, _tmp_task_handler_box))
+                        .await;
 
-                    self.wheel_queue
-                        .get_mut(&slot_seed)
-                        .unwrap()
-                        .value_mut()
-                        .add_task(task);
+                    {
+                        self.task_flag_map
+                            .get_mut(&task_id)
+                            .unwrap()
+                            .value_mut()
+                            .set_slot_mark(slot_seed);
+                    }
+
+                    {
+                        self.wheel_queue
+                            .get_mut(&slot_seed)
+                            .unwrap()
+                            .value_mut()
+                            .add_task(task);
+                    }
                 }
             }
 

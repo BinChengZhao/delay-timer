@@ -121,7 +121,7 @@ impl EventHandle {
         let second_hand = self.second_hand.load(Acquire);
         let exec_time: usize = task.get_next_exec_timestamp();
         println!(
-            "task_id:{}, next_time:{}, get_timestamp:{}",
+            "event_handle:task_id:{}, next_time:{}, get_timestamp:{}",
             task.task_id,
             exec_time,
             get_timestamp()
@@ -133,7 +133,7 @@ impl EventHandle {
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
 
         println!(
-            "task_id:{}, next_time:{}, slot_seed:{}",
+            "event_handle:task_id:{}, next_time:{}, slot_seed:{}",
             task.task_id, exec_time, slot_seed
         );
 
@@ -153,13 +153,8 @@ impl EventHandle {
         self.task_flag_map.insert(task_mark.task_id, task_mark);
     }
 
-    pub(crate) fn update_task_mark(&mut self, task_id: usize, slot_mark: usize) {
-        // self.task_flag_map
-        //     .entry(task_id)
-        //     .and_modify(|e| e.set_slot_mark(slot_mark));
-    }
-
     //TODO: addCountDown 限制，可能 remove 消息先消费，update slot后消费
+    //用waitmap.wait
     pub(crate) async fn remove_task(&mut self, task_id: usize) -> Option<Task> {
         let task_mark = self.task_flag_map.get(&task_id)?;
 
