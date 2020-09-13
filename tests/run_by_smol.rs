@@ -1,3 +1,4 @@
+#![feature(nll)]
 use delay_timer::timer::timer_core::get_timestamp;
 use delay_timer::{
     delay_timer::DelayTimer,
@@ -7,10 +8,11 @@ use delay_timer::{
     },
 };
 use futures::future;
-use smol::{Task, Timer};
+use smol::{channel, future as SmolFuture, LocalExecutor, Task, Timer};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
+use std::thread::Thread;
 use std::{
     thread,
     time::{Duration, Instant},
@@ -24,12 +26,12 @@ fn it_works() {
 
     // No need to `block_on()`, now we can just block on the main future.
     smol::block_on(async {
-        let task = Task::spawn(async {
+        let task = smol::spawn(async {
             thread::sleep(Duration::new(2, 0));
             println!("thread::sleep  会阻塞执行线程!{}", get_timestamp());
         });
 
-        let tasg = Task::spawn(async {
+        let tasg = smol::spawn(async {
             thread::sleep(Duration::new(2, 0));
             println!("2222222222222222222222222222222222:{}", get_timestamp());
         });
@@ -49,12 +51,12 @@ fn its_works() {
         async fn sleep(dur: Duration) {
             Timer::after(dur).await;
         }
-        let task = Task::spawn(async {
+        let task = smol::spawn(async {
             sleep(Duration::from_secs(2)).await;
             println!("async fn sleep  并不会阻塞执行器的线程!{}", get_timestamp());
         });
 
-        let tasg = Task::spawn(async {
+        let tasg = smol::spawn(async {
             sleep(Duration::from_secs(2)).await;
             println!("2222222222222222222222222222222222:{}", get_timestamp());
         });
@@ -73,12 +75,12 @@ fn that_works() {
 
     // No need to `block_on()`, now we can just block on the main future.
     smol::block_on(async {
-        let task = Task::spawn(async {
+        let task = smol::spawn(async {
             thread::sleep(Duration::new(2, 0));
             println!("咱俩一块阻塞跑!{}", get_timestamp());
         });
 
-        let tasg = Task::spawn(async {
+        let tasg = smol::spawn(async {
             thread::sleep(Duration::new(2, 0));
             println!("2222222222222222222222222222222222:{}", get_timestamp());
         });
@@ -143,32 +145,44 @@ fn tasks_works() {
         Box::new(move |value| Box::pin(f(value)))
     }
 
-    // let aa = a ;
-    // let b = create(a);
-    //单独放一个 future 放到task，会被耗尽
-    //使用一个闭包，源源不断的生成 future
-    //写两种task，一种是异步的，一种是同步的
-    let bb: BoxFn = Box::new(move |value| Box::pin(a(value)));
-
-    // let c = Box::new(move |value| Box::pin(a(value)));
-    let task = Task {
-        task_id: 1,
-        body: bb,
-        cylinder_line: 1,
-        valid: true,
-    };
-
-    let t1 = (task.body)(1);
-    let t2 = (task.body)(2);
-
-    use smol::Task as SmolTask;
     smol::block_on(async {
-        let task = SmolTask::local(t1);
-        // let task1 = SmolTask::spawn(async{(task.body)(2)});
+        let t = thread::spawn(move || {
+            let l = LocalExecutor::new();
 
-        let tasg = SmolTask::local(t2);
+            // let aa = a ;
+            // let b = create(a);
+            //单独放一个 future 放到task，会被耗尽
+            //使用一个闭包，源源不断的生成 future
+            //写两种task，一种是异步的，一种是同步的
+            let bb: BoxFn = Box::new(move |value| Box::pin(a(value)));
 
-        future::join(task, tasg).await;
+            // let c = Box::new(move |value| Box::pin(a(value)));
+            let task = Task {
+                task_id: 1,
+                body: bb,
+                cylinder_line: 1,
+                valid: true,
+            };
+
+            let t1 = (task.body)(1);
+            let t2 = (task.body)(2);
+
+            let t3 = SmolFuture::zip(t1, t2);
+            l.spawn(t3).detach();
+
+            SmolFuture::block_on(async {
+                loop {
+                    if l.try_tick() {
+                        println!("try_tick:success");
+                    } else {
+                        println!("goodbye");
+                        return;
+                    }
+                }
+            });
+        });
+
+        Timer::after(Duration::from_secs(1)).await;
     });
 }
 
@@ -183,7 +197,7 @@ fn test_sync() {
     macro_rules! create_function {
         ($func_name:ident, $body:block) => {
             fn $func_name() {
-                smol::Task::spawn(async { $body }).detach();
+                smol::spawn(async { $body }).detach();
 
                 println!("You called {:?}()", stringify!($func_name));
             }
@@ -193,7 +207,7 @@ fn test_sync() {
     macro_rules! create_async_return_result {
         ($func_name:ident, $func:ident) => {
             create_function!($func_name, {
-                let task = smol::Task::spawn(async { $func() });
+                let task = smol::spawn(async { $func() });
                 task.await;
             });
         };
@@ -217,7 +231,7 @@ fn test_sync() {
     thread::spawn(|| smol::block_on(future::pending::<()>()));
 
     fn sync_task() {
-        smol::Task::spawn(async {
+        smol::spawn(async {
             println!("123");
         })
         .detach();
@@ -249,13 +263,12 @@ fn test_sync() {
     }
 
     smol::block_on(async {
-        let a = smol::Task::spawn(surft());
-        a.unwrap().await;
+        let a = smol::spawn(surft()).detach();
 
-        let a = smol::Task::spawn(async {
-            let inner = smol::Task::spawn(surft());
+        let a = smol::spawn(async {
+            let inner = smol::spawn(surft());
             // let i = inner.unwrap();
-            inner.unwrap().detach();
+            inner.detach();
         });
     });
 }
@@ -301,12 +314,12 @@ fn test_cancel() {
 
     let body = || {
         println!("async-test-spawn");
-        let task2 = Task::spawn(async {
+        let task2 = smol::spawn(async {
             for i in 1..10 {
                 Timer::after(Duration::from_secs(1)).await;
                 let s = format!("https://httpbin.org/get?id={}", i);
                 println!("{}", s);
-                Task::spawn(async {
+                smol::spawn(async {
                     println!("{}", s);
 
                     let mut res = surf::get(s).await.unwrap();
@@ -328,7 +341,7 @@ fn test_cancel() {
     };
 
     smol::block_on(async {
-        let task = Task::spawn(async {
+        let task = smol::spawn(async {
             loop {
                 println!("Even though I'm in an infinite loop, you can still cancel me!");
                 Timer::after(Duration::from_secs(1)).await;

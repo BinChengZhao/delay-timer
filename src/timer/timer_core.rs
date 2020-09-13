@@ -1,10 +1,10 @@
 // use super::event_handle;
 use super::event_handle::{SharedTaskFlagMap, SharedTaskWheel};
 pub(crate) use super::runtime_trace::task_handle::DelayTaskHandlerBox;
-use super::runtime_trace::task_handle::{DelayTaskHandlerBoxBuilder, TaskTrace};
+use super::runtime_trace::task_handle::{DelayTaskHandlerBoxBuilder};
 pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
-pub(crate) use smol::channel::{Receiver as AsyncReceiver, RecvError, Sender as AsyncSender};
+pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 ///timer,时间轮
 /// 未来我会将这个库，实现用于rust-cron
 /// someting i will wrote chinese ,someting i will wrote english
@@ -13,13 +13,11 @@ pub(crate) use smol::channel::{Receiver as AsyncReceiver, RecvError, Sender as A
 use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
-use anyhow::Result;
 use smol::Timer as SmolTimer;
-use std::collections::HashMap;
 use std::sync::{
     atomic::{
         AtomicUsize,
-        Ordering::{Acquire, Relaxed, Release},
+        Ordering::{Relaxed, Release},
     },
     Arc,
 };
@@ -183,7 +181,7 @@ impl Timer {
 
                     self.timer_event_sender
                         .send(TimerEvent::AppendTaskHandle(task_id, _tmp_task_handler_box))
-                        .await;
+                        .await.unwrap_or_else(|e|println!("{}",e));
 
                     {
                         self.task_flag_map
