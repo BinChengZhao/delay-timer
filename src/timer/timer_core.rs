@@ -1,7 +1,7 @@
 // use super::event_handle;
 use super::event_handle::{SharedTaskFlagMap, SharedTaskWheel};
 pub(crate) use super::runtime_trace::task_handle::DelayTaskHandlerBox;
-use super::runtime_trace::task_handle::{DelayTaskHandlerBoxBuilder};
+use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
@@ -181,7 +181,8 @@ impl Timer {
 
                     self.timer_event_sender
                         .send(TimerEvent::AppendTaskHandle(task_id, _tmp_task_handler_box))
-                        .await.unwrap_or_else(|e|println!("{}",e));
+                        .await
+                        .unwrap_or_else(|e| println!("{}", e));
 
                     {
                         self.task_flag_map

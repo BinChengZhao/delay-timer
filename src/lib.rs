@@ -8,7 +8,6 @@ pub mod generate_fn_macro;
 pub mod timer;
 pub mod utils;
 
-#[macro_use]
 extern crate lazy_static;
 
 pub use generate_fn_macro::*;

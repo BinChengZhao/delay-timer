@@ -1,4 +1,3 @@
-
 #[macro_export]
 macro_rules! create_async_fn_body {
     ($async_body:block) => {

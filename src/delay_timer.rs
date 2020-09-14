@@ -1,12 +1,7 @@
-use super::{
-    timer::{
-        event_handle::{EventHandle},
-        task::{Frequency, Task},
-        timer_core::{
-             Timer, TimerEvent, TimerEventSender,
-            DEFAULT_TIMER_SLOT_COUNT,
-        },
-    },
+use super::timer::{
+    event_handle::EventHandle,
+    task::{Frequency, Task},
+    timer_core::{Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
 };
 
 use super::timer::task::TaskBuilder;
@@ -16,7 +11,7 @@ use super::utils::{
     convenience::functions::create_default_delay_task_handler, status_report::StatusReport,
 };
 use anyhow::{Context, Result};
-use smol::channel::{unbounded};
+use smol::channel::unbounded;
 use std::sync::{atomic::AtomicUsize, Arc};
 use threadpool::ThreadPool;
 use waitmap::WaitMap;

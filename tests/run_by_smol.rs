@@ -1,4 +1,3 @@
-#![feature(nll)]
 use delay_timer::timer::timer_core::get_timestamp;
 use delay_timer::{
     delay_timer::DelayTimer,

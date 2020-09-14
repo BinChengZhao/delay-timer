@@ -3,7 +3,6 @@ use cron_clock::schedule::{Schedule, ScheduleIteratorOwned};
 use cron_clock::Utc;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Mutex;
 //TaskMark is use to remove/stop the task.
 #[derive(Default)]
 pub struct TaskMark {
