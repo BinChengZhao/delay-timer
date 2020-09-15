@@ -25,7 +25,7 @@ impl TaskTrace {
         //entry is amazing!
         self.inner
             .entry(task_id)
-            .or_insert(LinkedList::new())
+            .or_insert_with(|| LinkedList::new())
             .push_back(task_handler_box);
     }
 
@@ -45,11 +45,7 @@ impl TaskTrace {
         task_id: usize,
         record_id: i64,
     ) -> Option<Result<()>> {
-        if !self.inner.get(&task_id).is_some() {
-            return None;
-        }
-
-        let task_handler_list = self.inner.get_mut(&task_id).unwrap();
+        let task_handler_list = self.inner.get_mut(&task_id)?;
 
         let filter_collection =
             task_handler_list.drain_filter(|handler_box| handler_box.record_id == record_id);

@@ -154,6 +154,6 @@ impl DelayTimer {
     fn seed_timer_event(&mut self, event: TimerEvent) -> Result<()> {
         self.timer_event_sender
             .try_send(event)
-            .with_context(|| format!("Failed Send Event from seed_timer_event"))
+            .with_context(|| "Failed Send Event from seed_timer_event".to_string())
     }
 }

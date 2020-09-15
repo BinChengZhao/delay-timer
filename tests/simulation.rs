@@ -60,8 +60,6 @@ fn go_works() {
     }
 }
 
-
-
 #[test]
 fn tests_countdown() {
     let mut delay_timer = DelayTimer::new();

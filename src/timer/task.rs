@@ -1,7 +1,6 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
 use cron_clock::schedule::{Schedule, ScheduleIteratorOwned};
 use cron_clock::Utc;
-use std::collections::HashMap;
 use std::str::FromStr;
 //TaskMark is use to remove/stop the task.
 #[derive(Default)]
@@ -17,10 +16,7 @@ pub enum TaskType {
 
 impl TaskMark {
     pub(crate) fn new(task_id: usize, slot_mark: usize) -> Self {
-        TaskMark {
-            task_id,
-            slot_mark: slot_mark,
-        }
+        TaskMark { task_id, slot_mark }
     }
 
     pub fn get_slot_mark(&self) -> usize {
@@ -71,10 +67,7 @@ impl FrequencyInner {
     }
 
     fn is_down_over(&mut self) -> bool {
-        match self {
-            FrequencyInner::CountDown(0, _) => false,
-            _ => true,
-        }
+        !matches!(self, FrequencyInner::CountDown(0, _))
     }
 }
 

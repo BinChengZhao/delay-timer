@@ -103,7 +103,7 @@ pub mod shell_command {
         let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
         if let Some(filename) = sub_command_inner.next() {
             println!("redirect:filename{:?}", filename);
-            return Some(create_stdio_file(angle_bracket, filename));
+            Some(create_stdio_file(angle_bracket, filename))
         } else {
             None
         }
