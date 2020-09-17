@@ -78,7 +78,6 @@ impl EventHandle {
                 TimerEvent::RemoveTask(task_id) => {
                     self.remove_task(task_id).await;
                 }
-                //TODO: handler error.
                 TimerEvent::CancelTask(_task_id, _record_id) => {
                     self.cancel_task(_task_id, _record_id);
                 }

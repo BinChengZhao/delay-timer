@@ -41,8 +41,6 @@ pub(crate) type SencondHand = Arc<AtomicUsize>;
 pub(crate) enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
-    // Wating handel evet separate from Timer, add it.... because Timer haven't Sender...
-    // UpdateTaskSlotMark(u32, usize),
     RemoveTask(usize),
     CancelTask(usize, i64),
     StopTask(usize),

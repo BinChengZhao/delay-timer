@@ -12,7 +12,7 @@ use super::utils::{
 };
 use anyhow::{Context, Result};
 use smol::channel::unbounded;
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::{sync::{atomic::AtomicUsize, Arc}};
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
 
@@ -72,6 +72,7 @@ impl DelayTimer {
         // set_recycle_task be restrain execution time 300ms.
 
         // Use threadpool can replenishes the pool if any worker threads panic.
+        //TODO: Maybe can use easy-parallel.
         let pool = ThreadPool::new(2);
 
         pool.execute(move || {
@@ -97,6 +98,7 @@ impl DelayTimer {
     pub fn set_recycle_task(&mut self) -> Result<()> {
         let mut task_builder = TaskBuilder::default();
 
+        //set a timeout.  most excute time is 200ms.
         let body = move || {
             smol::spawn(async move {
                 //TODO:bind a time-out-futures run maximum 200ms.
