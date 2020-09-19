@@ -11,7 +11,7 @@ use std::process::Child;
 
 #[derive(Default)]
 pub(crate) struct TaskTrace {
-    inner: HashMap<usize, LinkedList<DelayTaskHandlerBox>>,
+    inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
 }
 
 impl TaskTrace {
@@ -21,7 +21,7 @@ impl TaskTrace {
         }
     }
 
-    pub(crate) fn insert(&mut self, task_id: usize, task_handler_box: DelayTaskHandlerBox) {
+    pub(crate) fn insert(&mut self, task_id: u64, task_handler_box: DelayTaskHandlerBox) {
         //entry is amazing!
         self.inner
             .entry(task_id)
@@ -42,7 +42,7 @@ impl TaskTrace {
     //one record_id may be used for many handler.
     pub(crate) fn quit_one_task_handler(
         &mut self,
-        task_id: usize,
+        task_id: u64,
         record_id: i64,
     ) -> Option<Result<()>> {
         let task_handler_list = self.inner.get_mut(&task_id)?;
@@ -81,10 +81,11 @@ pub trait DelayTaskHandler: Send + Sync {
 // Multi-DelayTaskHandlerBox record_id can same, because one task can spawn Multi-process.
 pub(crate) struct DelayTaskHandlerBox {
     task_handler: Option<Box<dyn DelayTaskHandler>>,
-    task_id: usize,
+    task_id: u64,
     ///Globally unique ID.
     record_id: i64,
-    start_time: u32,
+    start_time: u64,
+    end_time: Option<u64>,
 }
 
 impl Drop for DelayTaskHandlerBox {
@@ -99,20 +100,27 @@ impl Drop for DelayTaskHandlerBox {
 
 #[derive(Default)]
 pub(crate) struct DelayTaskHandlerBoxBuilder {
-    task_id: usize,
+    task_id: u64,
     record_id: i64,
-    start_time: u32,
+    start_time: u64,
+    end_time: Option<u64>,
 }
 
 impl DelayTaskHandlerBoxBuilder {
-    pub fn set_task_id(&mut self, task_id: usize) {
+    pub fn set_task_id(&mut self, task_id: u64) {
         self.task_id = task_id;
     }
     pub fn set_record_id(&mut self, record_id: i64) {
         self.record_id = record_id;
     }
-    pub fn set_start_time(&mut self, start_time: u32) {
+    pub fn set_start_time(&mut self, start_time: u64) {
         self.start_time = start_time;
+    }
+
+    pub fn set_end_time(&mut self, maximum_running_time: Option<u64>) {
+        if let Some(running_time) = maximum_running_time {
+            self.end_time = Some(self.start_time + running_time);
+        }
     }
 
     pub fn spawn(self, task_handler: Box<dyn DelayTaskHandler>) -> DelayTaskHandlerBox {
@@ -121,18 +129,19 @@ impl DelayTaskHandlerBoxBuilder {
             task_id: self.task_id,
             record_id: self.record_id,
             start_time: self.start_time,
+            end_time: self.end_time,
         }
     }
 }
 
 impl DelayTaskHandlerBox {
-    pub fn get_task_id(&mut self) -> usize {
+    pub fn get_task_id(&mut self) -> u64 {
         self.task_id
     }
     pub fn get_record_id(&mut self) -> i64 {
         self.record_id
     }
-    pub fn get_start_time(&mut self) -> u32 {
+    pub fn get_start_time(&mut self) -> u64 {
         self.start_time
     }
 

@@ -5,8 +5,8 @@ use std::str::FromStr;
 //TaskMark is use to remove/stop the task.
 #[derive(Default)]
 pub struct TaskMark {
-    pub(crate) task_id: usize,
-    slot_mark: usize,
+    pub(crate) task_id: u64,
+    slot_mark: u64,
 }
 
 pub enum TaskType {
@@ -15,15 +15,15 @@ pub enum TaskType {
 }
 
 impl TaskMark {
-    pub(crate) fn new(task_id: usize, slot_mark: usize) -> Self {
+    pub(crate) fn new(task_id: u64, slot_mark: u64) -> Self {
         TaskMark { task_id, slot_mark }
     }
 
-    pub fn get_slot_mark(&self) -> usize {
+    pub fn get_slot_mark(&self) -> u64 {
         self.slot_mark
     }
 
-    pub fn set_slot_mark(&mut self, slot_mark: usize) {
+    pub fn set_slot_mark(&mut self, slot_mark: u64) {
         self.slot_mark = slot_mark;
     }
 }
@@ -74,16 +74,18 @@ impl FrequencyInner {
 #[derive(Debug, Default)]
 pub struct TaskBuilder {
     frequency: Option<Frequency>,
-    task_id: usize,
+    task_id: u64,
+    maximum_running_time: Option<u64>,
 }
 
 //TASK 执行完了，支持找新的Slot
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 pub struct Task {
-    pub task_id: usize,
+    pub task_id: u64,
     frequency: FrequencyInner,
-    pub body: SafeBoxFn,
-    cylinder_line: usize,
+    pub(crate) body: SafeBoxFn,
+    maximum_running_time: Option<u64>,
+    cylinder_line: u64,
     valid: bool,
 }
 
@@ -99,8 +101,12 @@ impl<'a> TaskBuilder {
     pub fn set_frequency(&mut self, frequency: Frequency) {
         self.frequency = Some(frequency);
     }
-    pub fn set_task_id(&mut self, task_id: usize) {
+    pub fn set_task_id(&mut self, task_id: u64) {
         self.task_id = task_id;
+    }
+
+    pub fn set_maximum_running_time(&mut self, maximum_running_time: u64) {
+        self.maximum_running_time = Some(maximum_running_time);
     }
 
     pub fn spawn<F>(self, body: F) -> Task
@@ -128,16 +134,27 @@ impl<'a> TaskBuilder {
             RepeatType::Num(repeat_count) => FrequencyInner::CountDown(repeat_count, taskschedule),
         };
 
-        Task::new(self.task_id, frequency_inner, Box::new(body))
+        Task::new(
+            self.task_id,
+            frequency_inner,
+            Box::new(body),
+            self.maximum_running_time,
+        )
     }
 }
 
 impl Task {
-    pub fn new(task_id: usize, frequency: FrequencyInner, body: SafeBoxFn) -> Task {
+    pub fn new(
+        task_id: u64,
+        frequency: FrequencyInner,
+        body: SafeBoxFn,
+        maximum_running_time: Option<u64>,
+    ) -> Task {
         Task {
             task_id,
             frequency,
             body,
+            maximum_running_time,
             cylinder_line: 0,
             valid: true,
         }
@@ -161,8 +178,12 @@ impl Task {
         self.valid = self.frequency.is_down_over();
     }
 
-    pub fn set_cylinder_line(&mut self, cylinder_line: usize) {
+    pub fn set_cylinder_line(&mut self, cylinder_line: u64) {
         self.cylinder_line = cylinder_line;
+    }
+
+    pub fn get_maximum_running_time(&self, start_time: u64) -> Option<u64>{
+        self.maximum_running_time.and_then(|t| Some(t+start_time) )
     }
 
     //single slot foreach do this.
@@ -199,7 +220,7 @@ impl Task {
     }
 
     //get_next_exec_timestamp
-    pub fn get_next_exec_timestamp(&mut self) -> usize {
-        self.frequency.next_alarm_timestamp() as usize
+    pub fn get_next_exec_timestamp(&mut self) -> u64 {
+        self.frequency.next_alarm_timestamp() as u64
     }
 }

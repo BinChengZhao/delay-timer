@@ -16,18 +16,18 @@ pub(crate) use super::task::TaskMark;
 use smol::Timer as SmolTimer;
 use std::sync::{
     atomic::{
-        AtomicUsize,
+        AtomicU64,
         Ordering::{Relaxed, Release},
     },
     Arc,
 };
 use std::time::{Duration, Instant, SystemTime};
 
-pub(crate) const DEFAULT_TIMER_SLOT_COUNT: usize = 3600;
+pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
 
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
-pub(crate) type SencondHand = Arc<AtomicUsize>;
+pub(crate) type SencondHand = Arc<AtomicU64>;
 
 //我需要将 使用task_id关联任务，放到一个全局的hash表
 //两个作用，task_id 跟 Task 一一对应
@@ -41,10 +41,10 @@ pub(crate) type SencondHand = Arc<AtomicUsize>;
 pub(crate) enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
-    RemoveTask(usize),
-    CancelTask(usize, i64),
-    StopTask(usize),
-    AppendTaskHandle(usize, DelayTaskHandlerBox),
+    RemoveTask(u64),
+    CancelTask(u64, i64),
+    StopTask(u64),
+    AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
 
 //add channel
@@ -70,7 +70,7 @@ impl Timer {
             wheel_queue,
             task_flag_map,
             timer_event_sender,
-            second_hand: Arc::new(AtomicUsize::new(0)),
+            second_hand: Arc::new(AtomicU64::new(0)),
             status_report_sender: None,
         }
     }
@@ -90,7 +90,7 @@ impl Timer {
         self.report(1);
     }
 
-    pub fn next_position(&mut self) -> usize {
+    pub fn next_position(&mut self) -> u64 {
         self.second_hand
             .fetch_update(Release, Relaxed, |x| {
                 Some((x + 1) % DEFAULT_TIMER_SLOT_COUNT)
@@ -112,6 +112,7 @@ impl Timer {
         let mut now;
         let mut when;
         let mut second_hand;
+        let mut timestamp;
 
         //TODO:auto-get nodeid and machineid.
         let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
@@ -119,6 +120,7 @@ impl Timer {
             second_hand = self.next_position();
             now = Instant::now();
             when = now + Duration::from_secs(1);
+            timestamp = get_timestamp();
 
             let task_ids;
 
@@ -149,6 +151,9 @@ impl Timer {
                     delay_task_handler_box_builder.set_task_id(task_id);
 
                     delay_task_handler_box_builder.set_record_id(snowflakeid_bucket.get_id());
+                    delay_task_handler_box_builder.set_start_time(timestamp);
+                    delay_task_handler_box_builder.set_end_time(task.get_maximum_running_time(timestamp));
+
 
                     let task_handler_box = (task.body)();
                     let _tmp_task_handler_box =
@@ -162,12 +167,12 @@ impl Timer {
                     }
 
                     //下一次执行时间
-                    let timestamp = task.get_next_exec_timestamp();
+                    let task_excute_timestamp = task.get_next_exec_timestamp();
 
                     //时间差+当前的分针
                     //比如 时间差是 7260，目前分针再 3599，7260+3599 = 10859
                     //， 从 当前 3599 走碰见三次，再第59个格子
-                    let step = timestamp - get_timestamp() + second_hand;
+                    let step = task_excute_timestamp - timestamp + second_hand;
                     let quan = step / DEFAULT_TIMER_SLOT_COUNT;
                     task.set_cylinder_line(quan);
                     let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
@@ -205,9 +210,9 @@ impl Timer {
     }
 }
 
-pub fn get_timestamp() -> usize {
+pub fn get_timestamp() -> u64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(n) => n.as_secs() as usize,
+        Ok(n) => n.as_secs(),
         Err(_) => panic!("SystemTime before UNIX EPOCH!"),
     }
 }

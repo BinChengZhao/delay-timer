@@ -12,7 +12,7 @@ use super::utils::{
 };
 use anyhow::{Context, Result};
 use smol::channel::unbounded;
-use std::{sync::{atomic::AtomicUsize, Arc}};
+use std::sync::{atomic::AtomicU64, Arc};
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
 
@@ -43,7 +43,7 @@ impl DelayTimer {
     pub fn new() -> DelayTimer {
         let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
         let task_flag_map = Arc::new(WaitMap::new());
-        let second_hand = Arc::new(AtomicUsize::new(0));
+        let second_hand = Arc::new(AtomicU64::new(0));
 
         //TODO: remove that.
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
@@ -145,11 +145,11 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
-    pub fn remove_task(&mut self, task_id: usize) -> Result<()> {
+    pub fn remove_task(&mut self, task_id: u64) -> Result<()> {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
-    pub fn cancel_task(&mut self, task_id: usize, record_id: i64) -> Result<()> {
+    pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Result<()> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 

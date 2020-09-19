@@ -8,16 +8,16 @@ use super::{
 
 use anyhow::Result;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering::Acquire},
+    atomic::{AtomicU64, Ordering::Acquire},
     Arc,
 };
 use waitmap::WaitMap;
 
 //use `AcqRel::AcqRel` to store and load.....
-pub(crate) type SencondHand = Arc<AtomicUsize>;
+pub(crate) type SencondHand = Arc<AtomicU64>;
 
-pub(crate) type SharedTaskWheel = Arc<WaitMap<usize, Slot>>;
-pub(crate) type SharedTaskFlagMap = Arc<WaitMap<usize, TaskMark>>;
+pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
+pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 // pub(crate) type SharedTaskTrace = Arc<TaskTrace>;
 
 //TODO: use TaskMapHeader insted of these Sharedxxxx.....
@@ -78,12 +78,12 @@ impl EventHandle {
                 TimerEvent::RemoveTask(task_id) => {
                     self.remove_task(task_id).await;
                 }
-                TimerEvent::CancelTask(_task_id, _record_id) => {
-                    self.cancel_task(_task_id, _record_id);
+                TimerEvent::CancelTask(task_id, record_id) => {
+                    self.cancel_task(task_id, record_id);
                 }
 
-                TimerEvent::AppendTaskHandle(_task_id, _delay_task_handler_box) => {
-                    self.task_trace.insert(_task_id, _delay_task_handler_box);
+                TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
+                    self.task_trace.insert(task_id, delay_task_handler_box);
                 }
 
                 TimerEvent::StopTask(_task_id) => todo!(),
@@ -109,7 +109,7 @@ impl EventHandle {
     //add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Task) -> TaskMark {
         let second_hand = self.second_hand.load(Acquire);
-        let exec_time: usize = task.get_next_exec_timestamp();
+        let exec_time: u64 = task.get_next_exec_timestamp();
         println!(
             "event_handle:task_id:{}, next_time:{}, get_timestamp:{}",
             task.task_id,
@@ -117,8 +117,8 @@ impl EventHandle {
             get_timestamp()
         );
         //TODO:exec_time IS LESS THAN TIMESTAMP.
-        let time_seed: usize = exec_time - get_timestamp() + second_hand;
-        let slot_seed: usize = time_seed % DEFAULT_TIMER_SLOT_COUNT;
+        let time_seed: u64 = exec_time - get_timestamp() + second_hand;
+        let slot_seed: u64 = (time_seed % DEFAULT_TIMER_SLOT_COUNT);
 
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
 
@@ -145,7 +145,7 @@ impl EventHandle {
 
     //TODO: addCountDown 限制，可能 remove 消息先消费，update slot后消费
     //用waitmap.wait
-    pub(crate) async fn remove_task(&mut self, task_id: usize) -> Option<Task> {
+    pub(crate) async fn remove_task(&mut self, task_id: u64) -> Option<Task> {
         let task_mark = self.task_flag_map.get(&task_id)?;
 
         let slot_mark = task_mark.value().get_slot_mark();
@@ -157,11 +157,11 @@ impl EventHandle {
             .remove_task(task_id)
     }
 
-    pub fn cancel_task(&mut self, task_id: usize, record_id: i64) -> Option<Result<()>> {
+    pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 
-    pub(crate) fn init_task_wheel(slots_numbers: usize) -> SharedTaskWheel {
+    pub(crate) fn init_task_wheel(slots_numbers: u64) -> SharedTaskWheel {
         let task_wheel = WaitMap::new();
 
         for i in 0..slots_numbers {
