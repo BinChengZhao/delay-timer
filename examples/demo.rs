@@ -52,7 +52,7 @@ fn main() {
     task_builder.set_frequency(Frequency::Repeated("0/5 * * * * * *"));
     task_builder.set_task_id(2);
     let _task = task_builder.spawn(body);
-    delay_timer.add_task(_task);
+    // delay_timer.add_task(_task);
 
     let mut task_builder = TaskBuilder::default();
     let body = || {
@@ -62,7 +62,7 @@ fn main() {
     task_builder.set_frequency(Frequency::CountDown(3, "0/3 * * * * * *"));
     task_builder.set_task_id(3);
     let _task = task_builder.spawn(body);
-    delay_timer.add_task(_task).unwrap();
+    // delay_timer.add_task(_task).unwrap();
 
     let mut task_builder = TaskBuilder::default();
     let body = || {
@@ -110,19 +110,31 @@ fn main() {
 
     let mut task_builder = TaskBuilder::default();
     let body = create_async_fn_body!({
-        println!("create_async_fn_body!");
-        Timer::after(Duration::from_secs(1)).await;
+        println!("create_async_fn_body!--7");
+        Timer::after(Duration::from_secs(2)).await;
+
+        println!("create_async_fn_body:i'm part of success--1");
+
+
+        Timer::after(Duration::from_secs(2)).await;
+
+        println!("create_async_fn_body:i'm part of success--2");
+
+        Timer::after(Duration::from_secs(2)).await;
+
+
         println!("create_async_fn_body:i'success");
         Ok(())
     });
-    task_builder.set_frequency(Frequency::CountDown(7, "0/7 * * * * * *"));
+    task_builder.set_frequency(Frequency::CountDown(2, "0/7 * * * * * *"));
     task_builder.set_task_id(7);
+    task_builder.set_maximum_running_time(5);
     let _task = task_builder.spawn(body);
     delay_timer.add_task(_task);
 
     loop {
         //infact loop is always run wait client send task-event.
         sleep(Duration::new(1, 0));
-        delay_timer.cancel_task(5, 25);
+        // delay_timer.cancel_task(5, 25);
     }
 }

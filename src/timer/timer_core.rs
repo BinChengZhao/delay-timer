@@ -152,8 +152,8 @@ impl Timer {
 
                     delay_task_handler_box_builder.set_record_id(snowflakeid_bucket.get_id());
                     delay_task_handler_box_builder.set_start_time(timestamp);
-                    delay_task_handler_box_builder.set_end_time(task.get_maximum_running_time(timestamp));
-
+                    delay_task_handler_box_builder
+                        .set_end_time(task.get_maximum_running_time(timestamp));
 
                     let task_handler_box = (task.body)();
                     let _tmp_task_handler_box =

@@ -59,6 +59,7 @@ impl DelayTimer {
             task_flag_map,
             second_hand,
             timer_event_receiver,
+            timer_event_sender.clone(),
         );
         // run register_features_fn
 

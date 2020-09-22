@@ -2,7 +2,7 @@
 // if open feature status-report, then compile that mod .
 // mapping
 // #[cfg(feature="status-report")]
-use async_channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
+use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 
 #[cfg(feature = "status-report")]
 pub trait StatusReport: Send + Sync + 'static {

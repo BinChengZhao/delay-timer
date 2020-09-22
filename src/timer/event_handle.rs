@@ -1,8 +1,11 @@
 use super::{
-    runtime_trace::task_handle::TaskTrace,
+    runtime_trace::{
+        sweeper::{RecycleUnit, RecyclingBins},
+        task_handle::TaskTrace,
+    },
     timer_core::{
         get_timestamp, AsyncSender, Slot, Task, TaskMark, TimerEvent, TimerEventReceiver,
-        DEFAULT_TIMER_SLOT_COUNT,
+        TimerEventSender, DEFAULT_TIMER_SLOT_COUNT,
     },
 };
 
@@ -12,6 +15,12 @@ use std::sync::{
     Arc,
 };
 use waitmap::WaitMap;
+
+use smol::{
+    channel::{unbounded, Receiver, Sender, TryRecvError::*},
+    future::{race, FutureExt},
+    lock::Mutex,
+};
 
 //use `AcqRel::AcqRel` to store and load.....
 pub(crate) type SencondHand = Arc<AtomicU64>;
@@ -33,7 +42,8 @@ pub(crate) struct EventHandle {
     second_hand: SencondHand,
     task_trace: TaskTrace,
     timer_event_receiver: TimerEventReceiver,
-    status_report_sender: Option<AsyncSender<i32>>,
+    status_report_sender: Option<Sender<i32>>,
+    recycle_unit_sources_sender: Sender<RecycleUnit>,
 }
 
 impl EventHandle {
@@ -42,9 +52,27 @@ impl EventHandle {
         task_flag_map: SharedTaskFlagMap,
         second_hand: SencondHand,
         timer_event_receiver: TimerEventReceiver,
+        timer_event_sender: TimerEventSender,
     ) -> Self {
         let status_report_sender: Option<AsyncSender<i32>> = None;
         let task_trace = TaskTrace::default();
+
+        let (recycle_unit_sources_sender, recycle_unit_sources_reciver) =
+            unbounded::<RecycleUnit>();
+
+        let recycling_bins = Arc::new(RecyclingBins::new(
+            recycle_unit_sources_reciver,
+            timer_event_sender,
+        ));
+
+        smol::spawn(
+            recycling_bins
+                .clone()
+                .add_recycle_unit()
+                .race(recycling_bins.recycle()),
+        )
+        .detach();
+
         EventHandle {
             wheel_queue,
             task_flag_map,
@@ -52,6 +80,7 @@ impl EventHandle {
             task_trace,
             timer_event_receiver,
             status_report_sender,
+            recycle_unit_sources_sender,
         }
     }
 
@@ -83,6 +112,16 @@ impl EventHandle {
                 }
 
                 TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
+                    //if has deadline, set recycle_unit.
+                    if let Some(deadline) = delay_task_handler_box.get_end_time() {
+                        let recycle_unit = RecycleUnit::new(
+                            deadline,
+                            delay_task_handler_box.get_task_id(),
+                            delay_task_handler_box.get_record_id(),
+                        );
+                        self.recycle_unit_sources_sender.send(recycle_unit).await;
+                    }
+
                     self.task_trace.insert(task_id, delay_task_handler_box);
                 }
 

@@ -107,12 +107,17 @@ pub(crate) struct DelayTaskHandlerBoxBuilder {
 }
 
 impl DelayTaskHandlerBoxBuilder {
+    #[inline(always)]
     pub fn set_task_id(&mut self, task_id: u64) {
         self.task_id = task_id;
     }
+
+    #[inline(always)]
     pub fn set_record_id(&mut self, record_id: i64) {
         self.record_id = record_id;
     }
+
+    #[inline(always)]
     pub fn set_start_time(&mut self, start_time: u64) {
         self.start_time = start_time;
     }
@@ -135,14 +140,24 @@ impl DelayTaskHandlerBoxBuilder {
 }
 
 impl DelayTaskHandlerBox {
-    pub fn get_task_id(&mut self) -> u64 {
+    #[inline(always)]
+    pub fn get_task_id(&self) -> u64 {
         self.task_id
     }
-    pub fn get_record_id(&mut self) -> i64 {
+
+    #[inline(always)]
+    pub fn get_record_id(&self) -> i64 {
         self.record_id
     }
-    pub fn get_start_time(&mut self) -> u64 {
+
+    #[inline(always)]
+    pub fn get_start_time(&self) -> u64 {
         self.start_time
+    }
+
+    #[inline(always)]
+    pub fn get_end_time(&self) -> Option<u64> {
+        self.end_time
     }
 
     fn quit(&mut self) -> Result<()> {
