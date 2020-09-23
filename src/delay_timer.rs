@@ -92,30 +92,9 @@ impl DelayTimer {
     }
 
     fn init(&mut self) -> Result<()> {
-        self.set_recycle_task()?;
         Ok(())
     }
 
-    pub fn set_recycle_task(&mut self) -> Result<()> {
-        let mut task_builder = TaskBuilder::default();
-
-        //set a timeout.  most excute time is 200ms.
-        let body = move || {
-            smol::spawn(async move {
-                //TODO:bind a time-out-futures run maximum 200ms.
-                ()
-            })
-            .detach();
-
-            create_default_delay_task_handler()
-        };
-
-        task_builder.set_frequency(Frequency::Repeated("0/7 * * * * * *"));
-        task_builder.set_task_id(0);
-        let task = task_builder.spawn(body);
-
-        self.add_task(task)
-    }
 
     // if open "status-report", then register task 3s auto-run report
     #[cfg(feature = "status-report")]

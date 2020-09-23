@@ -17,9 +17,8 @@ use std::sync::{
 use waitmap::WaitMap;
 
 use smol::{
-    channel::{unbounded, Receiver, Sender, TryRecvError::*},
+    channel::{unbounded, Sender, TryRecvError::*},
     future::{race, FutureExt},
-    lock::Mutex,
 };
 
 //use `AcqRel::AcqRel` to store and load.....

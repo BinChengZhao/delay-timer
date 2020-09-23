@@ -15,17 +15,12 @@ pub(crate) struct TaskTrace {
 }
 
 impl TaskTrace {
-    pub(crate) fn new() -> Self {
-        TaskTrace {
-            inner: HashMap::with_capacity(100),
-        }
-    }
 
     pub(crate) fn insert(&mut self, task_id: u64, task_handler_box: DelayTaskHandlerBox) {
         //entry is amazing!
         self.inner
             .entry(task_id)
-            .or_insert_with(|| LinkedList::new())
+            .or_insert_with(LinkedList::new)
             .push_back(task_handler_box);
     }
 

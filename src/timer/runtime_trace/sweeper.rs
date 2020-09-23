@@ -1,5 +1,5 @@
 use smol::{
-    channel::{Receiver, Sender, TryRecvError::*},
+    channel::{Receiver, TryRecvError::*},
     future,
     lock::Mutex,
 };
@@ -87,7 +87,7 @@ impl RecyclingBins {
                 // drop lock.
 
                 if let Some(recycle_flag) =
-                    (&mut recycle_unit_heap).peek().map(|r| r.0.deadline <= now)
+                    (&recycle_unit_heap).peek().map(|r| r.0.deadline <= now)
                 {
                     if !recycle_flag {
                         drop(recycle_unit_heap);
@@ -96,7 +96,7 @@ impl RecyclingBins {
 
                     let recycle_unit = (&mut recycle_unit_heap)
                         .pop()
-                        .and_then(|v| Some(v.0))
+                        .map(|v| v.0)
                         .unwrap();
 
                     //handle send-error.

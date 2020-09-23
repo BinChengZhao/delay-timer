@@ -183,7 +183,7 @@ impl Task {
     }
 
     pub fn get_maximum_running_time(&self, start_time: u64) -> Option<u64> {
-        self.maximum_running_time.and_then(|t| Some(t + start_time))
+        self.maximum_running_time.map(|t| t + start_time)
     }
 
     //single slot foreach do this.
