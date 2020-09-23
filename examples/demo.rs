@@ -115,13 +115,11 @@ fn main() {
 
         println!("create_async_fn_body:i'm part of success--1");
 
-
         Timer::after(Duration::from_secs(2)).await;
 
         println!("create_async_fn_body:i'm part of success--2");
 
-        Timer::after(Duration::from_secs(2)).await;
-
+        Timer::after(Duration::from_secs(3)).await;
 
         println!("create_async_fn_body:i'success");
         Ok(())

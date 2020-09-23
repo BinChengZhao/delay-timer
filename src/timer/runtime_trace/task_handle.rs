@@ -108,24 +108,27 @@ pub(crate) struct DelayTaskHandlerBoxBuilder {
 
 impl DelayTaskHandlerBoxBuilder {
     #[inline(always)]
-    pub fn set_task_id(&mut self, task_id: u64) {
+    pub fn set_task_id(mut self, task_id: u64) -> Self {
         self.task_id = task_id;
+        self
     }
 
     #[inline(always)]
-    pub fn set_record_id(&mut self, record_id: i64) {
+    pub fn set_record_id(mut self, record_id: i64) -> Self {
         self.record_id = record_id;
+        self
     }
 
     #[inline(always)]
-    pub fn set_start_time(&mut self, start_time: u64) {
+    pub fn set_start_time(mut self, start_time: u64) -> Self {
         self.start_time = start_time;
+        self
     }
 
-    pub fn set_end_time(&mut self, maximum_running_time: Option<u64>) {
-        if let Some(running_time) = maximum_running_time {
-            self.end_time = Some(self.start_time + running_time);
-        }
+    pub fn set_end_time(mut self, maximum_running_time: Option<u64>) -> Self {
+        self.end_time = maximum_running_time;
+
+        self
     }
 
     pub fn spawn(self, task_handler: Box<dyn DelayTaskHandler>) -> DelayTaskHandlerBox {

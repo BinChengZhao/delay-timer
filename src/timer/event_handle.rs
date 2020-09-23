@@ -119,7 +119,10 @@ impl EventHandle {
                             delay_task_handler_box.get_task_id(),
                             delay_task_handler_box.get_record_id(),
                         );
-                        self.recycle_unit_sources_sender.send(recycle_unit).await;
+                        self.recycle_unit_sources_sender
+                            .send(recycle_unit)
+                            .await
+                            .unwrap_or_else(|e| println!("{}", e));
                     }
 
                     self.task_trace.insert(task_id, delay_task_handler_box);
@@ -157,7 +160,7 @@ impl EventHandle {
         );
         //TODO:exec_time IS LESS THAN TIMESTAMP.
         let time_seed: u64 = exec_time - get_timestamp() + second_hand;
-        let slot_seed: u64 = (time_seed % DEFAULT_TIMER_SLOT_COUNT);
+        let slot_seed: u64 = time_seed % DEFAULT_TIMER_SLOT_COUNT;
 
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
 

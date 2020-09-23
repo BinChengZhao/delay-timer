@@ -147,21 +147,18 @@ impl Timer {
                 }
 
                 if let Some(mut task) = task_option {
-                    let mut delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
-                    delay_task_handler_box_builder.set_task_id(task_id);
-
-                    delay_task_handler_box_builder.set_record_id(snowflakeid_bucket.get_id());
-                    delay_task_handler_box_builder.set_start_time(timestamp);
-                    delay_task_handler_box_builder
-                        .set_end_time(task.get_maximum_running_time(timestamp));
-
                     let task_handler_box = (task.body)();
-                    let _tmp_task_handler_box =
-                        delay_task_handler_box_builder.spawn(task_handler_box);
+
+                    let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
+                    let tmp_task_handler_box = delay_task_handler_box_builder
+                        .set_task_id(dbg!(task_id))
+                        .set_record_id(dbg!(snowflakeid_bucket.get_id()))
+                        .set_start_time(dbg!(timestamp))
+                        .set_end_time(dbg!(task.get_maximum_running_time(timestamp)))
+                        .spawn(task_handler_box);
 
                     let task_valid = task.down_count_and_set_vaild();
-                    println!("timer-core:task_id:{}, valid:{}", task.task_id, task_valid);
-                    if !task_valid {
+                    if !dbg!(task_valid) {
                         drop(task);
                         continue;
                     }
@@ -183,7 +180,7 @@ impl Timer {
                     );
 
                     self.timer_event_sender
-                        .send(TimerEvent::AppendTaskHandle(task_id, _tmp_task_handler_box))
+                        .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
                         .await
                         .unwrap_or_else(|e| println!("{}", e));
 

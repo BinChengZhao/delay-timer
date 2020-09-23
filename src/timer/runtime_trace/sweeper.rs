@@ -11,7 +11,7 @@ use std::{
 
 use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
 
-#[derive(Default, Eq)]
+#[derive(Default, Eq, Debug)]
 pub(crate) struct RecycleUnit {
     deadline: u64,
     task_id: u64,
@@ -87,7 +87,7 @@ impl RecyclingBins {
                 // drop lock.
 
                 if let Some(recycle_flag) =
-                    (&mut recycle_unit_heap).peek().map(|r| r.0.deadline >= now)
+                    (&mut recycle_unit_heap).peek().map(|r| r.0.deadline <= now)
                 {
                     if !recycle_flag {
                         drop(recycle_unit_heap);
@@ -105,7 +105,8 @@ impl RecyclingBins {
                             recycle_unit.task_id,
                             recycle_unit.record_id,
                         ))
-                        .await;
+                        .await
+                        .unwrap_or_else(|e| println!("{}", e));
 
                 //send mes to event_handle.
 
@@ -128,7 +129,7 @@ impl RecyclingBins {
 
                 match self.recycle_unit_sources.try_recv() {
                     Ok(recycle_unit) => {
-                        (&mut recycle_unit_heap).push(Reverse(recycle_unit));
+                        (&mut recycle_unit_heap).push(dbg!(Reverse(recycle_unit)));
                     }
 
                     //TODO: Have a Error waiting fot handle.
