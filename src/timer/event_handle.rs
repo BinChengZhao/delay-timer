@@ -17,18 +17,17 @@ use std::sync::{
 use waitmap::WaitMap;
 
 use smol::{
-    channel::{unbounded, Sender, TryRecvError::*},
-    future::{race, FutureExt},
+    channel::{unbounded, Sender},
+    future::FutureExt,
 };
 
 //use `AcqRel::AcqRel` to store and load.....
 pub(crate) type SencondHand = Arc<AtomicU64>;
 
 pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
+//storage task current slot.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 // pub(crate) type SharedTaskTrace = Arc<TaskTrace>;
-
-//TODO: use TaskMapHeader insted of these Sharedxxxx.....
 
 //TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
@@ -87,10 +86,7 @@ impl EventHandle {
         self.status_report_sender = Some(status_report_sender);
     }
 
-    //_handle_event
-    //TODO: Maybe can package that in a delayTimeTask or smolTask... Tinking....
-    //if package smolTask for it, impl Futuren for this can auto-work.
-    //TODO:When separate handle_event   ,do not need global TASKMAP also and Mutex..........
+    //handle all event.
     pub(crate) async fn handle_event(&mut self) {
         while let Ok(event) = self.timer_event_receiver.recv().await {
             match event {
@@ -132,9 +128,6 @@ impl EventHandle {
         }
     }
 
-    //TODO:CancelTask, Is cancel once when task is running;
-    //I should storage processChild in somewhere, When cancel event hanple i will kill child.
-
     //TODO:
     //cancel is exit running task.
     //stop is suspension of execution(set vaild).
@@ -144,8 +137,6 @@ impl EventHandle {
 
     //if get cancel signal is sync task like 'spwan process' i can kill that, async i can cancel.
     //I think i can save async/sync handel in TaskTrace.
-
-    //TODO: self.buf Maybe need clear.
 
     //add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Task) -> TaskMark {
@@ -180,12 +171,12 @@ impl EventHandle {
         TaskMark::new(task_id, slot_seed)
     }
 
+    //for record task-mark.
     pub(crate) fn record_task_mark(&mut self, task_mark: TaskMark) {
         self.task_flag_map.insert(task_mark.task_id, task_mark);
     }
 
-    //TODO: addCountDown 限制，可能 remove 消息先消费，update slot后消费
-    //用waitmap.wait
+    //for remove task.
     pub(crate) async fn remove_task(&mut self, task_id: u64) -> Option<Task> {
         let task_mark = self.task_flag_map.get(&task_id)?;
 

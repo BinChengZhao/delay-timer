@@ -14,8 +14,9 @@ pub(crate) struct TaskTrace {
     inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
 }
 
+//hashMqp  task_id => child-handle-linklist
+//可以取消任务，child-handle 可以是进程句柄 - 也可以是异步句柄， 用linklist 是因为，可能任务支持同时多个并行
 impl TaskTrace {
-
     pub(crate) fn insert(&mut self, task_id: u64, task_handler_box: DelayTaskHandlerBox) {
         //entry is amazing!
         self.inner

@@ -6,7 +6,7 @@ use delay_timer::{
         runtime_trace::task_handle::DelayTaskHandler,
         task::{Frequency, TaskBuilder},
     },
-    utils::functions::create_delay_task_handler,
+    utils::functions::{create_default_delay_task_handler, create_delay_task_handler},
 };
 use smol::Timer;
 use std::fs::OpenOptions;
@@ -29,10 +29,9 @@ fn main() {
     let mut task_builder = TaskBuilder::default();
     let body = || {
         println!("task 1 ,1s run");
-        Box::new(MyUnit) as Box<dyn DelayTaskHandler>
+        create_default_delay_task_handler()
     };
 
-    //TODO:来一个简便函数，像thread::spawn() 一样，便捷生成任务。
     task_builder.set_frequency(Frequency::Repeated("* * * * * * *"));
     task_builder.set_task_id(1);
     let _task = task_builder.spawn(body);

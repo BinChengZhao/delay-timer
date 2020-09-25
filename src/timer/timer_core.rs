@@ -6,7 +6,6 @@ pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 ///timer,时间轮
-/// 未来我会将这个库，实现用于rust-cron
 /// someting i will wrote chinese ,someting i will wrote english
 /// I wanna wrote bilingual language show doc...
 /// there ara same content.
@@ -29,15 +28,7 @@ pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 pub(crate) type SencondHand = Arc<AtomicU64>;
 
-//我需要将 使用task_id关联任务，放到一个全局的hash表
-//两个作用，task_id 跟 Task 一一对应
-//在hash表上会存着，Task当前处在的Slot
-//TODO: Maybe that's can optimize.(We can add/del/set TaskMark in Timer.async_schedule)
-//TASKMAP is use to storage all TaskMark for check.
-
-//timer-async_schedule 负责往里面写/改数据， handel-event 负责删除
-
-//TODO:warning: large size difference between variants
+//warning: large size difference between variants
 pub(crate) enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
