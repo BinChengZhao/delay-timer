@@ -160,7 +160,7 @@ impl Timer {
                     //时间差+当前的分针
                     //比如 时间差是 7260，目前分针再 3599，7260+3599 = 10859
                     //， 从 当前 3599 走碰见三次，再第59个格子
-                    let step = task_excute_timestamp - timestamp + second_hand;
+                    let step = task_excute_timestamp.checked_sub(timestamp).unwrap_or_else(|| 1) + second_hand;
                     let quan = step / DEFAULT_TIMER_SLOT_COUNT;
                     task.set_cylinder_line(quan);
                     let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;

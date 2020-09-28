@@ -28,7 +28,7 @@ impl TaskMark {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Frequency {
     Once(&'static str),
     Repeated(&'static str),
@@ -71,7 +71,7 @@ impl FrequencyInner {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct TaskBuilder {
     frequency: Option<Frequency>,
     task_id: u64,

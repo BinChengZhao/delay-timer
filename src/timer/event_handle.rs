@@ -142,14 +142,16 @@ impl EventHandle {
     fn add_task(&mut self, mut task: Task) -> TaskMark {
         let second_hand = self.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();
+        //TODO:优化， 提取到tread_local 中timestamp or global process。
+        let timestamp = get_timestamp();
         println!(
             "event_handle:task_id:{}, next_time:{}, get_timestamp:{}",
             task.task_id,
             exec_time,
-            get_timestamp()
+            timestamp
         );
-        //TODO:exec_time IS LESS THAN TIMESTAMP.
-        let time_seed: u64 = exec_time - get_timestamp() + second_hand;
+        //TODO: unwrap_or_else 当减不过时，说明发生积压不能都放到下一个刻度上，应该来个随机数，随机扔一个刻度.
+        let time_seed: u64 = exec_time.checked_sub(timestamp).unwrap_or_else(|| 3) + second_hand;
         let slot_seed: u64 = time_seed % DEFAULT_TIMER_SLOT_COUNT;
 
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);

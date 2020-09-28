@@ -5,7 +5,7 @@ use super::timer::{
 };
 
 use anyhow::{Context, Result};
-use smol::channel::unbounded;
+use smol::{channel::unbounded, future::block_on};
 use std::sync::{atomic::AtomicU64, Arc};
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
@@ -68,7 +68,7 @@ impl DelayTimer {
         });
 
         pool.execute(move || {
-            smol::block_on(async {
+            block_on(async {
                 event_handle.handle_event().await;
             })
         });

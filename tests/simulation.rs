@@ -90,3 +90,20 @@ fn tests_countdown() {
         }
     }
 }
+
+#[test]
+fn bench_it() {
+    let mut delay_timer = DelayTimer::new();
+    let mut task_builder = TaskBuilder::default();
+    let body = move || create_default_delay_task_handler();
+
+    task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
+
+    for i in 0..10000 {
+        task_builder.set_task_id(i);
+        let task = task_builder.spawn(body);
+        delay_timer.add_task(task);
+    }
+    
+    park_timeout(Duration::from_secs(300));
+}
