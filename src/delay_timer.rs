@@ -36,6 +36,7 @@ impl DelayTimer {
             wheel_queue.clone(),
             task_flag_map.clone(),
             timer_event_sender.clone(),
+            second_hand.clone(),
         );
 
         //what is `ascription`.

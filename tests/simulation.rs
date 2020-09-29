@@ -1,3 +1,4 @@
+#![feature(ptr_internals)]
 use delay_timer::timer::timer_core::get_timestamp;
 use delay_timer::{
     delay_timer::DelayTimer,
@@ -14,14 +15,15 @@ use std::io::Write;
 use std::process::Command;
 use std::thread::Thread;
 use std::{
+    ptr::Unique,
     sync::{
         atomic::{
-            AtomicUsize,
-            Ordering::{Acquire, Release},
+            AtomicBool, AtomicUsize,
+            Ordering::{AcqRel, Acquire, Release, SeqCst},
         },
         Arc,
     },
-    thread::park_timeout,
+    thread::{current, park, park_timeout},
     time::{Duration, Instant},
 };
 
@@ -92,18 +94,50 @@ fn tests_countdown() {
 }
 
 #[test]
-fn bench_it() {
+fn demo_it() {
     let mut delay_timer = DelayTimer::new();
     let mut task_builder = TaskBuilder::default();
-    let body = move || create_default_delay_task_handler();
+    let mut run_flag = Arc::new(AtomicUsize::new(0));
+    // let run_flag_ref = run_flag.clone();
+    let mut run_flag_ref: Option<Unique<Arc<AtomicUsize>>> = Unique::new(&mut run_flag);
 
-    task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
+    let thread = current();
 
-    for i in 0..10000 {
+    let body = move || {
+        let local_run_flag = unsafe { run_flag_ref.unwrap().as_ptr() };
+
+        unsafe {
+            (*local_run_flag).fetch_add(1, SeqCst);
+        }
+        create_default_delay_task_handler()
+    };
+    let end_body = move || {
+        let local_run_flag = unsafe { run_flag_ref.unwrap().as_ptr() };
+        unsafe {
+            println!(
+                "end time {}, result {}",
+                get_timestamp(),
+                (*local_run_flag).load(SeqCst)
+            );
+        }
+        thread.unpark();
+        create_default_delay_task_handler()
+    };
+
+    task_builder.set_frequency(Frequency::CountDown(1, "0/10 * * * * * *"));
+    task_builder.set_maximum_running_time(5);
+
+    println!("start time {}", get_timestamp());
+    for i in 0..100 {
         task_builder.set_task_id(i);
-        let task = task_builder.spawn(body);
+
+        let task = task_builder.spawn(body.clone());
         delay_timer.add_task(task);
     }
-    
-    park_timeout(Duration::from_secs(300));
+
+    task_builder.set_task_id(300);
+    let task = task_builder.spawn(end_body);
+    delay_timer.add_task(task);
+
+    park();
 }

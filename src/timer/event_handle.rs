@@ -144,21 +144,25 @@ impl EventHandle {
         let exec_time: u64 = task.get_next_exec_timestamp();
         //TODO:优化， 提取到tread_local 中timestamp or global process。
         let timestamp = get_timestamp();
-        println!(
-            "event_handle:task_id:{}, next_time:{}, get_timestamp:{}",
-            task.task_id,
-            exec_time,
-            timestamp
-        );
-        //TODO: unwrap_or_else 当减不过时，说明发生积压不能都放到下一个刻度上，应该来个随机数，随机扔一个刻度.
-        let time_seed: u64 = exec_time.checked_sub(timestamp).unwrap_or_else(|| 3) + second_hand;
+        // println!(
+        //     "event_handle:task_id:{}, next_time:{}, get_timestamp:{}",
+        //     task.task_id,
+        //     exec_time,
+        //     timestamp
+        // );
+        //TODO: unwrap_or_else 当减不过时，说明发生积压不能都放到下一个刻度上，来个随机数，随机扔一个刻度.
+
+        let time_seed: u64 = exec_time
+            .checked_sub(timestamp)
+            .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
+            + second_hand;
         let slot_seed: u64 = time_seed % DEFAULT_TIMER_SLOT_COUNT;
 
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
 
         println!(
-            "event_handle:task_id:{}, next_time:{}, slot_seed:{}",
-            task.task_id, exec_time, slot_seed
+            "event_handle:task_id:{}, current_time {}, exec_time:{}, slot_seed:{}, second_hand{}",
+            task.task_id, timestamp, exec_time, slot_seed, second_hand
         );
 
         //copu task_id

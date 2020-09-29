@@ -56,12 +56,13 @@ impl Timer {
         wheel_queue: SharedTaskWheel,
         task_flag_map: SharedTaskFlagMap,
         timer_event_sender: TimerEventSender,
+        second_hand: SencondHand,
     ) -> Self {
         Timer {
             wheel_queue,
             task_flag_map,
             timer_event_sender,
-            second_hand: Arc::new(AtomicU64::new(0)),
+            second_hand,
             status_report_sender: None,
         }
     }
@@ -81,6 +82,7 @@ impl Timer {
         self.report(1);
     }
 
+    //TODO:读取当前slot时，提前+1 ，让event_handle 怎样都可以插入到之后slot
     pub fn next_position(&mut self) -> u64 {
         self.second_hand
             .fetch_update(Release, Relaxed, |x| {
@@ -112,16 +114,12 @@ impl Timer {
             now = Instant::now();
             when = now + Duration::from_secs(1);
             timestamp = get_timestamp();
-
             let task_ids;
 
             {
-                task_ids = self
-                    .wheel_queue
-                    .get_mut(&second_hand)
-                    .unwrap()
-                    .value_mut()
-                    .arrival_time_tasks();
+                let mut slot_mut = self.wheel_queue.get_mut(&second_hand).unwrap();
+
+                task_ids = slot_mut.value_mut().arrival_time_tasks();
             }
 
             println!("timer-core:Timer-second_hand: {}", second_hand);
@@ -129,12 +127,9 @@ impl Timer {
                 let task_option: Option<Task>;
 
                 {
-                    task_option = self
-                        .wheel_queue
-                        .get_mut(&second_hand)
-                        .unwrap()
-                        .value_mut()
-                        .remove_task(task_id);
+                    let mut slot_mut = self.wheel_queue.get_mut(&second_hand).unwrap();
+
+                    task_option = slot_mut.value_mut().remove_task(task_id);
                 }
 
                 if let Some(mut task) = task_option {
@@ -142,14 +137,14 @@ impl Timer {
 
                     let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
                     let tmp_task_handler_box = delay_task_handler_box_builder
-                        .set_task_id(dbg!(task_id))
-                        .set_record_id(dbg!(snowflakeid_bucket.get_id()))
-                        .set_start_time(dbg!(timestamp))
-                        .set_end_time(dbg!(task.get_maximum_running_time(timestamp)))
+                        .set_task_id(task_id)
+                        .set_record_id(snowflakeid_bucket.get_id())
+                        .set_start_time(timestamp)
+                        .set_end_time(task.get_maximum_running_time(timestamp))
                         .spawn(task_handler_box);
 
                     let task_valid = task.down_count_and_set_vaild();
-                    if !dbg!(task_valid) {
+                    if !task_valid {
                         drop(task);
                         continue;
                     }
@@ -160,7 +155,10 @@ impl Timer {
                     //时间差+当前的分针
                     //比如 时间差是 7260，目前分针再 3599，7260+3599 = 10859
                     //， 从 当前 3599 走碰见三次，再第59个格子
-                    let step = task_excute_timestamp.checked_sub(timestamp).unwrap_or_else(|| 1) + second_hand;
+                    let step = task_excute_timestamp
+                        .checked_sub(timestamp)
+                        .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
+                        + second_hand;
                     let quan = step / DEFAULT_TIMER_SLOT_COUNT;
                     task.set_cylinder_line(quan);
                     let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
@@ -176,19 +174,15 @@ impl Timer {
                         .unwrap_or_else(|e| println!("{}", e));
 
                     {
-                        self.task_flag_map
-                            .get_mut(&task_id)
-                            .unwrap()
-                            .value_mut()
-                            .set_slot_mark(slot_seed);
+                        let mut slot_mut = self.wheel_queue.get_mut(&slot_seed).unwrap();
+
+                        slot_mut.value_mut().add_task(task);
                     }
 
                     {
-                        self.wheel_queue
-                            .get_mut(&slot_seed)
-                            .unwrap()
-                            .value_mut()
-                            .add_task(task);
+                        let mut task_flag_map = self.task_flag_map.get_mut(&task_id).unwrap();
+
+                        task_flag_map.value_mut().set_slot_mark(slot_seed);
                     }
                 }
             }
