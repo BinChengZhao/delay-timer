@@ -144,6 +144,7 @@ impl<'a> TaskBuilder {
 }
 
 impl Task {
+    #[inline(always)]
     pub fn new(
         task_id: u64,
         frequency: FrequencyInner,

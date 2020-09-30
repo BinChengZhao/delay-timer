@@ -106,6 +106,7 @@ fn demo_it() {
     let body = move || {
         let local_run_flag = unsafe { run_flag_ref.unwrap().as_ptr() };
 
+        println!("running....");
         unsafe {
             (*local_run_flag).fetch_add(1, SeqCst);
         }
@@ -128,7 +129,7 @@ fn demo_it() {
     task_builder.set_maximum_running_time(5);
 
     println!("start time {}", get_timestamp());
-    for i in 0..100 {
+    for i in 0..10 {
         task_builder.set_task_id(i);
 
         let task = task_builder.spawn(body.clone());
