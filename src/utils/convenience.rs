@@ -13,6 +13,8 @@ impl DelayTaskHandler for MyUnit {
 pub mod functions {
 
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
+
+    #[inline(always)]
     pub fn create_delay_task_handler(
         task_handle: impl DelayTaskHandler + 'static + Send + Sync,
     ) -> Box<dyn DelayTaskHandler> {

@@ -110,6 +110,8 @@ impl Timer {
         //TODO:auto-get nodeid and machineid.
         let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
         loop {
+            //TODO: replenish ending single, for stop current jod and thread.
+
             second_hand = self.next_position();
             now = Instant::now();
             when = now + Duration::from_secs(1);
@@ -161,11 +163,15 @@ impl Timer {
             .set_end_time(task.get_maximum_running_time(timestamp))
             .spawn(task_handler_box);
 
+        self.timer_event_sender
+            .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
+            .await
+            .unwrap_or_else(|e| println!("{}", e));
+
         let task_valid = task.down_count_and_set_vaild();
         if !task_valid {
             return;
         }
-
         //下一次执行时间
         let task_excute_timestamp = task.get_next_exec_timestamp();
 
@@ -185,9 +191,6 @@ impl Timer {
         //     task.task_id, step, slot_seed, quan
         // );
 
-        self.timer_event_sender
-            .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
-            .await;
         //FIXME: hidden send error for bench.
         //.unwrap_or_else(|e| println!("{}", e));
 

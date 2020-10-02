@@ -1,8 +1,7 @@
-//TaskTrace-全局的句柄
+///TaskTrace own global task-handle.
 //当进程消亡，跟异步任务drop的时候对应的链表也减少，如果没值则删除k/v
 //如果是单实例执行任务，查看对应id是否有句柄在链表，如果有则跳过
 //如果是可多实例执行，直接追加新句柄在链表后
-//每个任务执行时，挂一个async的计时器，到时间时去调用句柄的cancel，调度者不负责取消超时
 
 use anyhow::Result;
 use smol::Task as SmolTask;

@@ -1,3 +1,14 @@
+//! DelayTimer is a cyclic task manager with latency properties, 
+//! based on an internal event manager and task scheduler, 
+//! and supported by the runtime provided by smol, 
+//! which makes it easy to manage asynchronous/synchronous/scripted cyclic tasks.
+//!
+//! # DelayTimer
+//!
+//! User applications can be served through the lib used by DelayTimer:
+//!
+//! 1. Mission deployment.
+//TODO:Replenish example in doc.
 #![feature(split_inclusive)]
 #![feature(drain_filter)]
 #![feature(test)]

@@ -12,9 +12,16 @@ use std::{
 use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
 
 #[derive(Default, Eq, Debug)]
+/// recycle unit.
 pub(crate) struct RecycleUnit {
+ 
+    /// deadline.
     deadline: u64,
+
+    /// task-id.
     task_id: u64,
+
+    ///record-id.
     record_id: i64,
 }
 
@@ -46,14 +53,21 @@ impl PartialEq for RecycleUnit {
     }
 }
 
-//RecyclingBins is resource recycler, excute timeout task-handle.
+///RecyclingBins is resource recycler, excute timeout task-handle.
 pub(crate) struct RecyclingBins {
+
+    ///storage all task-handle in there.
     recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>>,
+
+    /// use it to recieve source-data build recycle-unit.
     recycle_unit_sources: Receiver<RecycleUnit>,
+
+    /// notify timeout-event to event-handler for cancel that.
     timer_event_sender: TimerEventSender,
 }
 
 impl RecyclingBins {
+    /// construct.
     pub(crate) fn new(
         recycle_unit_sources: Receiver<RecycleUnit>,
         timer_event_sender: TimerEventSender,
@@ -68,6 +82,8 @@ impl RecyclingBins {
         }
     }
 
+
+    /// alternate run fn between recycle and  add_recycle_unit.
     pub(crate) async fn recycle(self: Arc<Self>) {
         //get now timestamp
 
@@ -113,6 +129,7 @@ impl RecyclingBins {
         }
     }
 
+    /// alternate run fn between recycle and  add_recycle_unit.
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {
         'loopLayer: loop {
             'forLayer: for _ in 0..200 {

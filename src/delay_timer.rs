@@ -1,3 +1,13 @@
+//! DelayTimer is a cyclic task manager with latency properties, 
+//! based on an internal event manager and task scheduler, 
+//! and supported by the runtime provided by smol, 
+//! which makes it easy to manage asynchronous/synchronous/scripted cyclic tasks.
+//!
+//! # DelayTimer
+//!
+//! User applications can be served through the lib used by DelayTimer:
+//!
+//! 1. Mission deployment.
 use super::timer::{
     event_handle::EventHandle,
     task::Task,
@@ -9,7 +19,7 @@ use smol::{channel::unbounded, future::block_on};
 use std::sync::{atomic::AtomicU64, Arc};
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
-
+//TODO:replenish the doc.
 // #[cfg(feature = "status-report")]
 
 pub struct DelayTimer {
@@ -18,8 +28,7 @@ pub struct DelayTimer {
 
 impl Default for DelayTimer {
     fn default() -> Self {
-        let mut delay_timer = DelayTimer::new();
-        delay_timer.init();
+        let delay_timer = DelayTimer::new();
         delay_timer
     }
 }
@@ -51,15 +60,9 @@ impl DelayTimer {
 
         //features include these fn:
         //TODO: timer.set_status_reporter
-        //TODO: timer.set_recycle_task
-
-        // set_recycle_task have a async_channel,
-        // get task record put that in minimum heap with estimate finish time.
-        // recycle task handle by a minimum heap.
-        // set_recycle_task be restrain execution time 300ms.
 
         // Use threadpool can replenishes the pool if any worker threads panic.
-        //TODO: Maybe can use easy-parallel.
+        // do not use easy-parallel it can block curent thread.
         let pool = ThreadPool::new(2);
 
         pool.execute(move || {
@@ -75,10 +78,6 @@ impl DelayTimer {
         });
 
         DelayTimer { timer_event_sender }
-    }
-
-    fn init(&mut self) -> Result<()> {
-        Ok(())
     }
 
     // if open "status-report", then register task 3s auto-run report

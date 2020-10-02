@@ -1,3 +1,12 @@
+//! A woker for handle events.
+//!
+//! # EventHandle
+//!
+//! This is an important entry point to control the flow of tasks:
+//!
+//! 1. Branch of different mandated events.
+//! 2. A communication center for internal and external workers.
+
 use super::{
     runtime_trace::{
         sweeper::{RecycleUnit, RecyclingBins},
@@ -21,13 +30,12 @@ use smol::{
     future::FutureExt,
 };
 
-//use `AcqRel::AcqRel` to store and load.....
+
 pub(crate) type SencondHand = Arc<AtomicU64>;
 
 pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
 //storage task current slot.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
-// pub(crate) type SharedTaskTrace = Arc<TaskTrace>;
 
 //TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
@@ -93,6 +101,8 @@ impl EventHandle {
                 TimerEvent::StopTimer => {
                     //TODO: DONE all of runing tasks.
                     //clear queue.
+
+                    //in the meantime set ending single stop timer_core.
                     panic!("i'm stop")
                 }
                 TimerEvent::AddTask(task) => {
@@ -115,7 +125,7 @@ impl EventHandle {
                             delay_task_handler_box.get_record_id(),
                         );
                         self.recycle_unit_sources_sender
-                            .send(recycle_unit)
+                            .send(dbg!(recycle_unit))
                             .await
                             .unwrap_or_else(|e| println!("{}", e));
                     }
