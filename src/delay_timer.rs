@@ -1,6 +1,6 @@
-//! DelayTimer is a cyclic task manager with latency properties, 
-//! based on an internal event manager and task scheduler, 
-//! and supported by the runtime provided by smol, 
+//! DelayTimer is a cyclic task manager with latency properties,
+//! based on an internal event manager and task scheduler,
+//! and supported by the runtime provided by smol,
 //! which makes it easy to manage asynchronous/synchronous/scripted cyclic tasks.
 //!
 //! # DelayTimer

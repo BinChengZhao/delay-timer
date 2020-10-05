@@ -30,7 +30,6 @@ use smol::{
     future::FutureExt,
 };
 
-
 pub(crate) type SencondHand = Arc<AtomicU64>;
 
 pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;

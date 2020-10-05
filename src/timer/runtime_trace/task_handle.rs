@@ -2,7 +2,6 @@
 //当进程消亡，跟异步任务drop的时候对应的链表也减少，如果没值则删除k/v
 //如果是单实例执行任务，查看对应id是否有句柄在链表，如果有则跳过
 //如果是可多实例执行，直接追加新句柄在链表后
-
 use anyhow::Result;
 use smol::Task as SmolTask;
 use std::collections::{HashMap, LinkedList};
@@ -174,6 +173,18 @@ impl DelayTaskHandler for Child {
     fn quit(mut self: Box<Self>) -> Result<()> {
         //to anyhow:Result
         self.kill()?;
+        Ok(())
+    }
+}
+
+impl DelayTaskHandler for LinkedList<Child> {
+    fn quit(mut self: Box<Self>) -> Result<()> {
+        //to anyhow:Result
+
+        for child in (*self).iter_mut() {
+            //TODO:Maybe first child kill fail after childs will be leak.
+            child.kill()?;
+        }
         Ok(())
     }
 }

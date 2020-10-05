@@ -14,7 +14,6 @@ use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
 #[derive(Default, Eq, Debug)]
 /// recycle unit.
 pub(crate) struct RecycleUnit {
- 
     /// deadline.
     deadline: u64,
 
@@ -55,7 +54,6 @@ impl PartialEq for RecycleUnit {
 
 ///RecyclingBins is resource recycler, excute timeout task-handle.
 pub(crate) struct RecyclingBins {
-
     ///storage all task-handle in there.
     recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>>,
 
@@ -81,7 +79,6 @@ impl RecyclingBins {
             timer_event_sender,
         }
     }
-
 
     /// alternate run fn between recycle and  add_recycle_unit.
     pub(crate) async fn recycle(self: Arc<Self>) {
