@@ -42,12 +42,20 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 // flag_map slotid with biggest task-slotid in trace, if has one delay, send a msg for recycleer
 // let it to trash the last taskhandle.
 pub(crate) struct EventHandle {
+    
+    //The task wheel has a slot dimension.
     wheel_queue: SharedTaskWheel,
+    //Task distribution map to track where tasks are in a slot for easy removal.
     task_flag_map: SharedTaskFlagMap,
+    //The hands of the clock.
     second_hand: SencondHand,
+    //Task Handle Collector, which makes it easy to cancel a running task.
     task_trace: TaskTrace,
+    //The core of the event recipient, dealing with the global event.
     timer_event_receiver: TimerEventReceiver,
+    //TODO:Reporter.
     status_report_sender: Option<Sender<i32>>,
+    //Data Senders for Resource Recyclers.
     recycle_unit_sources_sender: Sender<RecycleUnit>,
 }
 

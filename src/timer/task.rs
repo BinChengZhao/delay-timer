@@ -19,11 +19,11 @@ impl TaskMark {
         TaskMark { task_id, slot_mark }
     }
 
-    pub fn get_slot_mark(&self) -> u64 {
+    pub(crate) fn get_slot_mark(&self) -> u64 {
         self.slot_mark
     }
 
-    pub fn set_slot_mark(&mut self, slot_mark: u64) {
+    pub(crate) fn set_slot_mark(&mut self, slot_mark: u64) {
         self.slot_mark = slot_mark;
     }
 }

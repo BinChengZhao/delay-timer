@@ -3,6 +3,9 @@ use std::collections::HashMap;
 
 //Slot is based on HashMap, It easy to add it and find it.
 pub struct Slot {
+    //The scale of the clock, the task source is maintained by a hash table, 
+    //the addition and removal of tasks is O(1), 
+    //and the subtraction of laps is O(n).
     task_map: HashMap<u64, Task>,
 }
 

@@ -8,6 +8,7 @@ use std::collections::{HashMap, LinkedList};
 use std::process::Child;
 
 #[derive(Default)]
+// TaskTrace is contanier
 pub(crate) struct TaskTrace {
     inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
 }
@@ -41,6 +42,7 @@ impl TaskTrace {
     ) -> Option<Result<()>> {
         let task_handler_list = self.inner.get_mut(&task_id)?;
 
+        //TODO: Optimize.
         let filter_collection =
             task_handler_list.drain_filter(|handler_box| handler_box.record_id == record_id);
 
