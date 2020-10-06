@@ -4,12 +4,12 @@ use cron_clock::Utc;
 use std::str::FromStr;
 //TaskMark is use to remove/stop the task.
 #[derive(Default)]
-pub struct TaskMark {
+pub(crate) struct TaskMark {
     pub(crate) task_id: u64,
     slot_mark: u64,
 }
 
-pub enum TaskType {
+pub(crate) enum TaskType {
     AsyncType,
     SyncType,
 }
@@ -29,13 +29,17 @@ impl TaskMark {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum Frequency {
-    Once(&'static str),
-    Repeated(&'static str),
-    CountDown(u32, &'static str),
+///Enumerated values of repeating types.
+pub enum Frequency<'a> {
+    ///Repeat once.
+    Once(&'a str),
+    ///Repeat ad infinitum.
+    Repeated(&'a str),
+    ///Type of countdown.
+    CountDown(u32, &'a str),
 }
 
-pub enum FrequencyInner {
+pub(crate) enum FrequencyInner {
     Repeated(ScheduleIteratorOwned<Utc>),
     CountDown(u32, ScheduleIteratorOwned<Utc>),
 }
@@ -72,20 +76,32 @@ impl FrequencyInner {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-pub struct TaskBuilder {
-    frequency: Option<Frequency>,
+///Cycle plan task builder.
+pub struct TaskBuilder<'a> {
+    ///Repeat type.
+    frequency: Option<Frequency<'a>>,
+
+    ///Task_id should unique.
     task_id: u64,
+
+    ///Maximum execution time (optional).
     maximum_running_time: Option<u64>,
 }
 
 //TASK 执行完了，支持找新的Slot
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 pub struct Task {
+    ///Unique task-id.
     pub task_id: u64,
+    ///Iter of frequencies and executive clocks.
     frequency: FrequencyInner,
+    /// A Fn in box it can be run and return delayTaskHandler.
     pub(crate) body: SafeBoxFn,
+    ///Maximum execution time (optional).
     maximum_running_time: Option<u64>,
+    ///Loop the line and check how many more clock cycles it will take to execute it.
     cylinder_line: u64,
+    ///Validity.
     valid: bool,
 }
 
@@ -97,25 +113,31 @@ enum RepeatType {
     Always,
 }
 
-impl<'a> TaskBuilder {
-    pub fn set_frequency(&mut self, frequency: Frequency) {
+impl<'a> TaskBuilder<'a> {
+
+    ///Set task Frequency.
+    pub fn set_frequency(&mut self, frequency: Frequency<'a>) {
         self.frequency = Some(frequency);
     }
+
+    ///Set task-id.
     pub fn set_task_id(&mut self, task_id: u64) {
         self.task_id = task_id;
     }
 
+    ///Set maximum execution time (optional).
     pub fn set_maximum_running_time(&mut self, maximum_running_time: u64) {
         self.maximum_running_time = Some(maximum_running_time);
     }
 
+    ///Spawn a task.
     pub fn spawn<F>(self, body: F) -> Task
     where
         F: Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
         let frequency_inner;
 
-        //通过输入的模式匹配，表达式与重复类型
+        //The user inputs are pattern matched for different repetition types.
         let (expression_str, repeat_type) = match self.frequency.unwrap() {
             Frequency::Once(expression_str) => (expression_str, RepeatType::Num(1)),
             Frequency::Repeated(expression_str) => (expression_str, RepeatType::Always),
@@ -124,11 +146,11 @@ impl<'a> TaskBuilder {
             }
         };
 
-        //构建时间迭代器
+        //From cron-expression-str build time-iter.
         let schedule = Schedule::from_str(expression_str).unwrap();
         let taskschedule = schedule.upcoming_owned(Utc);
 
-        //根据重复类型，构建TaskFrequencyInner模式
+        //Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
             RepeatType::Always => FrequencyInner::Repeated(taskschedule),
             RepeatType::Num(repeat_count) => FrequencyInner::CountDown(repeat_count, taskschedule),
@@ -145,7 +167,7 @@ impl<'a> TaskBuilder {
 
 impl Task {
     #[inline(always)]
-    pub fn new(
+    pub(crate) fn new(
         task_id: u64,
         frequency: FrequencyInner,
         body: SafeBoxFn,
@@ -163,6 +185,7 @@ impl Task {
 
     //swap slot loction ,do this
     //down_count_and_set_vaild,will return new vaild status.
+    #[inline(always)]
     pub fn down_count_and_set_vaild(&mut self) -> bool {
         self.down_count();
         self.set_valid_by_count_down();
@@ -170,19 +193,23 @@ impl Task {
     }
 
     //down_exec_count
+    #[inline(always)]
     fn down_count(&mut self) {
         self.frequency.down_count();
     }
 
     //set_valid_by_count_down
+    #[inline(always)]
     fn set_valid_by_count_down(&mut self) {
         self.valid = self.frequency.is_down_over();
     }
 
-    pub fn set_cylinder_line(&mut self, cylinder_line: u64) {
+    #[inline(always)]
+    pub(crate) fn set_cylinder_line(&mut self, cylinder_line: u64) {
         self.cylinder_line = cylinder_line;
     }
 
+    #[inline(always)]
     pub fn get_maximum_running_time(&self, start_time: u64) -> Option<u64> {
         self.maximum_running_time.map(|t| t + start_time)
     }
@@ -190,11 +217,13 @@ impl Task {
     //single slot foreach do this.
     //sub_cylinder_line
     //return is can_running?
-    pub fn sub_cylinder_line(&mut self) -> bool {
+    #[inline(always)]
+    pub(crate) fn sub_cylinder_line(&mut self) -> bool {
         self.cylinder_line -= 1;
         self.is_can_running()
     }
 
+    #[inline(always)]
     pub fn check_arrived(&mut self) -> bool {
         if self.cylinder_line == 0 {
             return self.is_can_running();
@@ -203,11 +232,13 @@ impl Task {
     }
 
     //check is ready
+    #[inline(always)]
     pub fn is_already(&self) -> bool {
         self.cylinder_line == 0
     }
 
     //is_can_running
+    #[inline(always)]
     pub fn is_can_running(&self) -> bool {
         if self.is_valid() {
             return self.is_already();
@@ -216,11 +247,13 @@ impl Task {
     }
 
     //is_valid
+    #[inline(always)]
     pub fn is_valid(&self) -> bool {
         self.valid
     }
 
     //get_next_exec_timestamp
+    #[inline(always)]
     pub fn get_next_exec_timestamp(&mut self) -> u64 {
         self.frequency.next_alarm_timestamp() as u64
     }

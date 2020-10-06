@@ -5,7 +5,6 @@ use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
-///timer,时间轮
 /// someting i will wrote chinese ,someting i will wrote english
 /// I wanna wrote bilingual language show doc...
 /// there ara same content.
@@ -38,18 +37,17 @@ pub(crate) enum TimerEvent {
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
 
-//add channel
-//explore on time task
-// 暴漏一个 接收方，让读取任务
-pub struct Timer {
+pub(crate) struct Timer {
     wheel_queue: SharedTaskWheel,
     task_flag_map: SharedTaskFlagMap,
     timer_event_sender: TimerEventSender,
     second_hand: SencondHand,
+    //TODO:status_report_sender.
     status_report_sender: Option<AsyncSender<i32>>,
 }
 
-//不在调度者里面执行任务，不然时间会不准
+//In any case, the task is not executed in the scheduler, 
+//and task-Fn determines which runtime to put the internal task in when it is generated.
 //just provice api and struct ,less is more.
 impl Timer {
     pub(crate) fn new(
@@ -82,20 +80,15 @@ impl Timer {
         self.report(1);
     }
 
-    //TODO:读取当前slot时，提前+1 ，让event_handle 怎样都可以插入到之后slot
-    pub fn next_position(&mut self) -> u64 {
+    //Offset the current slot by one when reading it, 
+    //so event_handle can be easily inserted into subsequent slots.
+    pub(crate) fn next_position(&mut self) -> u64 {
         self.second_hand
             .fetch_update(Release, Relaxed, |x| {
                 Some((x + 1) % DEFAULT_TIMER_SLOT_COUNT)
             })
             .unwrap_or_else(|e| e)
     }
-
-    ///here,I wrote so poorly, greet you give directions.
-    /// schedule：
-    ///    first. add ||　remove task 。
-    ///    second.spawn task .
-    ///    thirid sleed 1- (run duration).
 
     pub(crate) async fn async_schedule(&mut self) {
         //not runing 1s ,Duration - runing time

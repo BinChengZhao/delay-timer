@@ -9,6 +9,7 @@ pub mod shell_command {
     use std::collections::LinkedList;
     //that code from 'build-your-own-shell-rust'. Thanks you Josh Mcguigan.
 
+    ///Generate a list of processes from a string of shell commands.
     pub fn parse_and_run(input: &str) -> Result<LinkedList<Child>> {
         let mut process_linked_list: LinkedList<Child> = LinkedList::new();
         // must be peekable so we know when we are on the last command

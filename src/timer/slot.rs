@@ -27,7 +27,7 @@ impl Slot {
     //check并减cylinder_line，
     //返回现在要运行的，TaskOwned的集合
     //cylinder_line == 0
-    pub fn arrival_time_tasks(&mut self) -> Vec<u64> {
+    pub(crate) fn arrival_time_tasks(&mut self) -> Vec<u64> {
         let mut task_id_vec = vec![];
 
         for (_, task) in self.task_map.iter_mut() {
