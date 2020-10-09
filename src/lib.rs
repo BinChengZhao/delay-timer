@@ -30,7 +30,7 @@ mod tests {
     use waitmap::WaitMap;
 
     use crate::{
-        delay_timer::DelayTimer,
+        delay_timer::{DelayTimer, SharedHeader},
         timer::{
             event_handle::EventHandle,
             runtime_trace::task_handle::DelayTaskHandler,
@@ -56,17 +56,9 @@ mod tests {
 
     #[bench]
     fn bench_maintain_task(b: &mut Bencher) {
-        let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
-        let task_flag_map = Arc::new(WaitMap::new());
-        let second_hand = Arc::new(AtomicU64::new(0));
-
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
-        let mut timer = Timer::new(
-            wheel_queue.clone(),
-            task_flag_map.clone(),
-            timer_event_sender.clone(),
-            second_hand.clone(),
-        );
+        let shared_header = SharedHeader::default();
+        let mut timer = Timer::new(timer_event_sender.clone(), shared_header);
 
         let body = move || create_default_delay_task_handler();
 

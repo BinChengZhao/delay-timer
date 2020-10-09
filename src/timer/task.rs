@@ -114,7 +114,6 @@ enum RepeatType {
 }
 
 impl<'a> TaskBuilder<'a> {
-
     ///Set task Frequency.
     pub fn set_frequency(&mut self, frequency: Frequency<'a>) {
         self.frequency = Some(frequency);

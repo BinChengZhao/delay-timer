@@ -2,6 +2,7 @@ use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
 use anyhow::Result;
 
+///No size type, API compliant consistency.
 pub struct MyUnit;
 
 impl DelayTaskHandler for MyUnit {

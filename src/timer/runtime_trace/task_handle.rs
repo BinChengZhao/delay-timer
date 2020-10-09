@@ -89,7 +89,7 @@ impl Drop for DelayTaskHandlerBox {
         if let Some(task_handler) = self.task_handler.take() {
             //使用trait 对象，不能直接传所有权，因为大小不确定
             //所以我用Box包装一下
-            task_handler.quit();
+            task_handler.quit().unwrap_or_else(|e| println!("{}", e));
         }
     }
 }

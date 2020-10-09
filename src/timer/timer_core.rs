@@ -1,32 +1,28 @@
-// use super::event_handle;
-use super::event_handle::{SharedTaskFlagMap, SharedTaskWheel};
+use super::event_handle::{
+     SharedHeader,
+};
 pub(crate) use super::runtime_trace::task_handle::DelayTaskHandlerBox;
 use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
+pub use crate::delay_timer::get_timestamp;
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
-/// someting i will wrote chinese ,someting i will wrote english
-/// I wanna wrote bilingual language show doc...
-/// there ara same content.
 use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
 use smol::Timer as SmolTimer;
 use std::sync::{
     atomic::{
-        AtomicU64,
+        
         Ordering::{Relaxed, Release},
     },
-    Arc,
 };
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
 
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
-pub(crate) type SencondHand = Arc<AtomicU64>;
-
 //warning: large size difference between variants
 pub(crate) enum TimerEvent {
     StopTimer,
@@ -38,30 +34,21 @@ pub(crate) enum TimerEvent {
 }
 
 pub(crate) struct Timer {
-    wheel_queue: SharedTaskWheel,
-    task_flag_map: SharedTaskFlagMap,
     timer_event_sender: TimerEventSender,
-    second_hand: SencondHand,
     //TODO:status_report_sender.
     status_report_sender: Option<AsyncSender<i32>>,
+    shared_header: SharedHeader,
 }
 
-//In any case, the task is not executed in the scheduler, 
+//In any case, the task is not executed in the scheduler,
 //and task-Fn determines which runtime to put the internal task in when it is generated.
 //just provice api and struct ,less is more.
 impl Timer {
-    pub(crate) fn new(
-        wheel_queue: SharedTaskWheel,
-        task_flag_map: SharedTaskFlagMap,
-        timer_event_sender: TimerEventSender,
-        second_hand: SencondHand,
-    ) -> Self {
+    pub(crate) fn new(timer_event_sender: TimerEventSender, shared_header: SharedHeader) -> Self {
         Timer {
-            wheel_queue,
-            task_flag_map,
             timer_event_sender,
-            second_hand,
             status_report_sender: None,
+            shared_header,
         }
     }
 
@@ -70,7 +57,7 @@ impl Timer {
     }
 
     //TODO:features append fn put there.
-    pub(crate) fn features_append_fn(&mut self, sender: AsyncSender<i32>) {
+    pub(crate) fn features_append_fn(&mut self, _sender: AsyncSender<i32>) {
         #[cfg(feature = "status-report")]
         fn report(&mut self, record: i32) {
             // async.sender.send(record);
@@ -80,10 +67,11 @@ impl Timer {
         self.report(1);
     }
 
-    //Offset the current slot by one when reading it, 
+    //Offset the current slot by one when reading it,
     //so event_handle can be easily inserted into subsequent slots.
     pub(crate) fn next_position(&mut self) -> u64 {
-        self.second_hand
+        self.shared_header
+            .second_hand
             .fetch_update(Release, Relaxed, |x| {
                 Some((x + 1) % DEFAULT_TIMER_SLOT_COUNT)
             })
@@ -109,10 +97,15 @@ impl Timer {
             now = Instant::now();
             when = now + Duration::from_secs(1);
             timestamp = get_timestamp();
+            self.shared_header.global_time.store(timestamp, Release);
             let task_ids;
 
             {
-                let mut slot_mut = self.wheel_queue.get_mut(&second_hand).unwrap();
+                let mut slot_mut = self
+                    .shared_header
+                    .wheel_queue
+                    .get_mut(&second_hand)
+                    .unwrap();
 
                 task_ids = slot_mut.value_mut().arrival_time_tasks();
             }
@@ -122,7 +115,11 @@ impl Timer {
                 let task_option: Option<Task>;
 
                 {
-                    let mut slot_mut = self.wheel_queue.get_mut(&second_hand).unwrap();
+                    let mut slot_mut = self
+                        .shared_header
+                        .wheel_queue
+                        .get_mut(&second_hand)
+                        .unwrap();
 
                     task_option = slot_mut.value_mut().remove_task(task_id);
                 }
@@ -188,22 +185,15 @@ impl Timer {
         //.unwrap_or_else(|e| println!("{}", e));
 
         {
-            let mut slot_mut = self.wheel_queue.get_mut(&slot_seed).unwrap();
+            let mut slot_mut = self.shared_header.wheel_queue.get_mut(&slot_seed).unwrap();
 
             slot_mut.value_mut().add_task(task);
         }
 
         {
-            let mut task_flag_map = self.task_flag_map.get_mut(&task_id).unwrap();
+            let mut task_flag_map = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
 
             task_flag_map.value_mut().set_slot_mark(slot_seed);
         }
-    }
-}
-
-pub fn get_timestamp() -> u64 {
-    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(n) => n.as_secs(),
-        Err(_) => panic!("SystemTime before UNIX EPOCH!"),
     }
 }

@@ -7,20 +7,23 @@
 //! 1. Branch of different mandated events.
 //! 2. A communication center for internal and external workers.
 
-use super::{
+pub(crate) use super::{
+    super::delay_timer::{
+         SharedHeader, SharedTaskWheel,
+    },
     runtime_trace::{
         sweeper::{RecycleUnit, RecyclingBins},
         task_handle::TaskTrace,
     },
     timer_core::{
-        get_timestamp, AsyncSender, Slot, Task, TaskMark, TimerEvent, TimerEventReceiver,
+        AsyncSender, Slot, Task, TaskMark, TimerEvent, TimerEventReceiver,
         TimerEventSender, DEFAULT_TIMER_SLOT_COUNT,
     },
 };
 
 use anyhow::Result;
 use std::sync::{
-    atomic::{AtomicU64, Ordering::Acquire},
+    atomic::{Ordering::Acquire},
     Arc,
 };
 use waitmap::WaitMap;
@@ -30,25 +33,12 @@ use smol::{
     future::FutureExt,
 };
 
-pub(crate) type SencondHand = Arc<AtomicU64>;
-
-pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
-//storage task current slot.
-pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
-
 //TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
 // maybe cancelAll msg before last `update msg`  check the
 // flag_map slotid with biggest task-slotid in trace, if has one delay, send a msg for recycleer
 // let it to trash the last taskhandle.
 pub(crate) struct EventHandle {
-    
-    //The task wheel has a slot dimension.
-    wheel_queue: SharedTaskWheel,
-    //Task distribution map to track where tasks are in a slot for easy removal.
-    task_flag_map: SharedTaskFlagMap,
-    //The hands of the clock.
-    second_hand: SencondHand,
     //Task Handle Collector, which makes it easy to cancel a running task.
     task_trace: TaskTrace,
     //The core of the event recipient, dealing with the global event.
@@ -57,15 +47,16 @@ pub(crate) struct EventHandle {
     status_report_sender: Option<Sender<i32>>,
     //Data Senders for Resource Recyclers.
     recycle_unit_sources_sender: Sender<RecycleUnit>,
+    //Shared header information.
+    shared_header: SharedHeader,
 }
 
 impl EventHandle {
+    //TODO: Put `wheel_queue` `task_flag_map` `second_hand` `global_time` in share_header.
     pub(crate) fn new(
-        wheel_queue: SharedTaskWheel,
-        task_flag_map: SharedTaskFlagMap,
-        second_hand: SencondHand,
         timer_event_receiver: TimerEventReceiver,
         timer_event_sender: TimerEventSender,
+        shared_header: SharedHeader,
     ) -> Self {
         let status_report_sender: Option<AsyncSender<i32>> = None;
         let task_trace = TaskTrace::default();
@@ -87,13 +78,11 @@ impl EventHandle {
         .detach();
 
         EventHandle {
-            wheel_queue,
-            task_flag_map,
-            second_hand,
             task_trace,
             timer_event_receiver,
             status_report_sender,
             recycle_unit_sources_sender,
+            shared_header,
         }
     }
 
@@ -157,10 +146,9 @@ impl EventHandle {
 
     //add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Task) -> TaskMark {
-        let second_hand = self.second_hand.load(Acquire);
+        let second_hand = self.shared_header.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();
-        //TODO:优化， 提取到tread_local 中timestamp or global process。
-        let timestamp = get_timestamp();
+        let timestamp = self.shared_header.global_time.load(Acquire);
         // println!(
         //     "event_handle:task_id:{}, next_time:{}, get_timestamp:{}",
         //     task.task_id,
@@ -185,7 +173,8 @@ impl EventHandle {
         //copu task_id
         let task_id = task.task_id;
 
-        self.wheel_queue
+        self.shared_header
+            .wheel_queue
             .get_mut(&slot_seed)
             .unwrap()
             .value_mut()
@@ -196,16 +185,19 @@ impl EventHandle {
 
     //for record task-mark.
     pub(crate) fn record_task_mark(&mut self, task_mark: TaskMark) {
-        self.task_flag_map.insert(task_mark.task_id, task_mark);
+        self.shared_header
+            .task_flag_map
+            .insert(task_mark.task_id, task_mark);
     }
 
     //for remove task.
     pub(crate) async fn remove_task(&mut self, task_id: u64) -> Option<Task> {
-        let task_mark = self.task_flag_map.get(&task_id)?;
+        let task_mark = self.shared_header.task_flag_map.get(&task_id)?;
 
         let slot_mark = task_mark.value().get_slot_mark();
 
-        self.wheel_queue
+        self.shared_header
+            .wheel_queue
             .get_mut(&slot_mark)
             .unwrap()
             .value_mut()

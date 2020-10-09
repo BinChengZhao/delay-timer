@@ -10,51 +10,80 @@
 //! 1. Mission deployment.
 use super::timer::{
     event_handle::EventHandle,
-    task::Task,
-    timer_core::{Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
+    task::{Task, TaskMark},
+    timer_core::{Slot, Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
 };
 
 use anyhow::{Context, Result};
 use smol::{channel::unbounded, future::block_on};
 use std::sync::{atomic::AtomicU64, Arc};
+use std::time::{SystemTime};
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
 //TODO:replenish the doc.
 // #[cfg(feature = "status-report")]
 
+//Global sencond hand.
+pub(crate) type SencondHand = Arc<AtomicU64>;
+//Global Timestamp.
+pub(crate) type GlobalTime = Arc<AtomicU64>;
+//Shared task-wheel for operate.
+pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
+//The slot currently used for storing global tasks.
+pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
+
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
 }
 
+#[derive(Clone)]
+pub(crate) struct SharedHeader {
+    //The task wheel has a slot dimension.
+    pub(crate) wheel_queue: SharedTaskWheel,
+    //Task distribution map to track where tasks are in a slot for easy removal.
+    pub(crate) task_flag_map: SharedTaskFlagMap,
+    //The hands of the clock.
+    pub(crate) second_hand: SencondHand,
+    //Global Timestamp.
+    pub(crate) global_time: GlobalTime,
+}
+
+impl Default for SharedHeader {
+    fn default() -> Self {
+        let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
+        let task_flag_map = Arc::new(WaitMap::new());
+        let second_hand = Arc::new(AtomicU64::new(0));
+        let global_time = Arc::new(AtomicU64::new(get_timestamp()));
+        SharedHeader {
+            wheel_queue,
+            task_flag_map,
+            second_hand,
+            global_time,
+        }
+    }
+}
+
 impl Default for DelayTimer {
     fn default() -> Self {
-        let delay_timer = DelayTimer::new();
-        delay_timer
+        DelayTimer::new()
     }
 }
 
 impl DelayTimer {
     pub fn new() -> DelayTimer {
-        let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
-        let task_flag_map = Arc::new(WaitMap::new());
-        let second_hand = Arc::new(AtomicU64::new(0));
+        let shared_header = SharedHeader::default();
+
+        //TODO: Inject SharedHeader to Timer and eventHandle.
 
         //init reader sender for timer-event handle.
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
-        let mut timer = Timer::new(
-            wheel_queue.clone(),
-            task_flag_map.clone(),
-            timer_event_sender.clone(),
-            second_hand.clone(),
-        );
+        let mut timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
 
         //what is `ascription`.
         let mut event_handle = EventHandle::new(
-            wheel_queue,
-            task_flag_map,
-            second_hand,
             timer_event_receiver,
             timer_event_sender.clone(),
+            shared_header,
         );
         // run register_features_fn
 
@@ -121,5 +150,12 @@ impl DelayTimer {
         self.timer_event_sender
             .try_send(event)
             .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+    }
+}
+
+pub fn get_timestamp() -> u64 {
+    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(n) => n.as_secs(),
+        Err(_) => panic!("SystemTime before UNIX EPOCH!"),
     }
 }
