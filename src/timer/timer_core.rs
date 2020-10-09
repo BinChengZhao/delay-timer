@@ -1,6 +1,4 @@
-use super::event_handle::{
-     SharedHeader,
-};
+use super::event_handle::SharedHeader;
 pub(crate) use super::runtime_trace::task_handle::DelayTaskHandlerBox;
 use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use super::slot::Slot;
@@ -11,12 +9,7 @@ use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
 use smol::Timer as SmolTimer;
-use std::sync::{
-    atomic::{
-        
-        Ordering::{Relaxed, Release},
-    },
-};
+use std::sync::atomic::Ordering::{Relaxed, Release};
 use std::time::{Duration, Instant};
 
 pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
@@ -67,8 +60,8 @@ impl Timer {
         self.report(1);
     }
 
-    //Offset the current slot by one when reading it,
-    //so event_handle can be easily inserted into subsequent slots.
+    ///Offset the current slot by one when reading it,
+    ///so event_handle can be easily inserted into subsequent slots.
     pub(crate) fn next_position(&mut self) -> u64 {
         self.shared_header
             .second_hand
@@ -78,11 +71,9 @@ impl Timer {
             .unwrap_or_else(|e| e)
     }
 
+    ///Return a future can pool it for schedule all cycles task.
     pub(crate) async fn async_schedule(&mut self) {
-        //not runing 1s ,Duration - runing time
-        //sleep  ,then loop
         //if that overtime , i run it not block
-
         let mut now;
         let mut when;
         let mut second_hand;
@@ -162,12 +153,10 @@ impl Timer {
         if !task_valid {
             return;
         }
-        //下一次执行时间
+        //Next execute timestamp.
         let task_excute_timestamp = task.get_next_exec_timestamp();
 
-        //时间差+当前的分针
-        //比如 时间差是 7260，目前分针再 3599，7260+3599 = 10859
-        //， 从 当前 3599 走碰见三次，再第59个格子
+        //Time difference + current second hand % DEFAULT_TIMER_SLOT_COUNT
         let step = task_excute_timestamp
             .checked_sub(timestamp)
             .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
@@ -180,9 +169,6 @@ impl Timer {
         //     "timer-core:task_id:{}, next_time:{}, slot_seed:{}, quan:{}",
         //     task.task_id, step, slot_seed, quan
         // );
-
-        //FIXME: hidden send error for bench.
-        //.unwrap_or_else(|e| println!("{}", e));
 
         {
             let mut slot_mut = self.shared_header.wheel_queue.get_mut(&slot_seed).unwrap();

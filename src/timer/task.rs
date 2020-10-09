@@ -38,9 +38,11 @@ pub enum Frequency<'a> {
     ///Type of countdown.
     CountDown(u32, &'a str),
 }
-
+///Iterator for task internal control of execution time.
 pub(crate) enum FrequencyInner {
+    ///Unlimited repetition types.
     Repeated(ScheduleIteratorOwned<Utc>),
+    ///Type of countdown.
     CountDown(u32, ScheduleIteratorOwned<Utc>),
 }
 

@@ -1,7 +1,6 @@
 ///TaskTrace own global task-handle.
 //当进程消亡，跟异步任务drop的时候对应的链表也减少，如果没值则删除k/v
 //如果是单实例执行任务，查看对应id是否有句柄在链表，如果有则跳过
-//如果是可多实例执行，直接追加新句柄在链表后
 use anyhow::Result;
 use smol::Task as SmolTask;
 use std::collections::{HashMap, LinkedList};
@@ -13,8 +12,7 @@ pub(crate) struct TaskTrace {
     inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
 }
 
-//hashMqp  task_id => child-handle-linklist
-//可以取消任务，child-handle 可以是进程句柄 - 也可以是异步句柄， 用linklist 是因为，可能任务支持同时多个并行
+//TaskTrace can cancel a task via a Task Handle.
 impl TaskTrace {
     pub(crate) fn insert(&mut self, task_id: u64, task_handler_box: DelayTaskHandlerBox) {
         //entry is amazing!
@@ -76,19 +74,23 @@ pub trait DelayTaskHandler: Send + Sync {
 // generics Type will single state just store one type in TaskTrace.
 // Multi-DelayTaskHandlerBox record_id can same, because one task can spawn Multi-process.
 pub(crate) struct DelayTaskHandlerBox {
+    ///Task Handle is most important part of DelayTaskHandlerBox.
     task_handler: Option<Box<dyn DelayTaskHandler>>,
+    ///task_id.
     task_id: u64,
     ///Globally unique ID.
     record_id: i64,
+    ///it's start_time.
     start_time: u64,
+    ///it's end_time.
     end_time: Option<u64>,
 }
 
 impl Drop for DelayTaskHandlerBox {
     fn drop(&mut self) {
         if let Some(task_handler) = self.task_handler.take() {
-            //使用trait 对象，不能直接传所有权，因为大小不确定
-            //所以我用Box包装一下
+            //Using a trait object, you can't pass ownership directly because the size is uncertain.
+            //So packet it by `Box`.
             task_handler.quit().unwrap_or_else(|e| println!("{}", e));
         }
     }

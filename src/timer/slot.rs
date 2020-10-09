@@ -2,7 +2,7 @@ use super::task::Task;
 use std::collections::HashMap;
 
 //Slot is based on HashMap, It easy to add it and find it.
-pub struct Slot {
+pub(crate) struct Slot {
     //The scale of the clock, the task source is maintained by a hash table,
     //the addition and removal of tasks is O(1),
     //and the subtraction of laps is O(n).
@@ -24,9 +24,8 @@ impl Slot {
         self.task_map.remove(&task_id)
     }
 
-    //check并减cylinder_line，
-    //返回现在要运行的，TaskOwned的集合
-    //cylinder_line == 0
+    //Check and reduce cylinder_line，
+    //Returns a Vec. containing all task ids to be executed.(cylinder_line == 0)
     pub(crate) fn arrival_time_tasks(&mut self) -> Vec<u64> {
         let mut task_id_vec = vec![];
 

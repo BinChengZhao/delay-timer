@@ -17,7 +17,7 @@ use super::timer::{
 use anyhow::{Context, Result};
 use smol::{channel::unbounded, future::block_on};
 use std::sync::{atomic::AtomicU64, Arc};
-use std::time::{SystemTime};
+use std::time::SystemTime;
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
 //TODO:replenish the doc.
@@ -70,10 +70,9 @@ impl Default for DelayTimer {
 }
 
 impl DelayTimer {
+    /// New a DelayTimer.
     pub fn new() -> DelayTimer {
         let shared_header = SharedHeader::default();
-
-        //TODO: Inject SharedHeader to Timer and eventHandle.
 
         //init reader sender for timer-event handle.
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
@@ -85,13 +84,9 @@ impl DelayTimer {
             timer_event_sender.clone(),
             shared_header,
         );
-        // run register_features_fn
 
-        //features include these fn:
-        //TODO: timer.set_status_reporter
+        //TODO: run register_features_fn
 
-        // Use threadpool can replenishes the pool if any worker threads panic.
-        // do not use easy-parallel it can block curent thread.
         let pool = ThreadPool::new(2);
 
         pool.execute(move || {
@@ -134,18 +129,22 @@ impl DelayTimer {
         self.add_task(task)
     }
 
+    /// Add a task in timer_core by event-channel.
     pub fn add_task(&mut self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
+    /// Remove a task in timer_core by event-channel.
     pub fn remove_task(&mut self, task_id: u64) -> Result<()> {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
+    /// Cancel a task in timer_core by event-channel.
     pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Result<()> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 
+    /// Send a event to event-handle.
     fn seed_timer_event(&mut self, event: TimerEvent) -> Result<()> {
         self.timer_event_sender
             .try_send(event)
@@ -153,6 +152,7 @@ impl DelayTimer {
     }
 }
 
+///get current OS SystemTime.
 pub fn get_timestamp() -> u64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs(),

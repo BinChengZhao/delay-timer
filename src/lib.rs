@@ -8,12 +8,10 @@
 //! User applications can be served through the lib used by DelayTimer:
 //!
 //! 1. Mission deployment.
-//TODO:Replenish example in doc.
 #![feature(split_inclusive)]
 #![feature(drain_filter)]
 #![feature(test)]
 extern crate test;
-// #[allow(dead_code)]
 pub mod delay_timer;
 pub mod generate_fn_macro;
 pub mod timer;

@@ -7,7 +7,7 @@ pub mod shell_command {
     use std::process::{Child, Command, Stdio};
 
     use std::collections::LinkedList;
-    //that code from 'build-your-own-shell-rust'. Thanks you Josh Mcguigan.
+    //that code base on 'build-your-own-shell-rust'. Thanks you Josh Mcguigan.
 
     ///Generate a list of processes from a string of shell commands.
     pub fn parse_and_run(input: &str) -> Result<LinkedList<Child>> {
@@ -23,9 +23,6 @@ pub mod shell_command {
 
             //TODO:priority.
             // process_body eq command.......
-            // let process_body = sub_command.next().ok_or(anyhow!("have no process body."));
-            //如果有重定向，则翻转取最后的字符串作为重定向地址
-
             // if has filename ,remove ''>> filename '' in commond
             // And run a process ,end.
 
@@ -38,9 +35,9 @@ pub mod shell_command {
             let command = parts.next().unwrap();
             let args = parts;
 
-            //当前要生成进程的标准输入
-            //如果有previous_command，就继承上一个命令的标准输出
-            //没有就继承当前的父进程。
+            //Standard input to the current process.
+            //If previous_command is present, it inherits the standard output of the previous command.
+            //If not, it inherits the current parent process.
             let previous_command = process_linked_list.back_mut();
             let mut stdin = Stdio::inherit();
 
@@ -88,8 +85,8 @@ pub mod shell_command {
     }
 
     // I should give Option<Result<File>>
-    //通过 Some判断，有或没有输出得stdio
-    //通过 Some内的Reuslt 判断，有没有open成功
+    //By Option(Some(Result<T>)), determine if there is an output stdio..
+    //By Result<T>(OK(t)), determine if there is success open file.
     fn _has_redirect_file(command: &str) -> Option<Result<File>> {
         let angle_bracket;
 
@@ -110,7 +107,7 @@ pub mod shell_command {
         }
     }
 
-    //确认有重定向文件后，解析命令 ‘>’  之前的就是命令
+    //After confirming that there is a redirect file, parse the command before the command '>'.
     fn _remove_angle_bracket_command(command: &str) -> Result<&str> {
         let mut sub_command_inner = command.trim().split('>');
         sub_command_inner
@@ -126,9 +123,9 @@ pub mod shell_command {
             file_tmp.append(true);
         }
 
-        //在需要返回Result的地方，使用Result<T, anyhow::Error>或者等价的anyhow::Result<T>，
-        //就可以利用？抛出任何类型实现了std::error::Error的错误
-        //anyhow::Error是与std::error::Error兼容的
+        // Where you need to return a Result, use Result<T, anyhow::Error> or the equivalent anyhow::Result<T>.
+        //You can use it? Throws any type of error that implements std::error::Error.
+        //anyhow::Error is compatible with std::error::Error.
 
         //Path::new("foo.txt").as_os_str()
         //TODO:I need record that open file error because filename has a whitespace i don't trim.
@@ -142,7 +139,7 @@ pub mod shell_command {
         Ok(stdio_file)
     }
 
-    //error record
+    //error record.
     //sub_command = input.trim().split(">>").rev();
     //因为 ">>" 作为一个Patten，内部关联类型Searcher会生成一个 StrSearcher<'a, 'b>
     //StrSearcher<'a, 'b>上面没有标签trait DoubleEndedSearcher

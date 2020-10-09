@@ -8,24 +8,19 @@
 //! 2. A communication center for internal and external workers.
 
 pub(crate) use super::{
-    super::delay_timer::{
-         SharedHeader, SharedTaskWheel,
-    },
+    super::delay_timer::{SharedHeader, SharedTaskWheel},
     runtime_trace::{
         sweeper::{RecycleUnit, RecyclingBins},
         task_handle::TaskTrace,
     },
     timer_core::{
-        AsyncSender, Slot, Task, TaskMark, TimerEvent, TimerEventReceiver,
-        TimerEventSender, DEFAULT_TIMER_SLOT_COUNT,
+        AsyncSender, Slot, Task, TaskMark, TimerEvent, TimerEventReceiver, TimerEventSender,
+        DEFAULT_TIMER_SLOT_COUNT,
     },
 };
 
 use anyhow::Result;
-use std::sync::{
-    atomic::{Ordering::Acquire},
-    Arc,
-};
+use std::sync::{atomic::Ordering::Acquire, Arc};
 use waitmap::WaitMap;
 
 use smol::{
