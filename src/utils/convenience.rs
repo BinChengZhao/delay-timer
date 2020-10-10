@@ -1,3 +1,5 @@
+use self::functions::create_delay_task_handler;
+use crate::smol_spawn;
 use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
 use anyhow::Result;
@@ -50,4 +52,16 @@ pub mod functions {
     pub fn create_default_delay_task_handler() -> Box<dyn DelayTaskHandler> {
         create_delay_task_handler(super::MyUnit)
     }
+}
+
+///Provide a template function that supports dynamic generation of closures.
+pub fn generate_closure_template(
+    a: i32,
+    b: String,
+) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+    move || create_delay_task_handler(smol_spawn(async_template(a, b.clone())))
+}
+
+pub async fn async_template(_: i32, _: String) -> Result<()> {
+    Ok(())
 }
