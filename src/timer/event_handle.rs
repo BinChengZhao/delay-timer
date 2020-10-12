@@ -150,7 +150,7 @@ impl EventHandle {
         //     exec_time,
         //     timestamp
         // );
-        //TODO: unwrap_or_else 当减不过时，说明发生积压不能都放到下一个刻度上，来个随机数，随机扔一个刻度.
+        // unwrap_or_else 当减不过时，说明发生积压不能都放到下一个刻度上，来个随机数，随机扔一个刻度.
 
         let time_seed: u64 = exec_time
             .checked_sub(timestamp)

@@ -91,6 +91,7 @@ pub struct TaskBuilder<'a> {
 }
 
 //TASK 执行完了，支持找新的Slot
+//TODO:未来任务支持，单体执行（同一时刻不能多个执行）。。
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 pub struct Task {
     ///Unique task-id.

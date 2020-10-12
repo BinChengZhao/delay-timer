@@ -16,13 +16,15 @@ use super::timer::{
 
 use anyhow::{Context, Result};
 use smol::{channel::unbounded, future::block_on};
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::{atomic::{AtomicU64, AtomicBool}, Arc};
 use std::time::SystemTime;
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
 //TODO:replenish the doc.
 // #[cfg(feature = "status-report")]
 
+//TODO: Set it. Motivation to move forward.
+pub(crate) type SharedMotivation = Arc<AtomicBool>;
 //Global sencond hand.
 pub(crate) type SencondHand = Arc<AtomicU64>;
 //Global Timestamp.
@@ -142,6 +144,10 @@ impl DelayTimer {
     /// Cancel a task in timer_core by event-channel.
     pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Result<()> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
+    }
+
+    pub fn stop_delay_timer(&mut self) -> Result<()> {
+        self.seed_timer_event(TimerEvent::StopTimer)
     }
 
     /// Send a event to event-handle.

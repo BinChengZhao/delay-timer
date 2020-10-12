@@ -3,6 +3,7 @@ Time-manager of delayed tasks.
 
 
 ## To Do List
+- [x]Disable unwrap related methods that will panic.
 - [x] Thread and running task quit when delayTimer drop.
 - [x] error handle need supplement.
 - [x] neaten todo in code, replenish tests and benchmark.

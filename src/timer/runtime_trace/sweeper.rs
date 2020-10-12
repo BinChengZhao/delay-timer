@@ -137,7 +137,6 @@ impl RecyclingBins {
                         (&mut recycle_unit_heap).push(dbg!(Reverse(recycle_unit)));
                     }
 
-                    //TODO: Have a Error waiting fot handle.
                     Err(e) => match e {
                         Empty => {
                             drop(recycle_unit_heap);

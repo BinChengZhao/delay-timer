@@ -20,9 +20,9 @@ pub mod utils;
 extern crate lazy_static;
 
 pub use generate_fn_macro::*;
-pub use smol::future as smol_future;
-pub use smol::spawn as smol_spawn;
-pub use smol::unblock as smol_unblock;
+pub use smol::future as future_lite;
+pub use smol::spawn as async_spawn;
+pub use smol::unblock as unblock_spawn;
 
 #[cfg(test)]
 mod tests {
