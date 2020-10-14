@@ -10,7 +10,16 @@ pub mod shell_command {
     //that code base on 'build-your-own-shell-rust'. Thanks you Josh Mcguigan.
 
     ///Generate a list of processes from a string of shell commands.
+    // TODO: There are a lot of system calls that happen when this method is called,
+    // the speed of execution depends on the parsing of the command and the speed of the process fork,
+    // after which it should be split into unblock().
     pub fn parse_and_run(input: &str) -> Result<LinkedList<Child>> {
+        // FIXME:If there is a parsing error during function execution,
+        // should kill all processes that were open before.
+
+        // Check to see if process_linked_list is also automatically dropped out of scope 
+        // by ERROR's early return and an internal kill method is executed.
+
         let mut process_linked_list: LinkedList<Child> = LinkedList::new();
         // must be peekable so we know when we are on the last command
         let mut commands = input.trim().split(" | ").peekable();
@@ -49,14 +58,14 @@ pub mod shell_command {
                     stdin = Stdio::from(child_stdio);
                 }
             }
-            println!("command:{:?}, args:{:?}", command, args);
+            // println!("command:{:?}, args:{:?}", command, args);
 
             let mut output = Command::new(command);
             output.args(args).stdin(stdin);
 
             let process;
             let end_flag = if check_redirect_result.is_some() {
-                println!("check_redirect_result : {:?}", check_redirect_result);
+                // println!("check_redirect_result : {:?}", check_redirect_result);
                 let stdout = check_redirect_result.unwrap()?;
                 process = output.stdout(stdout).spawn()?;
                 true
@@ -69,6 +78,8 @@ pub mod shell_command {
                 } else {
                     // there are no more commands piped behind this one
                     // send output to shell stdout
+                    // FIXME:It shouldn't be the standard output of the parent process in the context,
+                    // there should be a default file to record it.
                     stdout = Stdio::inherit();
                 };
                 process = output.stdout(stdout).spawn()?;
@@ -100,7 +111,7 @@ pub mod shell_command {
 
         let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
         if let Some(filename) = sub_command_inner.next() {
-            println!("redirect:filename{:?}", filename);
+            // println!("redirect:filename{:?}", filename);
             Some(create_stdio_file(angle_bracket, filename))
         } else {
             None
@@ -130,10 +141,10 @@ pub mod shell_command {
         //Path::new("foo.txt").as_os_str()
         //TODO:I need record that open file error because filename has a whitespace i don't trim.
         let os_filename = Path::new(filename.trim()).as_os_str();
-        println!("stdio_file:{:?}", file_tmp);
-        println!("filename:{:?}", filename);
+        // println!("stdio_file:{:?}", file_tmp);
+        // println!("filename:{:?}", filename);
 
-        println!("os_filename:{:?}", os_filename);
+        // println!("os_filename:{:?}", os_filename);
 
         let stdio_file = file_tmp.open(os_filename)?;
         Ok(stdio_file)

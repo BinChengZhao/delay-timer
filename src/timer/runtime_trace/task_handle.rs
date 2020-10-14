@@ -177,6 +177,7 @@ impl DelayTaskHandler for Child {
     fn quit(mut self: Box<Self>) -> Result<()> {
         //to anyhow:Result
         self.kill()?;
+        println!("bye bye  i'm  child");
         Ok(())
     }
 }

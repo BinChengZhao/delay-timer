@@ -11,7 +11,7 @@ use std::{
 
 use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
 
-#[derive(Default, Eq, Debug)]
+#[derive(Default, Eq, Debug, Copy, Clone)]
 /// recycle unit.
 pub(crate) struct RecycleUnit {
     /// deadline.
@@ -105,6 +105,7 @@ impl RecyclingBins {
 
                     let recycle_unit = (&mut recycle_unit_heap).pop().map(|v| v.0).unwrap();
 
+                    dbg!(recycle_unit);
                     //handle send-error.
                     self.timer_event_sender
                         .send(TimerEvent::CancelTask(

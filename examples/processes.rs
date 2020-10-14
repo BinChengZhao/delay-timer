@@ -24,7 +24,6 @@ fn main() {
     let _task = task_builder.spawn(body);
     delay_timer.add_task(_task);
 
-    loop {
-        sleep(Duration::new(1, 0));
-    }
+    sleep(Duration::new(90, 0));
+    delay_timer.stop_delay_timer();
 }

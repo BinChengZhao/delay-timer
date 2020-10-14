@@ -48,6 +48,8 @@ pub(crate) struct SharedHeader {
     pub(crate) second_hand: SencondHand,
     //Global Timestamp.
     pub(crate) global_time: GlobalTime,
+    //Delay_timer flag for running
+    pub(crate) shared_motivation: SharedMotivation,
 }
 
 impl Default for SharedHeader {
@@ -56,11 +58,14 @@ impl Default for SharedHeader {
         let task_flag_map = Arc::new(WaitMap::new());
         let second_hand = Arc::new(AtomicU64::new(0));
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
+        let shared_motivation = Arc::new(AtomicBool::new(true));
+
         SharedHeader {
             wheel_queue,
             task_flag_map,
             second_hand,
             global_time,
+            shared_motivation
         }
     }
 }
@@ -89,6 +94,9 @@ impl DelayTimer {
 
         //TODO: run register_features_fn
 
+        // When the method finishes executing, 
+        // the pool has been dropped. When these two tasks finish executing,
+        // the two threads will automatically release their resources after a single experience.
         let pool = ThreadPool::new(2);
 
         pool.execute(move || {

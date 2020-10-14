@@ -20,7 +20,7 @@ pub(crate) use super::{
 };
 
 use anyhow::Result;
-use std::sync::{atomic::Ordering::Acquire, Arc};
+use std::sync::{atomic::Ordering::{Acquire, Release}, Arc};
 use waitmap::WaitMap;
 
 use smol::{
@@ -90,11 +90,8 @@ impl EventHandle {
         while let Ok(event) = self.timer_event_receiver.recv().await {
             match event {
                 TimerEvent::StopTimer => {
-                    //TODO: DONE all of runing tasks.
-                    //clear queue.
-
-                    //in the meantime set ending single stop timer_core.
-                    panic!("i'm stop")
+                    self.shared_header.shared_motivation.store(false, Release);
+                    return;
                 }
                 TimerEvent::AddTask(task) => {
                     let task_mark = self.add_task(*task);
@@ -133,11 +130,7 @@ impl EventHandle {
     //cancel is exit running task.
     //stop is suspension of execution(set vaild).
     //user delete task , node should remove.
-
     //any `Task`  i can set `valid`  for that stop.
-
-    //if get cancel signal is sync task like 'spwan process' i can kill that, async i can cancel.
-    //I think i can save async/sync handel in TaskTrace.
 
     //add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Task) -> TaskMark {
