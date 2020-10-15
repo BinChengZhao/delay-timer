@@ -16,7 +16,10 @@ use super::timer::{
 
 use anyhow::{Context, Result};
 use smol::{channel::unbounded, future::block_on};
-use std::sync::{atomic::{AtomicU64, AtomicBool}, Arc};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64},
+    Arc,
+};
 use std::time::SystemTime;
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
@@ -65,7 +68,7 @@ impl Default for SharedHeader {
             task_flag_map,
             second_hand,
             global_time,
-            shared_motivation
+            shared_motivation,
         }
     }
 }
@@ -94,7 +97,7 @@ impl DelayTimer {
 
         //TODO: run register_features_fn
 
-        // When the method finishes executing, 
+        // When the method finishes executing,
         // the pool has been dropped. When these two tasks finish executing,
         // the two threads will automatically release their resources after a single experience.
         let pool = ThreadPool::new(2);

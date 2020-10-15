@@ -20,7 +20,10 @@ pub(crate) use super::{
 };
 
 use anyhow::Result;
-use std::sync::{atomic::Ordering::{Acquire, Release}, Arc};
+use std::sync::{
+    atomic::Ordering::{Acquire, Release},
+    Arc,
+};
 use waitmap::WaitMap;
 
 use smol::{

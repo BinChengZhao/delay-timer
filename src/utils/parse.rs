@@ -17,7 +17,7 @@ pub mod shell_command {
         // TODO:If there is a parsing error during function execution,
         // should kill all processes that were open before.
 
-        // Check to see if process_linked_list is also automatically dropped out of scope 
+        // Check to see if process_linked_list is also automatically dropped out of scope
         // by ERROR's early return and an internal kill method is executed.
 
         let mut process_linked_list: LinkedList<Child> = LinkedList::new();

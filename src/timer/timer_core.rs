@@ -9,7 +9,7 @@ use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
 use smol::Timer as SmolTimer;
-use std::sync::atomic::Ordering::{Relaxed, Release, Acquire};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::time::{Duration, Instant};
 
 pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
@@ -83,7 +83,7 @@ impl Timer {
         let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
         loop {
             //TODO: replenish ending single, for stop current jod and thread.
-            if !self.shared_header.shared_motivation.load(Acquire){
+            if !self.shared_header.shared_motivation.load(Acquire) {
                 return;
             }
 
@@ -134,7 +134,7 @@ impl Timer {
         record_id: i64,
         timestamp: u64,
         second_hand: u64,
-    ) -> Option<()>{
+    ) -> Option<()> {
         let task_id = task.task_id;
         let task_handler_box = (task.body)();
 
