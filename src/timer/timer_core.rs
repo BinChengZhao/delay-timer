@@ -134,7 +134,7 @@ impl Timer {
         record_id: i64,
         timestamp: u64,
         second_hand: u64,
-    ) {
+    ) -> Option<()>{
         let task_id = task.task_id;
         let task_handler_box = (task.body)();
 
@@ -153,7 +153,7 @@ impl Timer {
 
         let task_valid = task.down_count_and_set_vaild();
         if !task_valid {
-            return;
+            return Some(());
         }
         //Next execute timestamp.
         let task_excute_timestamp = task.get_next_exec_timestamp();
@@ -168,15 +168,16 @@ impl Timer {
         let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
 
         {
-            let mut slot_mut = self.shared_header.wheel_queue.get_mut(&slot_seed).unwrap();
+            let mut slot_mut = self.shared_header.wheel_queue.get_mut(&slot_seed)?;
 
             slot_mut.value_mut().add_task(task);
         }
 
         {
-            let mut task_flag_map = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+            let mut task_flag_map = self.shared_header.task_flag_map.get_mut(&task_id)?;
 
             task_flag_map.value_mut().set_slot_mark(slot_seed);
         }
+        Some(())
     }
 }

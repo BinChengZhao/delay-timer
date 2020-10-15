@@ -99,6 +99,7 @@ impl EventHandle {
                 }
                 TimerEvent::RemoveTask(task_id) => {
                     self.remove_task(task_id).await;
+                    self.shared_header.task_flag_map.cancel(&task_id);
                 }
                 TimerEvent::CancelTask(task_id, record_id) => {
                     self.cancel_task(task_id, record_id);
