@@ -14,7 +14,7 @@ pub mod shell_command {
     // the speed of execution depends on the parsing of the command and the speed of the process fork,
     // after which it should be split into unblock().
     pub fn parse_and_run(input: &str) -> Result<LinkedList<Child>> {
-        // FIXME:If there is a parsing error during function execution,
+        // TODO:If there is a parsing error during function execution,
         // should kill all processes that were open before.
 
         // Check to see if process_linked_list is also automatically dropped out of scope 
@@ -28,13 +28,6 @@ pub mod shell_command {
         let mut _stdio: Stdio;
 
         while let Some(mut command) = commands.next() {
-            //没有制定标准输出的重定向，默认给记下来
-
-            //TODO:priority.
-            // process_body eq command.......
-            // if has filename ,remove ''>> filename '' in commond
-            // And run a process ,end.
-
             let check_redirect_result = _has_redirect_file(command);
             if check_redirect_result.is_some() {
                 command = _remove_angle_bracket_command(command)?;
@@ -58,14 +51,12 @@ pub mod shell_command {
                     stdin = Stdio::from(child_stdio);
                 }
             }
-            // println!("command:{:?}, args:{:?}", command, args);
 
             let mut output = Command::new(command);
             output.args(args).stdin(stdin);
 
             let process;
             let end_flag = if check_redirect_result.is_some() {
-                // println!("check_redirect_result : {:?}", check_redirect_result);
                 let stdout = check_redirect_result.unwrap()?;
                 process = output.stdout(stdout).spawn()?;
                 true
@@ -78,7 +69,7 @@ pub mod shell_command {
                 } else {
                     // there are no more commands piped behind this one
                     // send output to shell stdout
-                    // FIXME:It shouldn't be the standard output of the parent process in the context,
+                    // TODO:It shouldn't be the standard output of the parent process in the context,
                     // there should be a default file to record it.
                     stdout = Stdio::inherit();
                 };
@@ -111,7 +102,6 @@ pub mod shell_command {
 
         let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
         if let Some(filename) = sub_command_inner.next() {
-            // println!("redirect:filename{:?}", filename);
             Some(create_stdio_file(angle_bracket, filename))
         } else {
             None
@@ -138,13 +128,8 @@ pub mod shell_command {
         //You can use it? Throws any type of error that implements std::error::Error.
         //anyhow::Error is compatible with std::error::Error.
 
-        //Path::new("foo.txt").as_os_str()
         //TODO:I need record that open file error because filename has a whitespace i don't trim.
         let os_filename = Path::new(filename.trim()).as_os_str();
-        // println!("stdio_file:{:?}", file_tmp);
-        // println!("filename:{:?}", filename);
-
-        // println!("os_filename:{:?}", os_filename);
 
         let stdio_file = file_tmp.open(os_filename)?;
         Ok(stdio_file)

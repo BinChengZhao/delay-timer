@@ -25,7 +25,7 @@ pub mod functions {
     ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
         move || {
             create_process_task(&shell_command).unwrap_or_else(|e| {
-                println!("{}", e);
+                println!("create-process:error:{}", e);
                 create_default_delay_task_handler()
             })
         }

@@ -104,7 +104,6 @@ impl Timer {
                 task_ids = slot_mut.value_mut().arrival_time_tasks();
             }
 
-            println!("timer-core:Timer-second_hand: {}", second_hand);
             for task_id in task_ids {
                 let task_option: Option<Task>;
 
@@ -160,18 +159,13 @@ impl Timer {
         let task_excute_timestamp = task.get_next_exec_timestamp();
 
         //Time difference + current second hand % DEFAULT_TIMER_SLOT_COUNT
-        let step = task_excute_timestamp
+        let step = dbg!(task_excute_timestamp)
             .checked_sub(timestamp)
             .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
             + second_hand;
         let quan = step / DEFAULT_TIMER_SLOT_COUNT;
         task.set_cylinder_line(quan);
         let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
-
-        // println!(
-        //     "timer-core:task_id:{}, next_time:{}, slot_seed:{}, quan:{}",
-        //     task.task_id, step, slot_seed, quan
-        // );
 
         {
             let mut slot_mut = self.shared_header.wheel_queue.get_mut(&slot_seed).unwrap();

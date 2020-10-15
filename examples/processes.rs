@@ -17,7 +17,10 @@ fn main() {
     let mut task_builder = TaskBuilder::default();
     let body = create_process_task_fn(r"php F:\rust\owner\delayTimer\examples\try_spawn.php >> F:\rust\owner\delayTimer\examples\try_spawn.txt".to_string());
 
-    task_builder.set_frequency(Frequency::Repeated("* 0/1 * * * * *"));
+    // misrepresentation
+    // let body = create_process_task_fn(r"php F:\rust\owner\delayTimer\examples\try_spawn.php | dir >> \a\try_spawn.txt".to_string());
+
+    task_builder.set_frequency(Frequency::CountDown(2, "0/50 * * * * * *"));
     task_builder.set_task_id(1);
     task_builder.set_maximum_running_time(5);
 

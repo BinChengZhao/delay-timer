@@ -177,7 +177,6 @@ impl DelayTaskHandler for Child {
     fn quit(mut self: Box<Self>) -> Result<()> {
         //to anyhow:Result
         self.kill()?;
-        println!("bye bye  i'm  child");
         Ok(())
     }
 }
@@ -201,7 +200,6 @@ impl DelayTaskHandler for SmolTask<Result<()>> {
             self.cancel().await;
         })
         .detach();
-        println!("bye bye  i'm  async");
         Ok(())
     }
 }

@@ -137,13 +137,6 @@ impl EventHandle {
         let second_hand = self.shared_header.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();
         let timestamp = self.shared_header.global_time.load(Acquire);
-        // println!(
-        //     "event_handle:task_id:{}, next_time:{}, get_timestamp:{}",
-        //     task.task_id,
-        //     exec_time,
-        //     timestamp
-        // );
-        // unwrap_or_else 当减不过时，说明发生积压不能都放到下一个刻度上，来个随机数，随机扔一个刻度.
 
         let time_seed: u64 = exec_time
             .checked_sub(timestamp)
@@ -152,11 +145,6 @@ impl EventHandle {
         let slot_seed: u64 = time_seed % DEFAULT_TIMER_SLOT_COUNT;
 
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
-
-        println!(
-            "event_handle:task_id:{}, current_time {}, exec_time:{}, slot_seed:{}, second_hand{}",
-            task.task_id, timestamp, exec_time, slot_seed, second_hand
-        );
 
         //copu task_id
         let task_id = task.task_id;
