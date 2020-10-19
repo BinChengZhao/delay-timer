@@ -152,11 +152,6 @@ impl DelayTaskHandlerBox {
     }
 
     #[inline(always)]
-    pub fn get_start_time(&self) -> u64 {
-        self.start_time
-    }
-
-    #[inline(always)]
     pub fn get_end_time(&self) -> Option<u64> {
         self.end_time
     }

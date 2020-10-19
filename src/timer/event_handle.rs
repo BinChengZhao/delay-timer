@@ -117,15 +117,13 @@ impl EventHandle {
                             delay_task_handler_box.get_record_id(),
                         );
                         self.recycle_unit_sources_sender
-                            .send(dbg!(recycle_unit))
+                            .send(recycle_unit)
                             .await
                             .unwrap_or_else(|e| println!("{}", e));
                     }
 
                     self.task_trace.insert(task_id, delay_task_handler_box);
                 }
-
-                TimerEvent::StopTask(_task_id) => todo!(),
             }
         }
     }

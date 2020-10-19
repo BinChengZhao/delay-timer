@@ -22,7 +22,6 @@ pub(crate) enum TimerEvent {
     AddTask(Box<Task>),
     RemoveTask(u64),
     CancelTask(u64, i64),
-    StopTask(u64),
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
 
@@ -47,17 +46,6 @@ impl Timer {
 
     pub(crate) fn set_status_report_sender(&mut self, sender: AsyncSender<i32>) {
         self.status_report_sender = Some(sender);
-    }
-
-    //TODO:features append fn put there.
-    pub(crate) fn features_append_fn(&mut self, _sender: AsyncSender<i32>) {
-        #[cfg(feature = "status-report")]
-        fn report(&mut self, record: i32) {
-            // async.sender.send(record);
-        }
-
-        #[cfg(feature = "status-report")]
-        self.report(1);
     }
 
     ///Offset the current slot by one when reading it,
@@ -146,6 +134,7 @@ impl Timer {
             .set_end_time(task.get_maximum_running_time(timestamp))
             .spawn(task_handler_box);
 
+        //FIXME: hidden send error for bench.
         self.timer_event_sender
             .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
             .await
@@ -159,7 +148,7 @@ impl Timer {
         let task_excute_timestamp = task.get_next_exec_timestamp();
 
         //Time difference + current second hand % DEFAULT_TIMER_SLOT_COUNT
-        let step = dbg!(task_excute_timestamp)
+        let step = task_excute_timestamp
             .checked_sub(timestamp)
             .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
             + second_hand;

@@ -49,9 +49,10 @@ mod tests {
         let body = move || create_default_delay_task_handler();
 
         let mut task_builder = TaskBuilder::default();
-        task_builder.set_frequency(Frequency::CountDown(1, "0/10 * * * * * *"));
-        task_builder.set_maximum_running_time(5);
-        task_builder.set_task_id(1);
+        task_builder = task_builder
+            .set_frequency(Frequency::CountDown(1, "0/10 * * * * * *"))
+            .set_maximum_running_time(5)
+            .set_task_id(1);
 
         b.iter(|| task_builder.spawn(body.clone()));
     }
@@ -65,13 +66,14 @@ mod tests {
         let body = move || create_default_delay_task_handler();
 
         let mut task_builder = TaskBuilder::default();
-        task_builder.set_frequency(Frequency::CountDown(1, "0/10 * * * * * *"));
-        task_builder.set_maximum_running_time(5);
-        task_builder.set_task_id(1);
+        task_builder = task_builder
+            .set_frequency(Frequency::CountDown(1, "0/10 * * * * * *"))
+            .set_maximum_running_time(5)
+            .set_task_id(1);
 
-        let mut tasks = Vec::with_capacity(1000000);
+        let mut tasks = Vec::with_capacity(1500000);
 
-        for _ in 0..1000000 {
+        for _ in 0..1500000 {
             tasks.push(task_builder.spawn(body));
         }
 

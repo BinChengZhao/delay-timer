@@ -32,7 +32,6 @@ use surf;
 #[test]
 fn go_works() {
     let mut delay_timer = DelayTimer::new();
-    let mut task_builder = TaskBuilder::default();
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
 
@@ -44,9 +43,10 @@ fn go_works() {
         create_default_delay_task_handler()
     };
 
-    task_builder.set_frequency(Frequency::CountDown(3, "0/6 * * * * * *"));
-    task_builder.set_task_id(1);
-    let task = task_builder.spawn(body);
+    let task = TaskBuilder::default()
+        .set_frequency(Frequency::CountDown(3, "0/6 * * * * * *"))
+        .set_task_id(1)
+        .spawn(body);
     delay_timer.add_task(task);
 
     let mut i = 0;
@@ -67,7 +67,6 @@ fn go_works() {
 #[test]
 fn tests_countdown() {
     let mut delay_timer = DelayTimer::new();
-    let mut task_builder = TaskBuilder::default();
     let share_num = Arc::new(AtomicUsize::new(3));
     let share_num_bunshin = share_num.clone();
     let body = move || {
@@ -76,9 +75,10 @@ fn tests_countdown() {
         create_default_delay_task_handler()
     };
 
-    task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-    task_builder.set_task_id(1);
-    let task = task_builder.spawn(body);
+    let task = TaskBuilder::default()
+        .set_frequency(Frequency::CountDown(3, "* * * * * * *"))
+        .set_task_id(1)
+        .spawn(body);
     delay_timer.add_task(task);
 
     let mut i = 0;
@@ -101,14 +101,12 @@ fn demo_it() {
     //printnl! block process if stand-pipe if full.
 
     let mut delay_timer = DelayTimer::new();
-    let mut task_builder = TaskBuilder::default();
     let mut run_flag = Arc::new(AtomicUsize::new(0));
     let run_flag_ref: Option<Unique<Arc<AtomicUsize>>> = Unique::new(&mut run_flag);
 
     let thread = current();
 
     let body = move || {
-        println!("running....");
         let local_run_flag = run_flag_ref.unwrap().as_ptr();
 
         unsafe {
@@ -136,29 +134,28 @@ fn demo_it() {
         Ok(())
     });
 
-    task_builder.set_frequency(Frequency::CountDown(1, "30 * * * * * *"));
-    task_builder.set_maximum_running_time(90);
+    let mut task_builder = TaskBuilder::default()
+        .set_frequency(Frequency::CountDown(1, "30 * * * * * *"))
+        .set_maximum_running_time(90);
 
     println!("start time {}", get_timestamp());
     for i in 0..10000 {
-        task_builder.set_task_id(i);
-
-        let task = task_builder.spawn(body);
+        let task = task_builder.set_task_id(i).spawn(body);
         delay_timer.add_task(task);
     }
 
-    task_builder.set_frequency(Frequency::CountDown(1, "59 * * * * * *"));
-    for i in 10000..13000 {
-        task_builder.set_task_id(i);
-
-        let task = task_builder.spawn(async_body);
+    task_builder = task_builder.set_frequency(Frequency::CountDown(1, "59 * * * * * *"));
+    for i in 10000..10100 {
+        let task = task_builder.set_task_id(i).spawn(async_body);
         delay_timer.add_task(task);
     }
 
-    task_builder.set_task_id(88888);
-    task_builder.set_frequency(Frequency::CountDown(1, "* 2 * * * * *"));
-    let task = task_builder.spawn(end_body);
+    let task = task_builder
+        .set_task_id(88888)
+        .set_frequency(Frequency::CountDown(1, "* 2 * * * * *"))
+        .spawn(end_body);
     delay_timer.add_task(task);
+    println!("push all at time {}", get_timestamp());
 
     park();
 }

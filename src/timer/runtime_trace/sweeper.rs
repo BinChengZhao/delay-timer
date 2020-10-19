@@ -105,7 +105,6 @@ impl RecyclingBins {
 
                     let recycle_unit = (&mut recycle_unit_heap).pop().map(|v| v.0).unwrap();
 
-                    dbg!(recycle_unit);
                     //handle send-error.
                     self.timer_event_sender
                         .send(TimerEvent::CancelTask(
@@ -135,7 +134,7 @@ impl RecyclingBins {
 
                 match self.recycle_unit_sources.try_recv() {
                     Ok(recycle_unit) => {
-                        (&mut recycle_unit_heap).push(dbg!(Reverse(recycle_unit)));
+                        (&mut recycle_unit_heap).push(Reverse(recycle_unit));
                     }
 
                     Err(e) => match e {

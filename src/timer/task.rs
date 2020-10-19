@@ -9,11 +9,6 @@ pub(crate) struct TaskMark {
     slot_mark: u64,
 }
 
-pub(crate) enum TaskType {
-    AsyncType,
-    SyncType,
-}
-
 impl TaskMark {
     pub(crate) fn new(task_id: u64, slot_mark: u64) -> Self {
         TaskMark { task_id, slot_mark }
@@ -47,6 +42,7 @@ pub(crate) enum FrequencyInner {
 }
 
 impl FrequencyInner {
+    //How many times the acquisition needs to be performed.
     fn residual_time(&self) -> u32 {
         match self {
             FrequencyInner::Repeated(_) => u32::MAX,
@@ -118,18 +114,24 @@ enum RepeatType {
 
 impl<'a> TaskBuilder<'a> {
     ///Set task Frequency.
-    pub fn set_frequency(&mut self, frequency: Frequency<'a>) {
+    #[inline(always)]
+    pub fn set_frequency(mut self, frequency: Frequency<'a>) -> Self {
         self.frequency = Some(frequency);
+        self
     }
 
     ///Set task-id.
-    pub fn set_task_id(&mut self, task_id: u64) {
+    #[inline(always)]
+    pub fn set_task_id(mut self, task_id: u64) -> Self {
         self.task_id = task_id;
+        self
     }
 
     ///Set maximum execution time (optional).
-    pub fn set_maximum_running_time(&mut self, maximum_running_time: u64) {
+    #[inline(always)]
+    pub fn set_maximum_running_time(mut self, maximum_running_time: u64) -> Self {
         self.maximum_running_time = Some(maximum_running_time);
+        self
     }
 
     ///Spawn a task.

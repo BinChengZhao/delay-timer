@@ -1,6 +1,6 @@
 # Version 0.2.0
 
-- Some function.
+- Some function.  LICENSE MIT.
 
 # Version 0.1.0
 

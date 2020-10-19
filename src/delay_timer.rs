@@ -15,7 +15,11 @@ use super::timer::{
 };
 
 use anyhow::{Context, Result};
-use smol::{channel::unbounded, future::block_on};
+use smol::{
+    channel::unbounded,
+    future::{block_on, FutureExt},
+    Executor,
+};
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
     Arc,
@@ -86,10 +90,10 @@ impl DelayTimer {
 
         //init reader sender for timer-event handle.
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
-        let mut timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
+        let timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
 
         //what is `ascription`.
-        let mut event_handle = EventHandle::new(
+        let event_handle = EventHandle::new(
             timer_event_receiver,
             timer_event_sender.clone(),
             shared_header,
@@ -97,10 +101,17 @@ impl DelayTimer {
 
         //TODO: run register_features_fn
 
+        //assign task.
+        Self::assign_task(timer, event_handle);
+
+        DelayTimer { timer_event_sender }
+    }
+
+    fn assign_task(mut timer: Timer, mut event_handle: EventHandle) {
         // When the method finishes executing,
         // the pool has been dropped. When these two tasks finish executing,
         // the two threads will automatically release their resources after a single experience.
-        let pool = ThreadPool::new(2);
+        let pool = ThreadPool::with_name("delay_timer".into(), 3);
 
         pool.execute(move || {
             smol::block_on(async {
@@ -114,7 +125,18 @@ impl DelayTimer {
             })
         });
 
-        DelayTimer { timer_event_sender }
+        pool.execute(|| {
+            let excutor1 = Executor::new();
+            let excutor2 = Executor::new();
+            let excutor3 = Executor::new();
+            block_on(async {
+                excutor1
+                    .tick()
+                    .or(excutor2.tick())
+                    .or(excutor3.tick())
+                    .await;
+            })
+        });
     }
 
     // if open "status-report", then register task 3s auto-run report
