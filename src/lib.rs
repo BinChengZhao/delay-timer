@@ -20,6 +20,8 @@ pub mod utils;
 
 extern crate lazy_static;
 
+pub(crate) use utils::parse::shell_command::{ChildGuard, ChildGuardList};
+
 pub use generate_fn_macro::*;
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;

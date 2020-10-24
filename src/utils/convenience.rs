@@ -18,6 +18,18 @@ pub mod functions {
     use super::{super::parse_and_run, Result};
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
+    use smol::{spawn, unblock};
+    pub fn unblock_process_task_fn(
+        shell_command: String,
+    ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+        move || {
+            let shell_command_clone = shell_command.clone();
+            create_delay_task_handler(spawn(async {
+                unblock(move || parse_and_run(&shell_command_clone)).await
+            }))
+        }
+    }
+
     #[inline(always)]
     ///Generate a closure from a string of shell commands that will generate a list of processes.
     pub fn create_process_task_fn(
@@ -54,7 +66,7 @@ pub mod functions {
     }
 }
 
-///Provide a template function that supports dynamic generation of closures.
+/// Provide a template function that supports dynamic generation of closures.
 pub fn generate_closure_template(
     a: i32,
     b: String,

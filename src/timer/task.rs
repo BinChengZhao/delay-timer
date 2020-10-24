@@ -1,6 +1,6 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
-use cron_clock::schedule::{Schedule, ScheduleIteratorOwned};
 use cron_clock::Utc;
+use cron_clock::{Schedule, ScheduleIteratorOwned};
 use std::str::FromStr;
 //TaskMark is use to remove/stop the task.
 #[derive(Default)]
@@ -43,6 +43,7 @@ pub(crate) enum FrequencyInner {
 
 impl FrequencyInner {
     //How many times the acquisition needs to be performed.
+    #[allow(dead_code)]
     fn residual_time(&self) -> u32 {
         match self {
             FrequencyInner::Repeated(_) => u32::MAX,

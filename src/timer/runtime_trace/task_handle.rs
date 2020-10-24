@@ -1,11 +1,10 @@
+use crate::{ChildGuard, ChildGuardList};
 ///TaskTrace own global task-handle.
 //当进程消亡，跟异步任务drop的时候对应的链表也减少，如果没值则删除k/v
 //如果是单实例执行任务，查看对应id是否有句柄在链表，如果有则跳过
 use anyhow::Result;
 use smol::Task as SmolTask;
 use std::collections::{HashMap, LinkedList};
-use std::process::Child;
-
 #[derive(Default)]
 // TaskTrace is contanier
 pub(crate) struct TaskTrace {
@@ -22,6 +21,7 @@ impl TaskTrace {
             .push_back(task_handler_box);
     }
 
+    #[allow(dead_code)]
     pub(crate) fn clear(self) {
         for (_task_id, task_handler_box_list) in self.inner.into_iter() {
             for task_handler_box in task_handler_box_list.into_iter() {
@@ -81,6 +81,7 @@ pub(crate) struct DelayTaskHandlerBox {
     ///Globally unique ID.
     record_id: i64,
     ///it's start_time.
+    #[allow(dead_code)]
     start_time: u64,
     ///it's end_time.
     end_time: Option<u64>,
@@ -168,28 +169,22 @@ impl DelayTaskHandlerBox {
 //Deafult implementation for Child and SmolTask
 //TODO:Maybe i can implementation a proc macro.
 
-impl DelayTaskHandler for Child {
-    fn quit(mut self: Box<Self>) -> Result<()> {
-        //to anyhow:Result
-        self.kill()?;
+impl DelayTaskHandler for ChildGuard {
+    fn quit(self: Box<Self>) -> Result<()> {
+        drop(self);
         Ok(())
     }
 }
 
-impl DelayTaskHandler for LinkedList<Child> {
-    fn quit(mut self: Box<Self>) -> Result<()> {
-        //to anyhow:Result
-
-        for child in (*self).iter_mut() {
-            //TODO:Maybe first child kill fail after childs will be leak.
-            child.kill()?;
-        }
+impl DelayTaskHandler for ChildGuardList {
+    fn quit(self: Box<Self>) -> Result<()> {
+        drop(self);
         Ok(())
     }
 }
 
 //When SmolTask is dropped, async task is cancel.
-impl DelayTaskHandler for SmolTask<Result<()>> {
+impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<Result<T>> {
     fn quit(self: Box<Self>) -> Result<()> {
         smol::spawn(async {
             self.cancel().await;

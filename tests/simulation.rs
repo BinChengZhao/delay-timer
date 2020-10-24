@@ -138,24 +138,22 @@ fn demo_it() {
         .set_frequency(Frequency::CountDown(1, "30 * * * * * *"))
         .set_maximum_running_time(90);
 
-    println!("start time {}", get_timestamp());
-    for i in 0..10000 {
+    for i in 0..1000 {
         let task = task_builder.set_task_id(i).spawn(body);
         delay_timer.add_task(task);
     }
 
-    task_builder = task_builder.set_frequency(Frequency::CountDown(1, "59 * * * * * *"));
-    for i in 10000..10100 {
+    task_builder = task_builder.set_frequency(Frequency::CountDown(1, "@minutely"));
+    for i in 1000..1100 {
         let task = task_builder.set_task_id(i).spawn(async_body);
         delay_timer.add_task(task);
     }
 
     let task = task_builder
-        .set_task_id(88888)
+        .set_task_id(8888)
         .set_frequency(Frequency::CountDown(1, "* 2 * * * * *"))
         .spawn(end_body);
     delay_timer.add_task(task);
-    println!("push all at time {}", get_timestamp());
 
     park();
 }

@@ -7,20 +7,35 @@ pub mod shell_command {
     use std::process::{Child, Command, Stdio};
 
     use std::collections::LinkedList;
+
+    pub type ChildGuardList = LinkedList<ChildGuard>;
+    #[derive(Debug)]
+    pub struct ChildGuard {
+        pub(crate) child: Child,
+    }
+
+    impl ChildGuard {
+        pub(crate) fn new(child: Child) -> Self {
+            Self { child }
+        }
+    }
+
+    impl Drop for ChildGuard {
+        fn drop(&mut self) {
+            self.child.kill().unwrap_or_else(|e| println!("{}", e));
+        }
+    }
     //that code base on 'build-your-own-shell-rust'. Thanks you Josh Mcguigan.
 
-    ///Generate a list of processes from a string of shell commands.
-    // TODO: There are a lot of system calls that happen when this method is called,
-    // the speed of execution depends on the parsing of the command and the speed of the process fork,
-    // after which it should be split into unblock().
-    pub fn parse_and_run(input: &str) -> Result<LinkedList<Child>> {
-        // TODO:If there is a parsing error during function execution,
-        // should kill all processes that were open before.
-
+    /// Generate a list of processes from a string of shell commands.
+    // There are a lot of system calls that happen when this method is called,
+    //  the speed of execution depends on the parsing of the command and the speed of the process fork,
+    //  after which it should be split into unblock().
+    pub fn parse_and_run(input: &str) -> Result<ChildGuardList> {
         // Check to see if process_linked_list is also automatically dropped out of scope
         // by ERROR's early return and an internal kill method is executed.
 
-        let mut process_linked_list: LinkedList<Child> = LinkedList::new();
+        let mut process_linked_list: ChildGuardList = LinkedList::new();
         // must be peekable so we know when we are on the last command
         let mut commands = input.trim().split(" | ").peekable();
         //if str has >> | > ,after spawn return.
@@ -45,7 +60,7 @@ pub mod shell_command {
 
             if let Some(previous_command_ref) = previous_command {
                 let mut t = None;
-                mem::swap(&mut previous_command_ref.stdout, &mut t);
+                mem::swap(&mut previous_command_ref.child.stdout, &mut t);
 
                 if let Some(child_stdio) = t {
                     stdin = Stdio::from(child_stdio);
@@ -55,7 +70,7 @@ pub mod shell_command {
             let mut output = Command::new(command);
             output.args(args).stdin(stdin);
 
-            let process;
+            let process: Child;
             let end_flag = if check_redirect_result.is_some() {
                 let stdout = check_redirect_result.unwrap()?;
                 process = output.stdout(stdout).spawn()?;
@@ -77,7 +92,7 @@ pub mod shell_command {
                 false
             };
 
-            process_linked_list.push_back(process);
+            process_linked_list.push_back(ChildGuard::new(process));
 
             if end_flag {
                 break;
@@ -94,7 +109,7 @@ pub mod shell_command {
 
         if command.contains(">>") {
             angle_bracket = ">>";
-        } else if command.contains(">") {
+        } else if command.contains('>') {
             angle_bracket = ">";
         } else {
             return None;

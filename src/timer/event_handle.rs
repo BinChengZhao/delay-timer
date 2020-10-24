@@ -42,6 +42,7 @@ pub(crate) struct EventHandle {
     //The core of the event recipient, dealing with the global event.
     timer_event_receiver: TimerEventReceiver,
     //TODO:Reporter.
+    #[warn(dead_code)]
     status_report_sender: Option<Sender<i32>>,
     //Data Senders for Resource Recyclers.
     recycle_unit_sources_sender: Sender<RecycleUnit>,
@@ -84,6 +85,7 @@ impl EventHandle {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn set_status_report_sender(&mut self, status_report_sender: AsyncSender<i32>) {
         self.status_report_sender = Some(status_report_sender);
     }

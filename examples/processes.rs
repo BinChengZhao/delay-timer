@@ -1,15 +1,15 @@
 use delay_timer::{
     delay_timer::DelayTimer,
     timer::task::{Frequency, TaskBuilder},
-    utils::functions::create_process_task_fn,
+    utils::functions::unblock_process_task_fn,
 };
 use std::thread::sleep;
 use std::time::Duration;
 
 fn main() {
     let mut delay_timer = DelayTimer::new();
-    let mut task_builder = TaskBuilder::default();
-    let body = create_process_task_fn(r"php F:\rust\owner\delayTimer\examples\try_spawn.php >> F:\rust\owner\delayTimer\examples\try_spawn.txt".to_string());
+    let  task_builder = TaskBuilder::default();
+    let body = unblock_process_task_fn(r"php F:\rust\owner\delayTimer\examples\try_spawn.php >> F:\rust\owner\delayTimer\examples\try_spawn.txt".to_string());
 
     // misrepresentation
     // let body = create_process_task_fn(r"php F:\rust\owner\delayTimer\examples\try_spawn.php | dir >> \a\try_spawn.txt".to_string());
