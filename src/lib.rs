@@ -31,18 +31,14 @@ pub use smol::unblock as unblock_spawn;
 #[cfg(test)]
 mod tests {
     use smol::{channel::unbounded, future::block_on};
-    use std::sync::{atomic::AtomicU64, Arc};
-    use waitmap::WaitMap;
 
     use crate::{
         delay_timer::{DelayTimer, SharedHeader},
         timer::{
-            event_handle::EventHandle,
-            runtime_trace::task_handle::DelayTaskHandler,
             task::{Frequency, TaskBuilder},
-            timer_core::{Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
+            timer_core::{Timer, TimerEvent, DEFAULT_TIMER_SLOT_COUNT},
         },
-        utils::functions::{create_default_delay_task_handler, create_delay_task_handler},
+        utils::functions::create_default_delay_task_handler,
     };
 
     use test::Bencher;

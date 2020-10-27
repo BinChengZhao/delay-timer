@@ -1,33 +1,20 @@
 #![feature(ptr_internals)]
-use delay_timer::timer::timer_core::get_timestamp;
 use delay_timer::{
-    create_async_fn_body,
     delay_timer::DelayTimer,
-    timer::{
-        runtime_trace::task_handle::DelayTaskHandler,
-        task::{Frequency, TaskBuilder},
-    },
-    utils::functions::{create_default_delay_task_handler, create_delay_task_handler},
+    timer::task::{Frequency, TaskBuilder},
+    utils::functions::create_default_delay_task_handler,
 };
-use futures::future;
-use smol::{channel, future as SmolFuture, LocalExecutor, Task, Timer};
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::process::Command;
-use std::thread::Thread;
 use std::{
-    ptr::Unique,
     sync::{
         atomic::{
-            AtomicBool, AtomicUsize,
-            Ordering::{AcqRel, Acquire, Release, SeqCst},
+            AtomicUsize,
+            Ordering::{Acquire, Release},
         },
         Arc,
     },
-    thread::{current, park, park_timeout},
-    time::{Duration, Instant},
+    thread::park_timeout,
+    time::Duration,
 };
-use surf;
 
 #[test]
 fn go_works() {
@@ -47,7 +34,7 @@ fn go_works() {
         .set_frequency(Frequency::CountDown(3, "0/6 * * * * * *"))
         .set_task_id(1)
         .spawn(body);
-    delay_timer.add_task(task);
+    delay_timer.add_task(task).unwrap();
 
     let mut i = 0;
 
@@ -79,7 +66,7 @@ fn tests_countdown() {
         .set_frequency(Frequency::CountDown(3, "* * * * * * *"))
         .set_task_id(1)
         .spawn(body);
-    delay_timer.add_task(task);
+    delay_timer.add_task(task).unwrap();
 
     let mut i = 0;
 
@@ -93,67 +80,4 @@ fn tests_countdown() {
             break;
         }
     }
-}
-
-#[test]
-fn demo_it() {
-    //TODO:Remember close terminal can speed up because of
-    //printnl! block process if stand-pipe if full.
-
-    let mut delay_timer = DelayTimer::new();
-    let mut run_flag = Arc::new(AtomicUsize::new(0));
-    let run_flag_ref: Option<Unique<Arc<AtomicUsize>>> = Unique::new(&mut run_flag);
-
-    let thread = current();
-
-    let body = move || {
-        let local_run_flag = run_flag_ref.unwrap().as_ptr();
-
-        unsafe {
-            (*local_run_flag).fetch_add(1, SeqCst);
-        }
-        create_default_delay_task_handler()
-    };
-    let end_body = move || {
-        let local_run_flag = run_flag_ref.unwrap().as_ptr();
-        unsafe {
-            println!(
-                "end time {}, result {}",
-                get_timestamp(),
-                (*local_run_flag).load(SeqCst)
-            );
-        }
-        thread.unpark();
-        create_default_delay_task_handler()
-    };
-
-    let async_body = create_async_fn_body!({
-        let mut res = surf::get("https://httpbin.org/get").await.unwrap();
-        let body_str = res.body_string().await.unwrap();
-        println!("{}", body_str);
-        Ok(())
-    });
-
-    let mut task_builder = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(1, "30 * * * * * *"))
-        .set_maximum_running_time(90);
-
-    for i in 0..1000 {
-        let task = task_builder.set_task_id(i).spawn(body);
-        delay_timer.add_task(task);
-    }
-
-    task_builder = task_builder.set_frequency(Frequency::CountDown(1, "@minutely"));
-    for i in 1000..1100 {
-        let task = task_builder.set_task_id(i).spawn(async_body);
-        delay_timer.add_task(task);
-    }
-
-    let task = task_builder
-        .set_task_id(8888)
-        .set_frequency(Frequency::CountDown(1, "* 2 * * * * *"))
-        .spawn(end_body);
-    delay_timer.add_task(task);
-
-    park();
 }
