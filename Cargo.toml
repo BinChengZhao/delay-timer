@@ -1,16 +1,23 @@
 [package]
 name = "delay_timer"
 version = "0.1.0"
-authors = ["Zhao.bicheng <zhaobicheng@youhaodongxi.com>"]
+authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
+repository = "https://github.com/BinChengZhao/delay_timer"
+documentation = "https://docs.rs/delay_timer"
+readme = "README.md"
+description = "delayTimer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures."
+keywords = [ "cron", "schedule", "repeat", "periodic", "time" ]
+license = "Apache-2.0 OR MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "delay_timer"
+
 [dependencies]
 smol = "1.0.0"
-futures = "0.3.5"
 cron_clock = "0.6.5"
-lazy_static = "1.4.0"
 anyhow = "1.0.31"
 threadpool = "1.8.1"
 rs-snowflake = "0.2.0"

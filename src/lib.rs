@@ -18,8 +18,6 @@ pub mod generate_fn_macro;
 pub mod timer;
 pub mod utils;
 
-extern crate lazy_static;
-
 pub(crate) use utils::parse::shell_command::{ChildGuard, ChildGuardList};
 
 pub use cron_clock;

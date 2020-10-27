@@ -85,8 +85,6 @@ Licensed under either of
 
  * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
-at your option.
-
 
 ## To Do List
 - [x] Disable unwrap related methods that will panic.
