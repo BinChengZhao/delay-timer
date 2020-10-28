@@ -13,18 +13,20 @@
 #![feature(test)]
 //TODO:When the version is stable in the future, we should consider using stable compile unified.
 extern crate test;
+
+pub(crate) use utils::parse::shell_command::{ChildGuard, ChildGuardList};
+
 pub mod delay_timer;
 pub mod generate_fn_macro;
 pub mod timer;
 pub mod utils;
-
-pub(crate) use utils::parse::shell_command::{ChildGuard, ChildGuardList};
 
 pub use cron_clock;
 pub use generate_fn_macro::*;
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
+pub use timer::runtime_trace::task_handle::DelayTaskHandler;
 
 #[cfg(test)]
 mod tests {

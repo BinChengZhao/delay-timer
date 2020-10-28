@@ -1,6 +1,8 @@
 # delayTimer
 delayTimer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures..
 
+The underlying runtime is currently based on smol, so upper level applications that want to extend asynchronous functionality need to use libraries that are compatible with smol.
+
 [![Build](https://github.com/BinChengZhao/delay_timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay_timer/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](
