@@ -191,7 +191,7 @@ impl Task {
     //swap slot loction ,do this
     //down_count_and_set_vaild,will return new vaild status.
     #[inline(always)]
-    pub fn down_count_and_set_vaild(&mut self) -> bool {
+    pub(crate) fn down_count_and_set_vaild(&mut self) -> bool {
         self.down_count();
         self.set_valid_by_count_down();
         self.is_valid()
@@ -229,6 +229,7 @@ impl Task {
     }
 
     #[inline(always)]
+    /// check if task has arrived.
     pub fn check_arrived(&mut self) -> bool {
         if self.cylinder_line == 0 {
             return self.is_can_running();
@@ -236,13 +237,13 @@ impl Task {
         self.sub_cylinder_line()
     }
 
-    //check is ready
+    /// check if task has already.
     #[inline(always)]
     pub fn is_already(&self) -> bool {
         self.cylinder_line == 0
     }
 
-    //is_can_running
+    /// check if task has runable status.
     #[inline(always)]
     pub fn is_can_running(&self) -> bool {
         if self.is_valid() {
@@ -251,13 +252,13 @@ impl Task {
         false
     }
 
-    //is_valid
+    /// check if task has valid status.
     #[inline(always)]
     pub fn is_valid(&self) -> bool {
         self.valid
     }
 
-    //get_next_exec_timestamp
+    ///get_next_exec_timestamp
     #[inline(always)]
     pub fn get_next_exec_timestamp(&mut self) -> u64 {
         self.frequency.next_alarm_timestamp() as u64

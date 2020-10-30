@@ -131,10 +131,10 @@ impl EventHandle {
     }
 
     //TODO:
-    //cancel is exit running task.
+    //cancel for exit running task.
     //stop is suspension of execution(set vaild).
     //user delete task , node should remove.
-    //any `Task`  i can set `valid`  for that stop.
+    //any `Task` can set `valid` for that stop.
 
     //add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Task) -> TaskMark {
