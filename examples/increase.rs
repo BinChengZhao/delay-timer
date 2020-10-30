@@ -28,7 +28,9 @@ fn main() {
     let end_body = get_end_fn(current(), run_flag_ref);
     let async_body = get_async_fn();
 
-    let mut task_builder = TaskBuilder::default()
+    let mut task_builder = TaskBuilder::default();
+
+    task_builder
         .set_frequency(Frequency::CountDown(1, "30 * * * * * *"))
         .set_maximum_running_time(90);
 
@@ -37,7 +39,7 @@ fn main() {
         delay_timer.add_task(task).unwrap();
     }
 
-    task_builder = task_builder.set_frequency(Frequency::CountDown(1, "58 * * * * * *"));
+    task_builder.set_frequency(Frequency::CountDown(1, "58 * * * * * *"));
     for i in 1000..1100 {
         let task = task_builder.set_task_id(i).spawn(async_body);
         delay_timer.add_task(task).unwrap();

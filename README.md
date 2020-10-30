@@ -3,6 +3,8 @@ delayTimer is a task manager based on a time wheel algorithm, which makes it eas
 
 The underlying runtime is currently based on smol, so upper level applications that want to extend asynchronous functionality need to use libraries that are compatible with smol.
 
+Since the library currently includes features such as #[bench], it needs to be developed in a nightly version.
+
 [![Build](https://github.com/BinChengZhao/delay_timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay_timer/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](
@@ -30,16 +32,9 @@ fn main() {
     delay_timer.stop_delay_timer().unwrap();
 }
 
-fn build_task1(task_builder: TaskBuilder) -> Task {
+fn build_task1(mut task_builder: TaskBuilder) -> Task {
     let body = create_async_fn_body!({
         println!("create_async_fn_body!--7");
-        Timer::after(Duration::from_secs(2)).await;
-
-        println!("create_async_fn_body:i'm part of success--1");
-
-        Timer::after(Duration::from_secs(2)).await;
-
-        println!("create_async_fn_body:i'm part of success--2");
 
         Timer::after(Duration::from_secs(3)).await;
 
@@ -47,16 +42,14 @@ fn build_task1(task_builder: TaskBuilder) -> Task {
         Ok(())
     });
     task_builder
-        .set_frequency(Frequency::CountDown(2, "0/7 * * * * * *"))
-        .set_task_id(7)
-        .set_maximum_running_time(5)
+        .set_frequency(Frequency::Repeated("0/7 * * * * * *"))
         .spawn(body)
 }
 
-fn build_task2(task_builder: TaskBuilder) -> Task {
+fn build_task2(mut task_builder: TaskBuilder) -> Task {
     let body = create_async_fn_body!({
         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
-        dbg!(res.body_string().await);
+        dbg!(res.body_string().await.unwrap());
 
         Ok(())
     });
@@ -67,14 +60,16 @@ fn build_task2(task_builder: TaskBuilder) -> Task {
         .spawn(body)
 }
 
-fn build_task3(task_builder: TaskBuilder) -> Task {
+fn build_task3(mut task_builder: TaskBuilder) -> Task {
     let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
     task_builder
-        .set_frequency(Frequency::CountDown(2, "@minutely"))
+        .set_frequency(Frequency::Once("@minutely"))
         .set_task_id(15)
         .set_maximum_running_time(5)
         .spawn(body)
 }
+
+
 
 ```
 

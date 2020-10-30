@@ -152,7 +152,6 @@ impl EventHandle {
 
         //copu task_id
         let task_id = task.task_id;
-
         self.shared_header
             .wheel_queue
             .get_mut(&slot_seed)

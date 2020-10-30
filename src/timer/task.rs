@@ -116,21 +116,21 @@ enum RepeatType {
 impl<'a> TaskBuilder<'a> {
     ///Set task Frequency.
     #[inline(always)]
-    pub fn set_frequency(mut self, frequency: Frequency<'a>) -> Self {
+    pub fn set_frequency(&mut self, frequency: Frequency<'a>) -> &mut Self {
         self.frequency = Some(frequency);
         self
     }
 
     ///Set task-id.
     #[inline(always)]
-    pub fn set_task_id(mut self, task_id: u64) -> Self {
+    pub fn set_task_id(&mut self, task_id: u64) -> &mut Self {
         self.task_id = task_id;
         self
     }
 
     ///Set maximum execution time (optional).
     #[inline(always)]
-    pub fn set_maximum_running_time(mut self, maximum_running_time: u64) -> Self {
+    pub fn set_maximum_running_time(&mut self, maximum_running_time: u64) -> &mut Self {
         self.maximum_running_time = Some(maximum_running_time);
         self
     }

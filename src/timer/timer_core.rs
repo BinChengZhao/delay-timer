@@ -135,7 +135,6 @@ impl Timer {
             .set_end_time(task.get_maximum_running_time(timestamp))
             .spawn(task_handler_box);
 
-        //FIXME: hidden send error for bench.
         self.timer_event_sender
             .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
             .await

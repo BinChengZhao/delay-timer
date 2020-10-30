@@ -27,16 +27,17 @@ pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
 pub use timer::runtime_trace::task_handle::DelayTaskHandler;
-
+pub use timer::task::{Frequency, Task, TaskBuilder};
+//TODO: Maybe can independent bench mod to one project.
 #[cfg(test)]
 mod tests {
     use smol::{channel::unbounded, future::block_on};
 
     use crate::{
-        delay_timer::{DelayTimer, SharedHeader},
+        delay_timer::SharedHeader,
         timer::{
             task::{Frequency, TaskBuilder},
-            timer_core::{Timer, TimerEvent, DEFAULT_TIMER_SLOT_COUNT},
+            timer_core::{Timer, TimerEvent},
         },
         utils::functions::create_default_delay_task_handler,
     };
@@ -48,34 +49,32 @@ mod tests {
         let body = move || create_default_delay_task_handler();
 
         let mut task_builder = TaskBuilder::default();
-        task_builder = task_builder
-            .set_frequency(Frequency::CountDown(1, "0/10 * * * * * *"))
+        task_builder
+            .set_frequency(Frequency::CountDown(1, "@yearly"))
             .set_maximum_running_time(5)
             .set_task_id(1);
 
+        // String parsing to corn-expression -> iterator is the most time-consuming operation.
+        // The iterator is used to find out when the next execution should take place, in about 500 ns.
         b.iter(|| task_builder.spawn(body.clone()));
     }
 
     #[bench]
     fn bench_maintain_task(b: &mut Bencher) {
-        let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
+        let (timer_event_sender, _timer_event_receiver) = unbounded::<TimerEvent>();
         let shared_header = SharedHeader::default();
         let mut timer = Timer::new(timer_event_sender.clone(), shared_header);
 
         let body = move || create_default_delay_task_handler();
 
         let mut task_builder = TaskBuilder::default();
-        task_builder = task_builder
-            .set_frequency(Frequency::CountDown(1, "0/10 * * * * * *"))
+        task_builder
+            .set_frequency(Frequency::CountDown(2, "@yearly"))
             .set_maximum_running_time(5)
             .set_task_id(1);
 
-        let mut tasks = Vec::with_capacity(1500000);
-
-        for _ in 0..1500000 {
-            tasks.push(task_builder.spawn(body));
-        }
-
-        b.iter(|| block_on(timer.maintain_task(tasks.pop().unwrap(), 1, 1, 1)));
+        // TODO: `task_builder.spawn(body)` is about 5000 ns ~ 25000ns.
+        // So maintain_task takes (result of bench - task_spawn)ns.  about 1500ns.
+        b.iter(|| block_on(timer.maintain_task(task_builder.spawn(body), 1, 1, 1)));
     }
 }

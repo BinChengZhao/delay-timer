@@ -1,7 +1,8 @@
 #![feature(ptr_internals)]
 use delay_timer::{
+    cron_clock::{ScheduleIteratorOwned, Utc},
     delay_timer::DelayTimer,
-    timer::task::{Frequency, TaskBuilder},
+    timer::task::{Frequency, Task, TaskBuilder},
     utils::functions::create_default_delay_task_handler,
 };
 use std::{
@@ -22,11 +23,8 @@ fn go_works() {
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
 
-    //每次 +1
-    //第一次任务会在，1秒后执行， 之后每次在6秒后执行
     let body = move || {
         share_num_bunshin.fetch_add(1, Release);
-        println!("task 1 ,1s run");
         create_default_delay_task_handler()
     };
 
@@ -40,9 +38,9 @@ fn go_works() {
 
     loop {
         i = i + 1;
-        park_timeout(Duration::from_secs(5));
+        park_timeout(Duration::from_micros(7_100_000));
 
-        //检测，任务是否执行的符合预期
+        //Testing, whether the mission is performing as expected.
         assert_eq!(i, share_num.load(Acquire));
 
         if i == 3 {
@@ -58,12 +56,11 @@ fn tests_countdown() {
     let share_num_bunshin = share_num.clone();
     let body = move || {
         share_num_bunshin.fetch_sub(1, Release);
-        println!("task 1 ,1s run");
         create_default_delay_task_handler()
     };
 
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(3, "* * * * * * *"))
+        .set_frequency(Frequency::CountDown(3, "0/2 * * * * * *"))
         .set_task_id(1)
         .spawn(body);
     delay_timer.add_task(task).unwrap();
@@ -72,12 +69,28 @@ fn tests_countdown() {
 
     loop {
         i = i + 1;
-        park_timeout(Duration::from_secs(1));
+        park_timeout(Duration::from_secs(3));
 
         if i == 6 {
-            //task 一共运行3次，每秒运行一次，6秒后从最多减到0
+            //The task runs 3 times, once per second, and after 6 seconds it goes down to 0 at most.
             assert_eq!(0, share_num.load(Acquire));
             break;
         }
     }
+}
+#[test]
+fn inspect_struct() {
+    println!("Task size :{:?}", std::mem::size_of::<Task>());
+    println!("Frequency size :{:?}", std::mem::size_of::<Frequency>());
+    println!("TaskBuilder size :{:?}", std::mem::size_of::<TaskBuilder>());
+    println!("DelayTimer size :{:?}", std::mem::size_of::<DelayTimer>());
+    println!(
+        "ScheduleIteratorOwned size :{:?}",
+        std::mem::size_of::<ScheduleIteratorOwned<Utc>>()
+    );
+
+    println!(
+        "Demo Taskes size :{:?}G",
+        std::mem::size_of::<Task>() * 1000000 / 1024 / 1024
+    );
 }
