@@ -1,3 +1,5 @@
+//! utils is a tool module that provides easy shell-command parsing,
+//! and functions that generate closures.
 pub mod convenience;
 pub mod parse;
 #[cfg(feature = "status-report")]
