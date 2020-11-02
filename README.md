@@ -13,7 +13,7 @@ https://github.com/BinChengZhao/delay_timer)
 https://crates.io/BinChengZhao/delay_timer)
 [![Documentation](https://docs.rs/delay_timer/badge.svg)](
 https://docs.rs/delay_timer)
-
+![image](https://github.com/BinChengZhao/delay_timer/blob/master/structural_drawing/DelayTImer.png)
 ## Examples
 
 
