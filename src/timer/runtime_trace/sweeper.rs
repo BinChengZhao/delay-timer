@@ -156,3 +156,5 @@ impl RecyclingBins {
         }
     }
 }
+
+//TODO:Add TestUnit.

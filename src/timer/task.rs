@@ -1,9 +1,11 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
 use cron_clock::Utc;
 use cron_clock::{Schedule, ScheduleIteratorOwned};
+use std::fmt;
+use std::fmt::Pointer;
 use std::str::FromStr;
 //TaskMark is use to remove/stop the task.
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct TaskMark {
     pub(crate) task_id: u64,
     slot_mark: u64,
@@ -34,6 +36,7 @@ pub enum Frequency<'a> {
     CountDown(u32, &'a str),
 }
 ///Iterator for task internal control of execution time.
+#[derive(Debug, Clone)]
 pub(crate) enum FrequencyInner {
     ///Unlimited repetition types.
     Repeated(ScheduleIteratorOwned<Utc>),
@@ -90,13 +93,23 @@ pub struct TaskBuilder<'a> {
 //TASK 执行完了，支持找新的Slot
 //TODO:未来任务支持，单体执行（同一时刻不能多个执行）。。
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+
+pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
+impl fmt::Debug for SafeStructBoxedFn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <&Self as Pointer>::fmt(&self, f).unwrap();
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 pub struct Task {
     ///Unique task-id.
     pub task_id: u64,
     ///Iter of frequencies and executive clocks.
     frequency: FrequencyInner,
     /// A Fn in box it can be run and return delayTaskHandler.
-    pub(crate) body: SafeBoxFn,
+    pub(crate) body: SafeStructBoxedFn,
     ///Maximum execution time (optional).
     maximum_running_time: Option<u64>,
     ///Loop the line and check how many more clock cycles it will take to execute it.
@@ -178,6 +191,7 @@ impl Task {
         body: SafeBoxFn,
         maximum_running_time: Option<u64>,
     ) -> Task {
+        let body = SafeStructBoxedFn(body);
         Task {
             task_id,
             frequency,
@@ -188,6 +202,13 @@ impl Task {
         }
     }
 
+    // get SafeBoxFn of Task to call.
+    #[inline(always)]
+    pub(crate) fn get_body(&self) -> &SafeBoxFn {
+        &(self.body).0
+    }
+
+    //TODO:Add TestUnit.
     //swap slot loction ,do this
     //down_count_and_set_vaild,will return new vaild status.
     #[inline(always)]
@@ -203,6 +224,7 @@ impl Task {
         self.frequency.down_count();
     }
 
+    //TODO:Add TestUnit.
     //set_valid_by_count_down
     #[inline(always)]
     fn set_valid_by_count_down(&mut self) {
@@ -243,6 +265,7 @@ impl Task {
         self.cylinder_line == 0
     }
 
+    //TODO:Add TestUnit.
     /// check if task has runable status.
     #[inline(always)]
     pub fn is_can_running(&self) -> bool {
@@ -262,5 +285,19 @@ impl Task {
     #[inline(always)]
     pub fn get_next_exec_timestamp(&mut self) -> u64 {
         self.frequency.next_alarm_timestamp() as u64
+    }
+}
+
+mod tests {
+
+    #[test]
+    fn test_is_can_running() {
+        use super::{Frequency, Schedule, Task, TaskBuilder};
+        use crate::utils::convenience::functions::create_default_delay_task_handler;
+        let mut task_builder = TaskBuilder::default();
+        task_builder.set_frequency(Frequency::CountDown(2, "* * * * * * *"));
+        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+        //newType debulg
+        dbg!(task).is_can_running();
     }
 }
