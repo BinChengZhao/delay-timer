@@ -51,7 +51,6 @@ pub(crate) struct EventHandle {
 }
 
 impl EventHandle {
-    //TODO: Put `wheel_queue` `task_flag_map` `second_hand` `global_time` in share_header.
     pub(crate) fn new(
         timer_event_receiver: TimerEventReceiver,
         timer_event_sender: TimerEventSender,

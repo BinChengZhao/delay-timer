@@ -90,8 +90,7 @@ pub struct TaskBuilder<'a> {
     maximum_running_time: Option<u64>,
 }
 
-//TASK 执行完了，支持找新的Slot
-//TODO:未来任务支持，单体执行（同一时刻不能多个执行）。。
+//TODO:Future tasks will support single execution (not multiple executions in the same time frame).
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
@@ -208,7 +207,6 @@ impl Task {
         &(self.body).0
     }
 
-    //TODO:Add TestUnit.
     //swap slot loction ,do this
     //down_count_and_set_vaild,will return new vaild status.
     #[inline(always)]
@@ -224,7 +222,6 @@ impl Task {
         self.frequency.down_count();
     }
 
-    //TODO:Add TestUnit.
     //set_valid_by_count_down
     #[inline(always)]
     fn set_valid_by_count_down(&mut self) {
@@ -265,7 +262,6 @@ impl Task {
         self.cylinder_line == 0
     }
 
-    //TODO:Add TestUnit.
     /// check if task has runable status.
     #[inline(always)]
     pub fn is_can_running(&self) -> bool {
@@ -291,13 +287,35 @@ impl Task {
 mod tests {
 
     #[test]
-    fn test_is_can_running() {
-        use super::{Frequency, Schedule, Task, TaskBuilder};
+    fn test_task_valid() {
+        use super::{Frequency, Task, TaskBuilder};
         use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
-        task_builder.set_frequency(Frequency::CountDown(2, "* * * * * * *"));
+
+        //The third run returns to an invalid state.
+        task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
         let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
-        //newType debulg
-        dbg!(task).is_can_running();
+
+        assert!(task.down_count_and_set_vaild());
+        assert!(task.down_count_and_set_vaild());
+        assert!(!task.down_count_and_set_vaild());
+    }
+
+    #[test]
+    fn test_is_can_running() {
+        use super::{Frequency, Task, TaskBuilder};
+        use crate::utils::convenience::functions::create_default_delay_task_handler;
+        let mut task_builder = TaskBuilder::default();
+
+        //The third run returns to an invalid state.
+        task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
+        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+
+        assert!(task.is_can_running());
+
+        task.set_cylinder_line(1);
+        assert!(!task.is_can_running());
+
+        assert!(task.check_arrived());
     }
 }
