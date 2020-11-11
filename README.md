@@ -1,19 +1,19 @@
-# delayTimer
-delayTimer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures..
+# delay-timer
+delay-timer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures..
 
 The underlying runtime is currently based on smol, so upper level applications that want to extend asynchronous functionality need to use libraries that are compatible with smol.
 
 Since the library currently includes features such as #[bench], it needs to be developed in a nightly version.
 
-[![Build](https://github.com/BinChengZhao/delay_timer/workflows/Build%20and%20test/badge.svg)](
-https://github.com/BinChengZhao/delay_timer/actions)
+[![Build](https://github.com/BinChengZhao/delay-timer/workflows/Build%20and%20test/badge.svg)](
+https://github.com/BinChengZhao/delay-timer/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](
-https://github.com/BinChengZhao/delay_timer)
+https://github.com/BinChengZhao/delay-timer)
 [![Cargo](https://img.shields.io/crates/v/delay_timer.svg)](
 https://crates.io/BinChengZhao/delay_timer)
 [![Documentation](https://docs.rs/delay_timer/badge.svg)](
 https://docs.rs/delay_timer)
-![image](https://github.com/BinChengZhao/delay_timer/blob/master/structural_drawing/DelayTImer.png)
+![image](https://github.com/BinChengZhao/delay-timer/blob/master/structural_drawing/DelayTImer.png)
 ## Examples
 
 
