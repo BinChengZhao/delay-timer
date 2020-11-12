@@ -10,7 +10,7 @@ https://github.com/BinChengZhao/delay-timer/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](
 https://github.com/BinChengZhao/delay-timer)
 [![Cargo](https://img.shields.io/crates/v/delay_timer.svg)](
-https://crates.io/BinChengZhao/delay_timer)
+https://crates.io/crates/delay_timer)
 [![Documentation](https://docs.rs/delay_timer/badge.svg)](
 https://docs.rs/delay_timer)
 ![image](https://github.com/BinChengZhao/delay-timer/blob/master/structural_drawing/DelayTImer.png)
