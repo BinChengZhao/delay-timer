@@ -22,6 +22,7 @@ anyhow = "1.0.31"
 threadpool = "1.8.1"
 rs-snowflake = "0.2.0"
 waitmap = "1.1.0"
+lru = "0.6.1"
 
 
 [dev-dependencies]

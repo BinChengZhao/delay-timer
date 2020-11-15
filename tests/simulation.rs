@@ -1,11 +1,12 @@
 #![feature(ptr_internals)]
 use delay_timer::{
-    cron_clock::{ScheduleIteratorOwned, Utc},
+    cron_clock::{Schedule, ScheduleIteratorOwned, Utc},
     delay_timer::DelayTimer,
     timer::task::{Frequency, Task, TaskBuilder},
     utils::functions::create_default_delay_task_handler,
 };
 use std::{
+    str::FromStr,
     sync::{
         atomic::{
             AtomicUsize,
@@ -13,7 +14,7 @@ use std::{
         },
         Arc,
     },
-    thread::park_timeout,
+    thread::{self, park_timeout},
     time::Duration,
 };
 
@@ -89,8 +90,17 @@ fn inspect_struct() {
         std::mem::size_of::<ScheduleIteratorOwned<Utc>>()
     );
 
-    println!(
-        "Demo Taskes size :{:?}G",
-        std::mem::size_of::<Task>() * 1000000 / 1024 / 1024
-    );
+    let mut s = Schedule::from_str("* * * * * * *")
+        .unwrap()
+        .upcoming_owned(Utc);
+
+    let mut s1 = s.clone();
+
+    println!("{:?}, {:?}", s.next(), s1.next());
+    thread::sleep(Duration::from_secs(1));
+    println!("{:?}, {:?}", s.next(), s1.next());
+
+    let mut s2 = s1.clone();
+    thread::sleep(Duration::from_secs(1));
+    println!("{:?}, {:?}", s.next(), s2.next());
 }

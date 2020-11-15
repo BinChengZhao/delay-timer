@@ -27,6 +27,7 @@ use std::sync::{
 use std::time::SystemTime;
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
+
 //TODO:replenish the doc.
 // #[cfg(feature = "status-report")]
 
@@ -190,6 +191,13 @@ impl DelayTimer {
             .with_context(|| "Failed Send Event from seed_timer_event".to_string())
     }
 }
+
+//TODO: Translate to english.
+//usein LRU cache...
+//线程全局的lru缓存，
+
+//以后spawn，任务就只用 几百ns了。
+//默认线程栈内存是 2M， 控制这用一下 256 个  大概默认栈内存的5%
 
 ///get current OS SystemTime.
 pub fn get_timestamp() -> u64 {

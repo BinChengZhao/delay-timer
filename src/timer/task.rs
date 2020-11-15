@@ -1,7 +1,11 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
-use cron_clock::Utc;
-use cron_clock::{Schedule, ScheduleIteratorOwned};
+use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
+use lru::LruCache;
 use std::str::FromStr;
+
+//TODO: Add doc.
+thread_local!(static CRON_EXPRESSION_CACHE: LruCache<&'static str, ScheduleIteratorOwned<Utc>> = LruCache::new(256));
+
 //TaskMark is use to remove/stop the task.
 #[derive(Default)]
 pub(crate) struct TaskMark {
@@ -87,8 +91,13 @@ pub struct TaskBuilder<'a> {
     maximum_running_time: Option<u64>,
 }
 
+//TODO: 张老师建议参考 ruby 那些库，设计的很人性化.
+
+//TODO:油条哥建议 cron 表达式的提供几个快捷enum， 这样IDE提示更方便。。
+//太细节了。
+
+//TODO:油条哥建议去除 api前的 set_，看起来更人性化。  但是有待权衡
 //TASK 执行完了，支持找新的Slot
-//TODO:未来任务支持，单体执行（同一时刻不能多个执行）。。
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 pub struct Task {
     ///Unique task-id.
@@ -167,6 +176,17 @@ impl<'a> TaskBuilder<'a> {
             Box::new(body),
             self.maximum_running_time,
         )
+    }
+
+    fn analyze_cron_expression(cron_expression: &str) ->ScheduleIteratorOwned<Utc> {
+
+        let indiscriminate_expression = cron_expression.trim_matches(' ');
+        //TODO: NOTICE cron-expression suger.
+        //find cache result in `CRON_EXPRESSION_CACHE` by indiscriminate_expression.
+        //From cron-expression-str build time-iter.
+        let schedule = Schedule::from_str(cron_expression).unwrap();
+        let taskschedule = schedule.upcoming_owned(Utc);
+        todo!();
     }
 }
 
