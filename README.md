@@ -17,8 +17,7 @@ https://docs.rs/delay_timer)
 ## Examples
 
 
-```
-
+```rust
 fn main() {
     let mut delay_timer = DelayTimer::new();
     let task_builder = TaskBuilder::default();
@@ -109,8 +108,6 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
 
     Ok(())
 }
-
-
 ```
 
 There's a lot more in the [examples] directory.
