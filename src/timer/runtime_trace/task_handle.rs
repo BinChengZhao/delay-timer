@@ -1,11 +1,10 @@
 use crate::{ChildGuard, ChildGuardList};
 ///TaskTrace own global task-handle.
-//当进程消亡，跟异步任务drop的时候对应的链表也减少，如果没值则删除k/v
-//如果是单实例执行任务，查看对应id是否有句柄在链表，如果有则跳过
 use anyhow::Result;
 use smol::Task as SmolTask;
 use std::collections::{HashMap, LinkedList};
-#[derive(Default)]
+use std::fmt::{self, Debug, Formatter, Pointer};
+#[derive(Default, Debug)]
 // TaskTrace is contanier
 pub(crate) struct TaskTrace {
     inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
@@ -71,14 +70,29 @@ pub trait DelayTaskHandler: Send + Sync {
     fn quit(self: Box<Self>) -> Result<()>;
 }
 
+pub(crate) struct SafeStructBoxedDelayTaskHandler(pub(crate) Box<dyn DelayTaskHandler>);
+impl Debug for SafeStructBoxedDelayTaskHandler {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        <&Self as Pointer>::fmt(&self, f).unwrap();
+        Ok(())
+    }
+}
+
+impl SafeStructBoxedDelayTaskHandler {
+    pub(crate) fn get_inner(self) -> Box<dyn DelayTaskHandler> {
+        self.0
+    }
+}
+
 // The problem of storage diffrent type in  DelayTaskHandlerBox  was solved through dyn DelayTaskHandler.
 // Before thinking about this solution, I thought about enumerations and generics Type.
 // But Both of them with new problems will be introduced , enumerations can't allow crate user expand,
 // generics Type will single state just store one type in TaskTrace.
 // Multi-DelayTaskHandlerBox record_id can same, because one task can spawn Multi-process.
+#[derive(Debug)]
 pub(crate) struct DelayTaskHandlerBox {
     ///Task Handle is most important part of DelayTaskHandlerBox.
-    task_handler: Option<Box<dyn DelayTaskHandler>>,
+    pub(crate) task_handler: Option<SafeStructBoxedDelayTaskHandler>,
     ///task_id.
     task_id: u64,
     ///Globally unique ID.
@@ -95,12 +109,15 @@ impl Drop for DelayTaskHandlerBox {
         if let Some(task_handler) = self.task_handler.take() {
             //Using a trait object, you can't pass ownership directly because the size is uncertain.
             //So packet it by `Box`.
-            task_handler.quit().unwrap_or_else(|e| println!("{}", e));
+            task_handler
+                .get_inner()
+                .quit()
+                .unwrap_or_else(|e| println!("{}", e));
         }
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct DelayTaskHandlerBoxBuilder {
     task_id: u64,
     record_id: i64,
@@ -134,6 +151,7 @@ impl DelayTaskHandlerBoxBuilder {
     }
 
     pub fn spawn(self, task_handler: Box<dyn DelayTaskHandler>) -> DelayTaskHandlerBox {
+        let task_handler = SafeStructBoxedDelayTaskHandler(task_handler);
         DelayTaskHandlerBox {
             task_handler: Some(task_handler),
             task_id: self.task_id,
@@ -145,6 +163,12 @@ impl DelayTaskHandlerBoxBuilder {
 }
 
 impl DelayTaskHandlerBox {
+    #[allow(dead_code)]
+    #[inline(always)]
+    pub fn get_task_handler(&self) -> &Option<SafeStructBoxedDelayTaskHandler> {
+        &(self.task_handler)
+    }
+
     #[inline(always)]
     pub fn get_task_id(&self) -> u64 {
         self.task_id
@@ -162,7 +186,7 @@ impl DelayTaskHandlerBox {
 
     fn quit(&mut self) -> Result<()> {
         if let Some(task_handler) = self.task_handler.take() {
-            return task_handler.quit();
+            return task_handler.get_inner().quit();
         }
 
         Ok(())

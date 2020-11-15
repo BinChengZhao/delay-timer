@@ -17,6 +17,7 @@ pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 //warning: large size difference between variants
+#[derive(Debug)]
 pub(crate) enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
@@ -24,12 +25,12 @@ pub(crate) enum TimerEvent {
     CancelTask(u64, i64),
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
-
+#[derive(Clone)]
 pub(crate) struct Timer {
     timer_event_sender: TimerEventSender,
     //TODO:status_report_sender.
     status_report_sender: Option<AsyncSender<i32>>,
-    shared_header: SharedHeader,
+    pub(crate) shared_header: SharedHeader,
 }
 
 //In any case, the task is not executed in the scheduler,
@@ -125,7 +126,7 @@ impl Timer {
         second_hand: u64,
     ) -> Option<()> {
         let task_id = task.task_id;
-        let task_handler_box = (task.body)();
+        let task_handler_box = (task.get_body())();
 
         let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
         let tmp_task_handler_box = delay_task_handler_box_builder
@@ -168,5 +169,27 @@ impl Timer {
             task_flag_map.value_mut().set_slot_mark(slot_seed);
         }
         Some(())
+    }
+}
+
+mod tests {
+
+    #[test]
+    fn test_next_position() {
+        use super::{SharedHeader, Timer, TimerEvent};
+        use smol::channel::unbounded;
+        use std::sync::atomic::Ordering;
+        let (s, _) = unbounded::<TimerEvent>();
+        let mut timer = Timer::new(s, SharedHeader::default());
+
+        assert_eq!(timer.next_position(), 0);
+        assert_eq!(timer.next_position(), 1);
+
+        timer
+            .shared_header
+            .second_hand
+            .store(3599, Ordering::SeqCst);
+        assert_eq!(timer.next_position(), 3599);
+        assert_eq!(timer.next_position(), 0);
     }
 }

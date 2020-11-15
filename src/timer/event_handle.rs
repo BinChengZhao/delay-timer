@@ -38,20 +38,19 @@ use smol::{
 // let it to trash the last taskhandle.
 pub(crate) struct EventHandle {
     //Task Handle Collector, which makes it easy to cancel a running task.
-    task_trace: TaskTrace,
+    pub(crate) task_trace: TaskTrace,
     //The core of the event recipient, dealing with the global event.
-    timer_event_receiver: TimerEventReceiver,
+    pub(crate) timer_event_receiver: TimerEventReceiver,
     //TODO:Reporter.
     #[warn(dead_code)]
-    status_report_sender: Option<Sender<i32>>,
+    pub(crate) status_report_sender: Option<Sender<i32>>,
     //Data Senders for Resource Recyclers.
-    recycle_unit_sources_sender: Sender<RecycleUnit>,
+    pub(crate) recycle_unit_sources_sender: Sender<RecycleUnit>,
     //Shared header information.
-    shared_header: SharedHeader,
+    pub(crate) shared_header: SharedHeader,
 }
 
 impl EventHandle {
-    //TODO: Put `wheel_queue` `task_flag_map` `second_hand` `global_time` in share_header.
     pub(crate) fn new(
         timer_event_receiver: TimerEventReceiver,
         timer_event_sender: TimerEventSender,
@@ -91,6 +90,7 @@ impl EventHandle {
     }
 
     //handle all event.
+    //TODO:Add TestUnit.
     pub(crate) async fn handle_event(&mut self) {
         while let Ok(event) = self.timer_event_receiver.recv().await {
             match event {

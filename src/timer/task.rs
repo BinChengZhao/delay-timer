@@ -1,13 +1,15 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
+use std::fmt;
+use std::fmt::Pointer;
 use std::str::FromStr;
 
 //TODO: Add doc.
 thread_local!(static CRON_EXPRESSION_CACHE: LruCache<&'static str, ScheduleIteratorOwned<Utc>> = LruCache::new(256));
 
 //TaskMark is use to remove/stop the task.
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct TaskMark {
     pub(crate) task_id: u64,
     slot_mark: u64,
@@ -38,6 +40,7 @@ pub enum Frequency<'a> {
     CountDown(u32, &'a str),
 }
 ///Iterator for task internal control of execution time.
+#[derive(Debug, Clone)]
 pub(crate) enum FrequencyInner {
     ///Unlimited repetition types.
     Repeated(ScheduleIteratorOwned<Utc>),
@@ -98,14 +101,25 @@ pub struct TaskBuilder<'a> {
 
 //TODO:油条哥建议去除 api前的 set_，看起来更人性化。  但是有待权衡
 //TASK 执行完了，支持找新的Slot
+//TODO:Future tasks will support single execution (not multiple executions in the same time frame).
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+
+pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
+impl fmt::Debug for SafeStructBoxedFn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <&Self as Pointer>::fmt(&self, f).unwrap();
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 pub struct Task {
     ///Unique task-id.
     pub task_id: u64,
     ///Iter of frequencies and executive clocks.
     frequency: FrequencyInner,
     /// A Fn in box it can be run and return delayTaskHandler.
-    pub(crate) body: SafeBoxFn,
+    pub(crate) body: SafeStructBoxedFn,
     ///Maximum execution time (optional).
     maximum_running_time: Option<u64>,
     ///Loop the line and check how many more clock cycles it will take to execute it.
@@ -198,6 +212,7 @@ impl Task {
         body: SafeBoxFn,
         maximum_running_time: Option<u64>,
     ) -> Task {
+        let body = SafeStructBoxedFn(body);
         Task {
             task_id,
             frequency,
@@ -206,6 +221,12 @@ impl Task {
             cylinder_line: 0,
             valid: true,
         }
+    }
+
+    // get SafeBoxFn of Task to call.
+    #[inline(always)]
+    pub(crate) fn get_body(&self) -> &SafeBoxFn {
+        &(self.body).0
     }
 
     //swap slot loction ,do this
@@ -282,5 +303,41 @@ impl Task {
     #[inline(always)]
     pub fn get_next_exec_timestamp(&mut self) -> u64 {
         self.frequency.next_alarm_timestamp() as u64
+    }
+}
+
+mod tests {
+
+    #[test]
+    fn test_task_valid() {
+        use super::{Frequency, Task, TaskBuilder};
+        use crate::utils::convenience::functions::create_default_delay_task_handler;
+        let mut task_builder = TaskBuilder::default();
+
+        //The third run returns to an invalid state.
+        task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
+        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+
+        assert!(task.down_count_and_set_vaild());
+        assert!(task.down_count_and_set_vaild());
+        assert!(!task.down_count_and_set_vaild());
+    }
+
+    #[test]
+    fn test_is_can_running() {
+        use super::{Frequency, Task, TaskBuilder};
+        use crate::utils::convenience::functions::create_default_delay_task_handler;
+        let mut task_builder = TaskBuilder::default();
+
+        //The third run returns to an invalid state.
+        task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
+        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+
+        assert!(task.is_can_running());
+
+        task.set_cylinder_line(1);
+        assert!(!task.is_can_running());
+
+        assert!(task.check_arrived());
     }
 }

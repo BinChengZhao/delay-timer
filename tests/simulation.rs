@@ -38,11 +38,11 @@ fn go_works() {
     let mut i = 0;
 
     loop {
-        i = i + 1;
-        park_timeout(Duration::from_micros(7_100_000));
-
         //Testing, whether the mission is performing as expected.
         assert_eq!(i, share_num.load(Acquire));
+
+        i = i + 1;
+        park_timeout(Duration::from_micros(6_100_000));
 
         if i == 3 {
             break;

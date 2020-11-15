@@ -52,6 +52,7 @@ impl PartialEq for RecycleUnit {
     }
 }
 
+#[derive(Debug)]
 ///RecyclingBins is resource recycler, excute timeout task-handle.
 pub(crate) struct RecyclingBins {
     ///storage all task-handle in there.
@@ -153,6 +154,60 @@ impl RecyclingBins {
 
             future::yield_now().await;
             // out of scope , recycle_unit_heap is auto-drop;
+        }
+    }
+}
+
+mod tests {
+
+    #[test]
+    fn test_task_valid() {
+        use super::{get_timestamp, RecycleUnit, RecyclingBins, TimerEvent};
+        use smol::{
+            block_on,
+            channel::{unbounded, TryRecvError},
+            future::FutureExt,
+        };
+        use std::{
+            sync::Arc,
+            thread::{park_timeout, spawn},
+            time::Duration,
+        };
+
+        let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
+        let (recycle_unit_sender, recycle_unit_receiver) = unbounded::<RecycleUnit>();
+
+        let recycling_bins = Arc::new(RecyclingBins::new(
+            recycle_unit_receiver,
+            timer_event_sender,
+        ));
+        spawn(move || {
+            block_on(async {
+                recycling_bins
+                    .clone()
+                    .recycle()
+                    .or(recycling_bins.add_recycle_unit())
+                    .await;
+            })
+        });
+
+        let deadline = get_timestamp() + 5;
+
+        for i in 1..10 {
+            recycle_unit_sender
+                .try_send(RecycleUnit::new(deadline, i, (i * i) as i64))
+                .unwrap();
+        }
+
+        park_timeout(Duration::new(2, 0));
+
+        if let Err(e) = timer_event_receiver.try_recv() {
+            assert_eq!(e, TryRecvError::Empty);
+        }
+        park_timeout(Duration::new(3, 3_000_000));
+
+        for _ in 1..10 {
+            assert!(dbg!(timer_event_receiver.try_recv()).is_ok());
         }
     }
 }

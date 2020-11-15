@@ -3,7 +3,7 @@ name = "delay_timer"
 version = "0.1.0"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
-repository = "https://github.com/BinChengZhao/delay_timer"
+repository = "https://github.com/BinChengZhao/delay-timer"
 documentation = "https://docs.rs/delay_timer"
 readme = "README.md"
 description = "delayTimer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures."
@@ -17,10 +17,10 @@ name = "delay_timer"
 
 [dependencies]
 smol = "1.0.0"
-cron_clock = "0.6.5"
+cron_clock = "0.6.6"
 anyhow = "1.0.31"
 threadpool = "1.8.1"
-rs-snowflake = "0.2.0"
+rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
 
