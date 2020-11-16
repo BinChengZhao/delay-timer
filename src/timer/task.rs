@@ -1,12 +1,14 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
+use std::thread::AccessError;
 
 //TODO: Add doc.
-thread_local!(static CRON_EXPRESSION_CACHE: LruCache<&'static str, ScheduleIteratorOwned<Utc>> = LruCache::new(256));
+thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<String, ScheduleIteratorOwned<Utc>>> = RefCell::new(LruCache::new(256)));
 
 //TaskMark is use to remove/stop the task.
 #[derive(Default, Debug, Clone, Copy)]
@@ -192,15 +194,23 @@ impl<'a> TaskBuilder<'a> {
         )
     }
 
-    fn analyze_cron_expression(cron_expression: &str) ->ScheduleIteratorOwned<Utc> {
+    fn analyze_cron_expression(
+        cron_expression: String,
+    ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
+        let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
 
-        let indiscriminate_expression = cron_expression.trim_matches(' ');
-        //TODO: NOTICE cron-expression suger.
-        //find cache result in `CRON_EXPRESSION_CACHE` by indiscriminate_expression.
-        //From cron-expression-str build time-iter.
-        let schedule = Schedule::from_str(cron_expression).unwrap();
-        let taskschedule = schedule.upcoming_owned(Utc);
-        todo!();
+        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
+            let mut LruCache = expression_cache.borrow_mut();
+            //TODO: 笔记。
+            if let Some(schedule_iterator) = LruCache.get(&indiscriminate_expression) {
+                return schedule_iterator.clone();
+            }
+            let taskschedule = Schedule::from_str(&indiscriminate_expression)
+                .unwrap()
+                .upcoming_owned(Utc);
+            LruCache.put(indiscriminate_expression, taskschedule.clone());
+            taskschedule
+        })
     }
 }
 

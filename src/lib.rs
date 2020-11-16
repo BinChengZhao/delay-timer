@@ -21,6 +21,7 @@ pub mod generate_fn_macro;
 pub mod timer;
 pub mod utils;
 
+pub use anyhow::Result as AnyResult;
 pub use cron_clock;
 pub use generate_fn_macro::*;
 pub use smol::future as future_lite;
