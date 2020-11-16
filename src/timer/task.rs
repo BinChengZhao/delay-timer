@@ -161,7 +161,7 @@ impl<'a> TaskBuilder<'a> {
     }
 
     ///Spawn a task.
-    pub fn spawn<F>(self, body: F) -> Task
+    pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where
         F: Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
@@ -176,9 +176,8 @@ impl<'a> TaskBuilder<'a> {
             }
         };
 
-        //From cron-expression-str build time-iter.
-        let schedule = Schedule::from_str(expression_str).unwrap();
-        let taskschedule = schedule.upcoming_owned(Utc);
+        //TODO: to_owned is redundant
+        let taskschedule = Self::analyze_cron_expression(expression_str.to_owned())?;
 
         //Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
@@ -186,12 +185,12 @@ impl<'a> TaskBuilder<'a> {
             RepeatType::Num(repeat_count) => FrequencyInner::CountDown(repeat_count, taskschedule),
         };
 
-        Task::new(
+        Ok(Task::new(
             self.task_id,
             frequency_inner,
             Box::new(body),
             self.maximum_running_time,
-        )
+        ))
     }
 
     fn analyze_cron_expression(
@@ -200,15 +199,14 @@ impl<'a> TaskBuilder<'a> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
 
         CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
-            let mut LruCache = expression_cache.borrow_mut();
-            //TODO: 笔记。
-            if let Some(schedule_iterator) = LruCache.get(&indiscriminate_expression) {
+            let mut lru_cache = expression_cache.borrow_mut();
+            if let Some(schedule_iterator) = lru_cache.get(&indiscriminate_expression) {
                 return schedule_iterator.clone();
             }
             let taskschedule = Schedule::from_str(&indiscriminate_expression)
                 .unwrap()
                 .upcoming_owned(Utc);
-            LruCache.put(indiscriminate_expression, taskschedule.clone());
+            lru_cache.put(indiscriminate_expression, taskschedule.clone());
             taskschedule
         })
     }
@@ -326,7 +324,9 @@ mod tests {
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+        let mut task: Task = task_builder
+            .spawn(|| create_default_delay_task_handler())
+            .unwrap();
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
@@ -341,7 +341,9 @@ mod tests {
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+        let mut task: Task = task_builder
+            .spawn(|| create_default_delay_task_handler())
+            .unwrap();
 
         assert!(task.is_can_running());
 

@@ -50,6 +50,7 @@ fn build_task1(mut task_builder: TaskBuilder) -> Task {
         .set_task_id(1)
         .set_frequency(Frequency::Repeated("0/7 * * * * * *"))
         .spawn(body)
+        .unwrap()
 }
 
 fn build_task2(mut task_builder: TaskBuilder) -> Task {
@@ -64,6 +65,7 @@ fn build_task2(mut task_builder: TaskBuilder) -> Task {
         .set_task_id(2)
         .set_maximum_running_time(5)
         .spawn(body)
+        .unwrap()
 }
 
 fn build_task3(mut task_builder: TaskBuilder) -> Task {
@@ -73,6 +75,7 @@ fn build_task3(mut task_builder: TaskBuilder) -> Task {
         .set_task_id(3)
         .set_maximum_running_time(5)
         .spawn(body)
+        .unwrap()
 }
 
 fn build_task5(mut task_builder: TaskBuilder) -> Task {
@@ -84,6 +87,7 @@ fn build_task5(mut task_builder: TaskBuilder) -> Task {
         .set_task_id(5)
         .set_maximum_running_time(5)
         .spawn(body)
+        .unwrap()
 }
 
 pub fn generate_closure_template(

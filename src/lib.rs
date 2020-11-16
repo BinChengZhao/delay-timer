@@ -52,10 +52,11 @@ mod tests {
         let mut task_builder = TaskBuilder::default();
         task_builder
             .set_frequency(Frequency::CountDown(1, "@yearly"))
+
             .set_maximum_running_time(5)
             .set_task_id(1);
 
-        // String parsing to corn-expression -> iterator is the most time-consuming operation.
+        // String parsing to corn-expression -> iterator is the most time-consuming operation about 1500ns ~ 3500 ns.
         // The iterator is used to find out when the next execution should take place, in about 500 ns.
         b.iter(|| task_builder.spawn(body.clone()));
     }
@@ -76,6 +77,6 @@ mod tests {
 
         // TODO: `task_builder.spawn(body)` is about 5000 ns ~ 25000ns.
         // So maintain_task takes (result of bench - task_spawn)ns.  about 1500ns.
-        b.iter(|| block_on(timer.maintain_task(task_builder.spawn(body), 1, 1, 1)));
+        b.iter(|| block_on(timer.maintain_task(task_builder.spawn(body).unwrap(), 1, 1, 1)));
     }
 }

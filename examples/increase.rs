@@ -35,20 +35,21 @@ fn main() {
         .set_maximum_running_time(90);
 
     for i in 0..1000 {
-        let task = task_builder.set_task_id(i).spawn(body);
+        let task = task_builder.set_task_id(i).spawn(body).unwrap();
         delay_timer.add_task(task).unwrap();
     }
 
     task_builder.set_frequency(Frequency::CountDown(1, "58 * * * * * *"));
     for i in 1000..1100 {
-        let task = task_builder.set_task_id(i).spawn(async_body);
+        let task = task_builder.set_task_id(i).spawn(async_body).unwrap();
         delay_timer.add_task(task).unwrap();
     }
 
     let task = task_builder
         .set_task_id(8888)
         .set_frequency(Frequency::CountDown(1, "@minutely"))
-        .spawn(end_body);
+        .spawn(end_body)
+        .unwrap();
     delay_timer.add_task(task).unwrap();
 
     park();

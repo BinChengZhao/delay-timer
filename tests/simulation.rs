@@ -32,7 +32,8 @@ fn go_works() {
     let task = TaskBuilder::default()
         .set_frequency(Frequency::CountDown(3, "0/6 * * * * * *"))
         .set_task_id(1)
-        .spawn(body);
+        .spawn(body)
+        .unwrap();
     delay_timer.add_task(task).unwrap();
 
     let mut i = 0;
@@ -63,7 +64,8 @@ fn tests_countdown() {
     let task = TaskBuilder::default()
         .set_frequency(Frequency::CountDown(3, "0/2 * * * * * *"))
         .set_task_id(1)
-        .spawn(body);
+        .spawn(body)
+        .unwrap();
     delay_timer.add_task(task).unwrap();
 
     let mut i = 0;
