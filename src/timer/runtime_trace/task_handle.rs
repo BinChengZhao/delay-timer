@@ -39,26 +39,33 @@ impl TaskTrace {
     ) -> Option<Result<()>> {
         let task_handler_list = self.inner.get_mut(&task_id)?;
 
-        //TODO: Optimize.
-        let filter_collection =
-            task_handler_list.drain_filter(|handler_box| handler_box.record_id == record_id);
+        let mut list_mut_cursor = task_handler_list.cursor_back_mut();
 
-        let (filter_collection_count, _) = filter_collection.size_hint();
-
-        if filter_collection_count == 0 {
-            return None;
-        }
-
-        let mut handlers_quit_result = Some(Ok(()));
-
-        for mut task_handler_box in filter_collection {
-            let handler_quit_result = task_handler_box.quit();
-            if handler_quit_result.is_err() {
-                handlers_quit_result = Some(handler_quit_result);
+        let mut task_handler_box_ref: &mut DelayTaskHandlerBox;
+        loop {
+            if list_mut_cursor.current().is_none() {
+                return None;
             }
+
+            task_handler_box_ref = list_mut_cursor.current().unwrap();
+
+            if task_handler_box_ref.record_id > record_id {
+                return None;
+            }
+
+            if task_handler_box_ref.record_id == record_id {
+                break;
+            }
+
+            list_mut_cursor.move_next();
         }
 
-        handlers_quit_result
+        //remove current task_handler_box.
+        if let Some(mut task_handler_box) = list_mut_cursor.remove_current() {
+            Some(task_handler_box.quit())
+        } else {
+            None
+        }
     }
 }
 

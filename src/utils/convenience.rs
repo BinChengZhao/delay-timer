@@ -64,9 +64,9 @@ pub mod functions {
 }
 
 pub mod cron_expression_grammatical_candy {
-    //直接对应时间迭代器
-    //再用LRU支持一个，常用解析字符串缓存
-    enum CronCandy {
+
+    #[derive(Debug, Copy, Clone)]
+    pub enum CronCandy {
         Secondly,
         Minutely,
         Hourly,
@@ -74,6 +74,21 @@ pub mod cron_expression_grammatical_candy {
         Weekly,
         Monthly,
         Yearly,
+    }
+    use CronCandy::*;
+
+    impl From<CronCandy> for &'static str {
+        fn from(cron_candy: CronCandy) -> Self {
+            match cron_candy {
+                Secondly => "@secondly",
+                Minutely => "@minutely",
+                Hourly => "@hourly",
+                Daily => "@daily",
+                Weekly => "@weekly",
+                Monthly => "@monthly",
+                Yearly => "@yearly",
+            }
+        }
     }
 }
 

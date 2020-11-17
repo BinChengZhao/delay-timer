@@ -9,7 +9,7 @@
 //!
 //! 1. Mission deployment.
 #![feature(split_inclusive)]
-#![feature(drain_filter)]
+#![feature(linked_list_cursors)]
 #![feature(test)]
 //TODO:When the version is stable in the future, we should consider using stable compile unified.
 extern crate test;
@@ -29,6 +29,8 @@ pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
 pub use timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use timer::task::{Frequency, Task, TaskBuilder};
+pub use utils::convenience::cron_expression_grammatical_candy::CronCandy;
+
 //TODO: Maybe can independent bench mod to one project.
 #[cfg(test)]
 mod tests {
@@ -52,7 +54,6 @@ mod tests {
         let mut task_builder = TaskBuilder::default();
         task_builder
             .set_frequency(Frequency::CountDown(1, "@yearly"))
-
             .set_maximum_running_time(5)
             .set_task_id(1);
 

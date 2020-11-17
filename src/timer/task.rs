@@ -30,6 +30,7 @@ impl TaskMark {
         self.slot_mark = slot_mark;
     }
 }
+//TODO: Add CronCandy version.
 
 #[derive(Debug, Copy, Clone)]
 ///Enumerated values of repeating types.
