@@ -45,7 +45,7 @@ impl Timer {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "status_report")]
     pub(crate) fn set_status_report_sender(&mut self, sender: AsyncSender<i32>) {
         self.status_report_sender = Some(sender);
     }

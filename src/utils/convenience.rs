@@ -77,9 +77,9 @@ pub mod cron_expression_grammatical_candy {
     }
     use CronCandy::*;
 
-    impl From<CronCandy> for &'static str {
-        fn from(cron_candy: CronCandy) -> Self {
-            match cron_candy {
+    impl Into<&'static str> for CronCandy {
+        fn into(self) -> &'static str {
+            match self {
                 Secondly => "@secondly",
                 Minutely => "@minutely",
                 Hourly => "@hourly",
@@ -102,4 +102,23 @@ pub fn generate_closure_template(
 
 pub async fn async_template(_: i32, _: String) -> Result<()> {
     Ok(())
+}
+
+mod tests {
+
+    #[test]
+    fn test_cron_candy() {
+        use super::cron_expression_grammatical_candy::CronCandy;
+
+        let mut s: &'static str;
+
+        s = CronCandy::Daily.into();
+        assert_eq!(s, "@daily");
+
+        s = CronCandy::Yearly.into();
+        assert_eq!(s, "@yearly");
+
+        s = CronCandy::Secondly.into();
+        assert_eq!(s, "@secondly");
+    }
 }

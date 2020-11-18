@@ -17,13 +17,14 @@ extern crate test;
 pub(crate) use utils::parse::shell_command::{ChildGuard, ChildGuardList};
 
 pub mod delay_timer;
-pub mod generate_fn_macro;
+#[macro_use]
+pub mod macros;
 pub mod timer;
 pub mod utils;
 
 pub use anyhow::Result as AnyResult;
 pub use cron_clock;
-pub use generate_fn_macro::*;
+pub use macros::*;
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
@@ -32,6 +33,7 @@ pub use timer::task::{Frequency, Task, TaskBuilder};
 pub use utils::convenience::cron_expression_grammatical_candy::CronCandy;
 
 //TODO: Maybe can independent bench mod to one project.
+//Or via `rustversion` Isolation of different modules.
 #[cfg(test)]
 mod tests {
     use smol::{channel::unbounded, future::block_on};

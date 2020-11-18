@@ -15,6 +15,11 @@ license = "Apache-2.0 OR MIT"
 [lib]
 name = "delay_timer"
 
+[features]
+status-report = []
+tokio-support = ["tokio"]
+
+
 [dependencies]
 smol = "1.0.0"
 cron_clock = "0.6.6"
@@ -23,6 +28,7 @@ threadpool = "1.8.1"
 rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
+tokio = { version = "0.3", features = ["rt", "rt-multi-thread", "net", "process", "time", "fs"] , optional = true }
 
 
 [dev-dependencies]

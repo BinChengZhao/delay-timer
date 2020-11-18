@@ -17,7 +17,7 @@ https://docs.rs/delay_timer)
 ## Examples
 
 
-```
+``` rust
 
 fn main() {
     let mut delay_timer = DelayTimer::new();
@@ -124,6 +124,8 @@ Licensed under either of
 
 
 ## To Do List
+- [x] Support async-local-executor API and defalut start.
+- [x] Support tokio Ecology.
 - [x] Disable unwrap related methods that will panic.
 - [x] Thread and running task quit when delayTimer drop.
 - [x] error handle need supplement.

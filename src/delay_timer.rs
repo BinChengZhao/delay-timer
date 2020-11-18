@@ -28,8 +28,11 @@ use std::time::SystemTime;
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
 
-//TODO:replenish the doc.
-// #[cfg(feature = "status-report")]
+//TODO: Read compiler conditional.
+#[cfg(feature = "tokio-support")]
+use std::sync::atomic::{AtomicUsize, Ordering};
+#[cfg(feature = "tokio-support")]
+use tokio::runtime::{Builder, Runtime};
 
 //TODO: Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
@@ -45,6 +48,8 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
 }
+
+struct Runtimes {}
 
 #[derive(Clone)]
 pub(crate) struct SharedHeader {
@@ -84,6 +89,7 @@ impl Default for DelayTimer {
     }
 }
 
+//TODO:支持tokio，我只启动一个runtime，跟暴露几个API
 impl DelayTimer {
     /// New a DelayTimer.
     pub fn new() -> DelayTimer {
@@ -112,7 +118,7 @@ impl DelayTimer {
         // When the method finishes executing,
         // the pool has been dropped. When these two tasks finish executing,
         // the two threads will automatically release their resources after a single experience.
-        let pool = ThreadPool::with_name("delay_timer".into(), 3);
+        let pool = ThreadPool::with_name("delay_timer_default".into(), 3);
 
         pool.execute(move || {
             smol::block_on(async {
@@ -140,9 +146,22 @@ impl DelayTimer {
         });
     }
 
+    #[cfg(feature = "tokio-support")]
+    fn tokio_support() -> Runtime {
+        Builder::thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("tokio-{}", id)
+        })
+        .on_thread_start(|| {
+            println!("tokio-thread started");
+        })
+        .build()
+    }
+
     // if open "status-report", then register task 3s auto-run report
     #[cfg(feature = "status-report")]
-    pub fn set_status_reporter(&mut self, status_report: impl StatusReport) -> Result<()> {
+    pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
         let mut task_builder = TaskBuilder::default();
 
         let body = move || {
@@ -166,26 +185,26 @@ impl DelayTimer {
     }
 
     /// Add a task in timer_core by event-channel.
-    pub fn add_task(&mut self, task: Task) -> Result<()> {
+    pub fn add_task(&self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
     /// Remove a task in timer_core by event-channel.
-    pub fn remove_task(&mut self, task_id: u64) -> Result<()> {
+    pub fn remove_task(&self, task_id: u64) -> Result<()> {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
     /// Cancel a task in timer_core by event-channel.
-    pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Result<()> {
+    pub fn cancel_task(&self, task_id: u64, record_id: i64) -> Result<()> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 
-    pub fn stop_delay_timer(&mut self) -> Result<()> {
+    pub fn stop_delay_timer(&self) -> Result<()> {
         self.seed_timer_event(TimerEvent::StopTimer)
     }
 
     /// Send a event to event-handle.
-    fn seed_timer_event(&mut self, event: TimerEvent) -> Result<()> {
+    fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
         self.timer_event_sender
             .try_send(event)
             .with_context(|| "Failed Send Event from seed_timer_event".to_string())
