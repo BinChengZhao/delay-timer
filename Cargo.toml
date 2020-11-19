@@ -1,6 +1,6 @@
 [package]
 name = "delay_timer"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
@@ -16,6 +16,7 @@ license = "Apache-2.0 OR MIT"
 name = "delay_timer"
 
 [features]
+default = []
 status-report = []
 tokio-support = ["tokio"]
 
@@ -28,11 +29,13 @@ threadpool = "1.8.1"
 rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
-tokio = { version = "0.3", features = ["rt", "rt-multi-thread", "net", "process", "time", "fs"] , optional = true }
+tokio = { version = "0.3.3", features = ["rt", "rt-multi-thread", "net", "process", "time", "fs"] , optional = true }
 
 
 [dev-dependencies]
 surf = "2.1.0"
+tokio = { version = "0.3.3", features = ["full"] }
+hyper = "0.13"
 
 [dev-dependencies.async-std]
 version = "1.6.3"

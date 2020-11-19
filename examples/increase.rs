@@ -20,7 +20,7 @@ use surf;
 //TODO:Remember close terminal can speed up because of
 //printnl! block process if stand-pipe if full.
 fn main() {
-    let mut delay_timer = DelayTimer::new();
+    let delay_timer = DelayTimer::new();
     let mut run_flag = Arc::new(AtomicUsize::new(0));
     let run_flag_ref: Option<Unique<Arc<AtomicUsize>>> = Unique::new(&mut run_flag);
 

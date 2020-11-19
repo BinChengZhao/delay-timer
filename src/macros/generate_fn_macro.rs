@@ -13,3 +13,15 @@ macro_rules! create_async_fn_body {
         }
     };
 }
+
+cfg_tokio_support!(
+    #[macro_export]
+    macro_rules! create_async_fn_tokio_body {
+        ($async_body:block) => {
+            || {
+                let handle = delay_timer::tokio_async_spawn(async { $async_body });
+                create_delay_task_handler(handle)
+            }
+        };
+    }
+);

@@ -1,0 +1,27 @@
+[package]
+name = "examples"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+# If you copy one of the examples into a new project, you should be using
+# [dependencies] instead.
+[dev-dependencies]
+delay_timer = { version = "0.2.0", path = "../", features = ["tokio-support", "status-report"] }
+futures = "0.3.0"
+http = "0.2"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+
+[[example]]
+name = "increase"
+path = "increase.rs"
+
+[[example]]
+name = "demo"
+path = "demo.rs"
+
+[[example]]
+name = "cycle_tokio_task"
+path = "cycle_tokio_task.rs"

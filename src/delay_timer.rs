@@ -14,6 +14,13 @@ use super::timer::{
     timer_core::{Slot, Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
 };
 
+use crate::{cfg_status_report, cfg_tokio_support};
+
+cfg_tokio_support!(
+    use tokio::runtime::{Builder, Runtime};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+);
+
 use anyhow::{Context, Result};
 use smol::{
     channel::unbounded,
@@ -27,12 +34,6 @@ use std::sync::{
 use std::time::SystemTime;
 use threadpool::ThreadPool;
 use waitmap::WaitMap;
-
-//TODO: Read compiler conditional.
-#[cfg(feature = "tokio-support")]
-use std::sync::atomic::{AtomicUsize, Ordering};
-#[cfg(feature = "tokio-support")]
-use tokio::runtime::{Builder, Runtime};
 
 //TODO: Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
@@ -48,8 +49,6 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
 }
-
-struct Runtimes {}
 
 #[derive(Clone)]
 pub(crate) struct SharedHeader {
@@ -106,12 +105,21 @@ impl DelayTimer {
             shared_header,
         );
 
-        //TODO: run register_features_fn
+        DelayTimer::register_features_fn();
 
         //assign task.
         Self::assign_task(timer, event_handle);
 
         DelayTimer { timer_event_sender }
+    }
+
+    fn register_features_fn() {
+    //   #[cfg(feature = "tokio-support")]
+
+    //TODO: need macro to fix it.
+    //   tokio_support();
+      
+        
     }
 
     fn assign_task(mut timer: Timer, mut event_handle: EventHandle) {
@@ -146,43 +154,45 @@ impl DelayTimer {
         });
     }
 
-    #[cfg(feature = "tokio-support")]
-    fn tokio_support() -> Runtime {
-        Builder::thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("tokio-{}", id)
-        })
-        .on_thread_start(|| {
-            println!("tokio-thread started");
-        })
-        .build()
-    }
-
-    // if open "status-report", then register task 3s auto-run report
-    #[cfg(feature = "status-report")]
-    pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
-        let mut task_builder = TaskBuilder::default();
-
-        let body = move || {
-            SmolTask::spawn(async move {
-                let report_result = status_report.report().await;
-
-                if report_result.is_err() {
-                    status_report.help();
-                }
+    cfg_tokio_support!(
+        fn tokio_support() -> Runtime {
+            Builder::new_multi_thread().thread_name_fn(|| {
+                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                format!("tokio-{}", id)
             })
-            .detach();
+            .on_thread_start(|| {
+                println!("tokio-thread started");
+            })
+            .build().unwrap()
+        }
+    );
 
-            convenience::create_delay_task_handler(MyUnit)
-        };
+    cfg_status_report!(
+        // if open "status-report", then register task 3s auto-run report
+        pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
+            let mut task_builder = TaskBuilder::default();
 
-        task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
-        task_builder.set_task_id(0);
-        let task = task_builder.spawn(body);
+            let body = move || {
+                SmolTask::spawn(async move {
+                    let report_result = status_report.report().await;
 
-        self.add_task(task)
-    }
+                    if report_result.is_err() {
+                        status_report.help();
+                    }
+                })
+                .detach();
+
+                convenience::create_delay_task_handler(MyUnit)
+            };
+
+            task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
+            task_builder.set_task_id(0);
+            let task = task_builder.spawn(body);
+
+            self.add_task(task)
+        }
+    );
 
     /// Add a task in timer_core by event-channel.
     pub fn add_task(&self, task: Task) -> Result<()> {

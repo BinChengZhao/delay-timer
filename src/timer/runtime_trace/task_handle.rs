@@ -227,3 +227,13 @@ impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<Result<T>> {
         Ok(())
     }
 }
+
+cfg_tokio_support!(
+    use tokio::task::JoinHandle;
+    impl<T: Send + Sync + 'static> DelayTaskHandler for JoinHandle<Result<T>> {
+        fn quit(self: Box<Self>) -> Result<()> {
+            (&*self).abort();
+            Ok(())
+        }
+    }
+);

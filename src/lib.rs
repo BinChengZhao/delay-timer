@@ -32,8 +32,14 @@ pub use timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use timer::task::{Frequency, Task, TaskBuilder};
 pub use utils::convenience::cron_expression_grammatical_candy::CronCandy;
 
+cfg_tokio_support!(
+    pub use tokio::task::spawn as tokio_async_spawn;
+    pub use tokio::task::spawn_blocking as tokio_unblock_spawn;
+);
+
 //TODO: Maybe can independent bench mod to one project.
 //Or via `rustversion` Isolation of different modules.
+//TODO: Add a prelude.
 #[cfg(test)]
 mod tests {
     use smol::{channel::unbounded, future::block_on};
