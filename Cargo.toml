@@ -17,7 +17,8 @@ name = "delay_timer"
 
 [features]
 default = []
-status-report = []
+full = ["tokio-support", "status-report"]
+status-report = ["async-trait"]
 tokio-support = ["tokio"]
 
 
@@ -30,7 +31,7 @@ rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
 tokio = { version = "0.3.3", features = ["rt", "rt-multi-thread", "net", "process", "time", "fs"] , optional = true }
-
+async-trait = { version = "0.1.41", optional = true }
 
 [dev-dependencies]
 surf = "2.1.0"

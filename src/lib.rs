@@ -11,6 +11,7 @@
 #![feature(split_inclusive)]
 #![feature(linked_list_cursors)]
 #![feature(test)]
+#![feature(associated_type_defaults)]
 //TODO:When the version is stable in the future, we should consider using stable compile unified.
 extern crate test;
 

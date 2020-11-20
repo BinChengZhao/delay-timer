@@ -1,4 +1,3 @@
-use self::functions::create_delay_task_handler;
 use crate::async_spawn;
 use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 use anyhow::Result;
@@ -97,7 +96,7 @@ pub fn generate_closure_template(
     a: i32,
     b: String,
 ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move || create_delay_task_handler(async_spawn(async_template(a, b.clone())))
+    move || self::functions::create_delay_task_handler(async_spawn(async_template(a, b.clone())))
 }
 
 pub async fn async_template(_: i32, _: String) -> Result<()> {

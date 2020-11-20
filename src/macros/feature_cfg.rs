@@ -13,5 +13,12 @@ macro_rules! cfg_status_report {
             #[cfg(feature = "status-report")]
             $item
         )*
+    };
+
+    ($($item:stmt)*) => {
+        $(
+            #[cfg(feature = "status-report")]
+            $item
+        )*
     }
 }

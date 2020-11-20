@@ -21,6 +21,11 @@ cfg_tokio_support!(
     use std::sync::atomic::{AtomicUsize, Ordering};
 );
 
+cfg_status_report!(
+    use crate::utils::functions::create_delay_task_handler;
+    //TODO: use StatusReport;
+);
+
 use anyhow::{Context, Result};
 use smol::{
     channel::unbounded,
@@ -114,12 +119,10 @@ impl DelayTimer {
     }
 
     fn register_features_fn() {
-    //   #[cfg(feature = "tokio-support")]
+        //   #[cfg(feature = "tokio-support")]
 
-    //TODO: need macro to fix it.
-    //   tokio_support();
-      
-        
+        //TODO: need macro to fix it.
+        //   tokio_support();
     }
 
     fn assign_task(mut timer: Timer, mut event_handle: EventHandle) {
@@ -156,15 +159,17 @@ impl DelayTimer {
 
     cfg_tokio_support!(
         fn tokio_support() -> Runtime {
-            Builder::new_multi_thread().thread_name_fn(|| {
-                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                format!("tokio-{}", id)
-            })
-            .on_thread_start(|| {
-                println!("tokio-thread started");
-            })
-            .build().unwrap()
+            Builder::new_multi_thread()
+                .thread_name_fn(|| {
+                    static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                    let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("tokio-{}", id)
+                })
+                .on_thread_start(|| {
+                    println!("tokio-thread started");
+                })
+                .build()
+                .unwrap()
         }
     );
 
@@ -183,7 +188,7 @@ impl DelayTimer {
                 })
                 .detach();
 
-                convenience::create_delay_task_handler(MyUnit)
+                create_delay_task_handler(MyUnit)
             };
 
             task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
