@@ -8,6 +8,17 @@
 //! User applications can be served through the lib used by DelayTimer:
 //!
 //! 1. Mission deployment.
+//!
+//! 除了简单的没几秒执行一次
+
+//!，还可以指定 特定日期，比如周日的凌晨4点执行一个备份任务
+
+//!还支持判断前一个任务没执行完成时，是否并行，最大并行数量
+
+//!同步异步任务都支持， 支持执行过程中取消
+
+//!支持 smol tokio async-std构建的Future等
+//!
 #![feature(split_inclusive)]
 #![feature(linked_list_cursors)]
 #![feature(test)]

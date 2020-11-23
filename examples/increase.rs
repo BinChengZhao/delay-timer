@@ -40,7 +40,7 @@ fn main() {
     }
 
     task_builder.set_frequency(Frequency::CountDown(1, "58 * * * * * *"));
-    for i in 1000..1100 {
+    for i in 1000..1300 {
         let task = task_builder.set_task_id(i).spawn(async_body).unwrap();
         delay_timer.add_task(task).unwrap();
     }

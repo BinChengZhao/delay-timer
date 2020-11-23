@@ -83,10 +83,14 @@ fn tests_countdown() {
 }
 #[test]
 fn inspect_struct() {
+    use tokio::runtime::Runtime;
+
     println!("Task size :{:?}", std::mem::size_of::<Task>());
     println!("Frequency size :{:?}", std::mem::size_of::<Frequency>());
     println!("TaskBuilder size :{:?}", std::mem::size_of::<TaskBuilder>());
     println!("DelayTimer size :{:?}", std::mem::size_of::<DelayTimer>());
+    println!("Runtime size :{:?}", std::mem::size_of::<Runtime>());
+
     println!(
         "ScheduleIteratorOwned size :{:?}",
         std::mem::size_of::<ScheduleIteratorOwned<Utc>>()
@@ -101,7 +105,6 @@ fn inspect_struct() {
     println!("{:?}, {:?}", s.next(), s1.next());
     thread::sleep(Duration::from_secs(1));
     println!("{:?}, {:?}", s.next(), s1.next());
-
     let mut s2 = s1.clone();
     thread::sleep(Duration::from_secs(1));
     println!("{:?}, {:?}", s.next(), s2.next());

@@ -5,6 +5,17 @@ The underlying runtime is currently based on smol, so upper level applications t
 
 Since the library currently includes features such as #[bench], it needs to be developed in a nightly version.
 
+
+除了简单的没几秒执行一次
+
+，还可以指定 特定日期，比如周日的凌晨4点执行一个备份任务 
+
+还支持判断前一个任务没执行完成时，是否并行，最大并行数量
+
+同步异步任务都支持， 支持执行过程中取消
+
+支持 smol tokio async-std构建的Future等
+
 [![Build](https://github.com/BinChengZhao/delay-timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay-timer/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](

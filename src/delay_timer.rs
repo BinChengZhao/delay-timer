@@ -22,8 +22,8 @@ cfg_tokio_support!(
 );
 
 cfg_status_report!(
-    use crate::utils::functions::create_delay_task_handler;
-    //TODO: use StatusReport;
+    use crate::utils::{StatusReport, functions::create_default_delay_task_handler};
+    use crate::{TaskBuilder, Frequency, async_spawn};
 );
 
 use anyhow::{Context, Result};
@@ -67,6 +67,14 @@ pub(crate) struct SharedHeader {
     pub(crate) global_time: GlobalTime,
     //Delay_timer flag for running
     pub(crate) shared_motivation: SharedMotivation,
+    //OtherRuntimes
+    pub(crate) other_runtimes: OtherRuntimes,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct OtherRuntimes {
+    #[cfg(feature = "tokio-support")]
+    pub(crate) tokio: Option<Arc<Runtime>>,
 }
 
 impl Default for SharedHeader {
@@ -76,15 +84,41 @@ impl Default for SharedHeader {
         let second_hand = Arc::new(AtomicU64::new(0));
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
+        let other_runtimes = OtherRuntimes::default();
 
-        SharedHeader {
+        let shared_header = SharedHeader {
             wheel_queue,
             task_flag_map,
             second_hand,
             global_time,
             shared_motivation,
-        }
+            other_runtimes,
+        };
+
+        shared_header
     }
+}
+
+impl SharedHeader {
+    cfg_tokio_support!(
+        pub(crate) fn tokio_support() -> Option<Runtime> {
+            Builder::new_multi_thread()
+                .thread_name_fn(|| {
+                    static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                    let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("tokio-{}", id)
+                })
+                .on_thread_start(|| {
+                    println!("tokio-thread started");
+                })
+                .build()
+                .ok()
+        }
+
+        pub(crate) fn register_tokio_runtime(&mut self) {
+            self.other_runtimes.tokio = Some(Arc::new(Self::tokio_support().unwrap()));
+        }
+    );
 }
 
 impl Default for DelayTimer {
@@ -98,7 +132,23 @@ impl DelayTimer {
     /// New a DelayTimer.
     pub fn new() -> DelayTimer {
         let shared_header = SharedHeader::default();
+        Self::init_by_shared_header(shared_header)
+    }
 
+    //TODO:笔记
+    //条件编译的 cfg 标记是以item为单位的，可以理解为一个函数单元
+    //不能在函数内部，一半用cfg标记，一半不用
+    //如果需要根据不同 cfg 标记调用不同的 statement 单元，用方法包住
+    //让用户选择去调用。
+    cfg_tokio_support!(
+        pub fn new_with_tokio() -> DelayTimer {
+            let mut shared_header = SharedHeader::default();
+            shared_header.register_tokio_runtime();
+            Self::init_by_shared_header(shared_header)
+        }
+    );
+
+    fn init_by_shared_header(shared_header: SharedHeader) -> DelayTimer {
         //init reader sender for timer-event handle.
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
         let timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
@@ -110,19 +160,10 @@ impl DelayTimer {
             shared_header,
         );
 
-        DelayTimer::register_features_fn();
-
         //assign task.
         Self::assign_task(timer, event_handle);
 
         DelayTimer { timer_event_sender }
-    }
-
-    fn register_features_fn() {
-        //   #[cfg(feature = "tokio-support")]
-
-        //TODO: need macro to fix it.
-        //   tokio_support();
     }
 
     fn assign_task(mut timer: Timer, mut event_handle: EventHandle) {
@@ -157,43 +198,30 @@ impl DelayTimer {
         });
     }
 
-    cfg_tokio_support!(
-        fn tokio_support() -> Runtime {
-            Builder::new_multi_thread()
-                .thread_name_fn(|| {
-                    static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                    let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                    format!("tokio-{}", id)
-                })
-                .on_thread_start(|| {
-                    println!("tokio-thread started");
-                })
-                .build()
-                .unwrap()
-        }
-    );
-
     cfg_status_report!(
         // if open "status-report", then register task 3s auto-run report
         pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
             let mut task_builder = TaskBuilder::default();
+            let status_report_arc = Arc::new(status_report);
 
             let body = move || {
-                SmolTask::spawn(async move {
-                    let report_result = status_report.report().await;
+                let status_report_ref = status_report_arc.clone();
+                async_spawn(async move {
+                    let report_result = status_report_ref.report(None).await;
 
-                    if report_result.is_err() {
-                        status_report.help();
-                    }
+                    // if report_result.is_err() {
+                    //     status_report.help();
+                    // }
                 })
                 .detach();
 
-                create_delay_task_handler(MyUnit)
+                create_default_delay_task_handler()
             };
 
             task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
+            //single use.
             task_builder.set_task_id(0);
-            let task = task_builder.spawn(body);
+            let task = task_builder.spawn(body).unwrap();
 
             self.add_task(task)
         }
@@ -231,7 +259,6 @@ impl DelayTimer {
 //线程全局的lru缓存，
 
 //以后spawn，任务就只用 几百ns了。
-//默认线程栈内存是 2M， 控制这用一下 256 个  大概默认栈内存的5%
 
 ///get current OS SystemTime.
 pub fn get_timestamp() -> u64 {

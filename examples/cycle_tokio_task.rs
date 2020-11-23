@@ -8,16 +8,16 @@ use hyper::{Client, Uri};
 use std::thread::{current, park, Thread};
 
 use delay_timer::timer::timer_core::get_timestamp;
-//try add feature.
+//TODO: When you try to run that's example nedd add feature `tokio-support`.
 use delay_timer::{tokio_async_spawn, DelayTaskHandler};
 
 use anyhow::Result;
 
 fn main() {
-    let delay_timer = DelayTimer::new();
+    let delay_timer = DelayTimer::new_with_tokio();
     let task_builder = TaskBuilder::default();
     delay_timer.add_task(build_task(task_builder)).unwrap();
-    delay_timer.add_task(build_wake_task(task_builder)).unwrap();
+    // delay_timer.add_task(build_wake_task(task_builder)).unwrap();
 
     park();
     delay_timer.stop_delay_timer().unwrap();
@@ -26,7 +26,7 @@ fn main() {
 fn build_task(mut task_builder: TaskBuilder) -> Task {
     let body = generate_closure_template("delay_timer is easy to use. .".into());
 
-    //use candy.
+    //TODO:use candy.
     task_builder
         .set_frequency(Frequency::Repeated(
             "10,15,25,50 0/1 * * Jan-Dec * 2020-2100",
@@ -41,13 +41,14 @@ fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
     // let body = create_default_delay_task_handler;
     let thread: Thread = current();
     let body = move || {
+        println!("bye bye");
         thread.unpark();
         create_default_delay_task_handler()
     };
 
-    //use candy.
+    //TODO:use candy.
     task_builder
-        .set_frequency(Frequency::Repeated("0 * * * Jan-Dec * 2020-2100"))
+        .set_frequency(Frequency::Once("0 * * * Jan-Dec * 2020-2100"))
         .set_task_id(7)
         .set_maximum_running_time(5)
         .spawn(body)

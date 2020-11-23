@@ -64,6 +64,10 @@ pub mod functions {
 
 pub mod cron_expression_grammatical_candy {
 
+    //TODO: Support a customer-CronCandy in future.
+    // let c = customer-CronCandy::new();
+    // c.add_cron_candy("@fuzzy", "* * * * * * 2020");
+
     #[derive(Debug, Copy, Clone)]
     pub enum CronCandy {
         Secondly,
