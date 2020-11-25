@@ -1,7 +1,8 @@
 // status_report is mod  for report node heathy
 // if open feature status-report, then compile that mod .
 // mapping
-use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
+pub(crate) use crate::{AsyncReceiver, AsyncSender};
+
 use std::sync::Arc;
 cfg_status_report!(
 

@@ -47,7 +47,13 @@ pub use utils::convenience::cron_expression_grammatical_candy::CronCandy;
 cfg_tokio_support!(
     pub use tokio::task::spawn as tokio_async_spawn;
     pub use tokio::task::spawn_blocking as tokio_unblock_spawn;
+    pub(crate) use tokio::sync::mpsc::{
+        UnboundedReceiver as AsyncReceiver, UnboundedSender as AsyncSender,
+    };
 );
+
+#[cfg(not(feature = "tokio-support"))]
+pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 
 //TODO: Maybe can independent bench mod to one project.
 //Or via `rustversion` Isolation of different modules.

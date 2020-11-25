@@ -4,7 +4,7 @@ use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
 pub use crate::delay_timer::get_timestamp;
-pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
+pub(crate) use crate::{AsyncReceiver, AsyncSender};
 use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
@@ -27,8 +27,7 @@ pub(crate) enum TimerEvent {
 }
 #[derive(Clone)]
 pub(crate) struct Timer {
-    timer_event_sender: TimerEventSender,
-    //TODO:status_report_sender.
+    pub(crate) timer_event_sender: TimerEventSender,
     status_report_sender: Option<AsyncSender<i32>>,
     pub(crate) shared_header: SharedHeader,
 }
@@ -118,6 +117,30 @@ impl Timer {
         }
     }
 
+    #[cfg(not(feature = "tokio-support"))]
+    pub(crate) async fn send_timer_event(
+        &mut self,
+        task_id: u64,
+        tmp_task_handler_box: DelayTaskHandlerBox,
+    ) {
+        self.timer_event_sender
+            .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
+            .await
+            .unwrap_or_else(|e| println!("{}", e));
+    }
+
+    cfg_tokio_support!(
+        pub(crate) async fn send_timer_event(
+            &mut self,
+            task_id: u64,
+            tmp_task_handler_box: DelayTaskHandlerBox,
+        ) {
+            self.timer_event_sender
+                .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
+                .unwrap_or_else(|e| println!("{}", e));
+        }
+    );
+
     #[inline(always)]
     pub(crate) async fn maintain_task(
         &mut self,
@@ -137,10 +160,7 @@ impl Timer {
             .set_end_time(task.get_maximum_running_time(timestamp))
             .spawn(task_handler_box);
 
-        self.timer_event_sender
-            .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
-            .await
-            .unwrap_or_else(|e| println!("{}", e));
+        self.send_timer_event(task_id, tmp_task_handler_box).await;
 
         let task_valid = task.down_count_and_set_vaild();
         if !task_valid {

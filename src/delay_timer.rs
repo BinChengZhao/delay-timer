@@ -14,11 +14,13 @@ use super::timer::{
     timer_core::{Slot, Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
 };
 
-use crate::{cfg_status_report, cfg_tokio_support};
+use crate::{cfg_status_report, cfg_tokio_support, AsyncReceiver, AsyncSender};
 
 cfg_tokio_support!(
-    use tokio::runtime::{Builder, Runtime};
+    use tokio::runtime::{Builder as TokioBuilder, Runtime};
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::thread::spawn as thread_spawn;
+    use tokio::sync::mpsc::unbounded_channel;
 );
 
 cfg_status_report!(
@@ -27,17 +29,14 @@ cfg_status_report!(
 );
 
 use anyhow::{Context, Result};
-use smol::{
-    channel::unbounded,
-    future::{block_on, FutureExt},
-    Executor,
-};
+use smol::{channel::unbounded, future::block_on};
+
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
     Arc,
 };
+use std::thread::Builder;
 use std::time::SystemTime;
-use threadpool::ThreadPool;
 use waitmap::WaitMap;
 
 //TODO: Set it. Motivation to move forward.
@@ -102,7 +101,7 @@ impl Default for SharedHeader {
 impl SharedHeader {
     cfg_tokio_support!(
         pub(crate) fn tokio_support() -> Option<Runtime> {
-            Builder::new_multi_thread()
+            TokioBuilder::new_multi_thread()
                 .thread_name_fn(|| {
                     static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
                     let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
@@ -116,7 +115,12 @@ impl SharedHeader {
         }
 
         pub(crate) fn register_tokio_runtime(&mut self) {
-            self.other_runtimes.tokio = Some(Arc::new(Self::tokio_support().unwrap()));
+            let tokio_runtime = Arc::new(Self::tokio_support().unwrap());
+            let tokio_runtime_ref = tokio_runtime.clone();
+            //TODO: optimization and set name.
+            //TODO: need call `timer.async_schedule()` in tokioRuntime.block_on();
+            thread_spawn(move || tokio_runtime_ref.block_on(async { loop {} }));
+            self.other_runtimes.tokio = Some(tokio_runtime);
         }
     );
 }
@@ -131,8 +135,7 @@ impl Default for DelayTimer {
 impl DelayTimer {
     /// New a DelayTimer.
     pub fn new() -> DelayTimer {
-        let shared_header = SharedHeader::default();
-        Self::init_by_shared_header(shared_header)
+        Self::init_by_shared_header(SharedHeader::default())
     }
 
     //TODO:笔记
@@ -148,9 +151,21 @@ impl DelayTimer {
         }
     );
 
+    //TODO:分多个 impl 去 给类型实现方法
+    cfg_tokio_support!(
+        fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
+            unbounded_channel::<TimerEvent>()
+        }
+    );
+
+    #[cfg(not(feature = "tokio-support"))]
+    fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
+        unbounded::<TimerEvent>()
+    }
+
     fn init_by_shared_header(shared_header: SharedHeader) -> DelayTimer {
         //init reader sender for timer-event handle.
-        let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
+        let (timer_event_sender, timer_event_receiver) = Self::timer_event_channel();
         let timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
 
         //what is `ascription`.
@@ -170,32 +185,24 @@ impl DelayTimer {
         // When the method finishes executing,
         // the pool has been dropped. When these two tasks finish executing,
         // the two threads will automatically release their resources after a single experience.
-        let pool = ThreadPool::with_name("delay_timer_default".into(), 3);
 
-        pool.execute(move || {
-            smol::block_on(async {
-                timer.async_schedule().await;
+        Builder::new()
+            .name("async_schedule".into())
+            .spawn(move || {
+                smol::block_on(async {
+                    timer.async_schedule().await;
+                })
             })
-        });
+            .expect("async_schedule can't start.");
 
-        pool.execute(move || {
-            block_on(async {
-                event_handle.handle_event().await;
+        Builder::new()
+            .name("handle_event".into())
+            .spawn(move || {
+                block_on(async {
+                    event_handle.handle_event().await;
+                })
             })
-        });
-
-        pool.execute(|| {
-            let excutor1 = Executor::new();
-            let excutor2 = Executor::new();
-            let excutor3 = Executor::new();
-            block_on(async {
-                excutor1
-                    .tick()
-                    .or(excutor2.tick())
-                    .or(excutor3.tick())
-                    .await;
-            })
-        });
+            .expect("handle_event can't start.");
     }
 
     cfg_status_report!(
@@ -247,11 +254,20 @@ impl DelayTimer {
     }
 
     /// Send a event to event-handle.
+    #[cfg(not(feature = "tokio-support"))]
     fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
         self.timer_event_sender
             .try_send(event)
             .with_context(|| "Failed Send Event from seed_timer_event".to_string())
     }
+
+    cfg_tokio_support!(
+        fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
+            self.timer_event_sender
+                .send(event)
+                .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+        }
+    );
 }
 
 //TODO: Translate to english.
