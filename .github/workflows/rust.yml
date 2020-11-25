@@ -1,22 +1,45 @@
-name: Rust
+name: Build and test
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
   pull_request:
-    branches: [ master ]
-
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
+  build_and_test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [nightly]
     steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v2
+      
+      - name: Set current week of the year in environnement
+        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macOS')
+        run: echo "::set-env name=CURRENT_WEEK::$(date +%V)"
+      
+      - name: Set current week of the year in environnement
+        if: startsWith(matrix.os, 'windows')
+        run: echo "::set-env name=CURRENT_WEEK::$(Get-Date -UFormat %V)"
+
+      - name: Install latest ${{ matrix.rust }}
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: ${{ matrix.rust }}
+            profile: minimal
+            override: true
+
+      - name: Run basic cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all --benches --bins --examples --tests --all-features
+                    
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
