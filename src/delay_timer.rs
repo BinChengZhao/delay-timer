@@ -29,6 +29,7 @@ cfg_status_report!(
 );
 
 use anyhow::{Context, Result};
+//TODO:收到一个口
 use smol::{channel::unbounded, future::block_on};
 
 use std::sync::{
@@ -85,16 +86,14 @@ impl Default for SharedHeader {
         let shared_motivation = Arc::new(AtomicBool::new(true));
         let other_runtimes = OtherRuntimes::default();
 
-        let shared_header = SharedHeader {
+        SharedHeader {
             wheel_queue,
             task_flag_map,
             second_hand,
             global_time,
             shared_motivation,
             other_runtimes,
-        };
-
-        shared_header
+        }
     }
 }
 

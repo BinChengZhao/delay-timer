@@ -49,11 +49,18 @@ cfg_tokio_support!(
     pub use tokio::task::spawn_blocking as tokio_unblock_spawn;
     pub(crate) use tokio::sync::mpsc::{
         UnboundedReceiver as AsyncReceiver, UnboundedSender as AsyncSender,
+        unbounded_channel as async_unbounded_channel,
     };
+    pub(crate) use tokio::sync::Mutex as AsyncMutex;
+    pub(crate) use tokio::task::yield_now;
 );
 
-#[cfg(not(feature = "tokio-support"))]
-pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
+cfg_not_tokio_support!(
+    pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
+    pub(crate) use smol::lock::Mutex as AsyncMutex;
+    pub(crate) use smol::future::yield_now;
+    pub(crate) use smol::{channel::unbounded as async_unbounded_channel, future::block_on};
+);
 
 //TODO: Maybe can independent bench mod to one project.
 //Or via `rustversion` Isolation of different modules.
@@ -73,6 +80,7 @@ mod tests {
 
     use test::Bencher;
 
+    //TODO:可以独立benches  到一个跟examples平级的目录，参考 async-task
     #[bench]
     fn bench_task_spwan(b: &mut Bencher) {
         let body = move || create_default_delay_task_handler();

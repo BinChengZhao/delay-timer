@@ -43,11 +43,7 @@ impl TaskTrace {
 
         let mut task_handler_box_ref: &mut DelayTaskHandlerBox;
         loop {
-            if list_mut_cursor.current().is_none() {
-                return None;
-            }
-
-            task_handler_box_ref = list_mut_cursor.current().unwrap();
+            task_handler_box_ref = list_mut_cursor.current()?;
 
             if task_handler_box_ref.record_id > record_id {
                 return None;

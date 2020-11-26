@@ -7,6 +7,15 @@ macro_rules! cfg_tokio_support {
     }
 }
 
+macro_rules! cfg_not_tokio_support {
+    ($($item:item)*) => {
+        $(
+#[cfg(not(feature = "tokio-support"))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_status_report {
     ($($item:item)*) => {
         $(

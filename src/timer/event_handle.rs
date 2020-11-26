@@ -27,12 +27,14 @@ use std::sync::{
 };
 use waitmap::WaitMap;
 
-
 use smol::{
     channel::{unbounded, Sender},
-    future::{FutureExt,block_on}
+    future::{block_on, FutureExt},
 };
 use std::thread::spawn as thread_spawn;
+cfg_tokio_support!(
+    use tokio::sync::mpsc::unbounded_channel;
+);
 
 //TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
@@ -70,6 +72,10 @@ impl EventHandle {
             timer_event_sender,
         ));
 
+        //TODO: need spawn in runtime or single thread because tokio just can spawn in runtime.
+        //not use race, use commone futures::join or others.
+        //mutex
+        //TODO:optimize.
         smol::spawn(
             recycling_bins
                 .clone()
@@ -77,7 +83,6 @@ impl EventHandle {
                 .race(recycling_bins.recycle()),
         )
         .detach();
-        
 
         EventHandle {
             task_trace,

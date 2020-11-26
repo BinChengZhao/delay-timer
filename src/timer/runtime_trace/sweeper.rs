@@ -1,3 +1,4 @@
+use crate::{yield_now, AsyncMutex};
 use smol::{future, lock::Mutex};
 
 #[cfg(not(feature = "tokio-support"))]
@@ -11,6 +12,7 @@ use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse},
     collections::BinaryHeap,
     sync::Arc,
+    thread::spawn as thread_spawn,
 };
 
 use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
@@ -64,7 +66,7 @@ pub(crate) struct RecyclingBins {
     recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>>,
 
     /// use it to recieve source-data build recycle-unit.
-    recycle_unit_sources: RefCell<AsyncReceiver<RecycleUnit>>,
+    recycle_unit_sources: AsyncMutex<AsyncReceiver<RecycleUnit>>,
 
     /// notify timeout-event to event-handler for cancel that.
     timer_event_sender: TimerEventSender,
@@ -78,7 +80,7 @@ impl RecyclingBins {
     ) -> Self {
         let recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>> =
             Mutex::new(BinaryHeap::new());
-        let recycle_unit_sources = RefCell::new(recycle_unit_sources);
+        let recycle_unit_sources = AsyncMutex::new(recycle_unit_sources);
 
         RecyclingBins {
             recycle_unit_heap,
@@ -126,7 +128,7 @@ impl RecyclingBins {
                 }
             }
 
-            future::yield_now().await;
+            yield_now().await;
             //drop lock.
         }
     }
@@ -152,7 +154,7 @@ impl RecyclingBins {
             'forLayer: for _ in 0..200 {
                 let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
 
-                match self.recycle_unit_sources.borrow_mut().try_recv() {
+                match self.recycle_unit_sources.lock().await.try_recv() {
                     Ok(recycle_unit) => {
                         (&mut recycle_unit_heap).push(Reverse(recycle_unit));
                     }
@@ -171,13 +173,14 @@ impl RecyclingBins {
                 }
             }
 
-            future::yield_now().await;
+            yield_now().await;
             // out of scope , recycle_unit_heap is auto-drop;
         }
     }
 }
 
 mod tests {
+    use std::thread::spawn as thread_spawn;
 
     #[test]
     fn test_task_valid() {
@@ -187,11 +190,7 @@ mod tests {
             channel::{unbounded, TryRecvError},
             future::FutureExt,
         };
-        use std::{
-            sync::Arc,
-            thread::{park_timeout, spawn},
-            time::Duration,
-        };
+        use std::{sync::Arc, thread::park_timeout, time::Duration};
 
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
         let (recycle_unit_sender, recycle_unit_receiver) = unbounded::<RecycleUnit>();
@@ -200,7 +199,8 @@ mod tests {
             recycle_unit_receiver,
             timer_event_sender,
         ));
-        spawn(move || {
+        //TODO:optimize.
+        thread_spawn(move || {
             block_on(async {
                 recycling_bins
                     .clone()
