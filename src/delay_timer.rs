@@ -51,8 +51,10 @@ pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
 //The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 
+#[warn(dead_code)]
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
+    shared_header: SharedHeader,
 }
 
 #[derive(Clone)]
@@ -97,33 +99,6 @@ impl Default for SharedHeader {
     }
 }
 
-impl SharedHeader {
-    cfg_tokio_support!(
-        pub(crate) fn tokio_support() -> Option<Runtime> {
-            TokioBuilder::new_multi_thread()
-                .thread_name_fn(|| {
-                    static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                    let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                    format!("tokio-{}", id)
-                })
-                .on_thread_start(|| {
-                    println!("tokio-thread started");
-                })
-                .build()
-                .ok()
-        }
-
-        pub(crate) fn register_tokio_runtime(&mut self) {
-            let tokio_runtime = Arc::new(Self::tokio_support().unwrap());
-            let tokio_runtime_ref = tokio_runtime.clone();
-            //TODO: optimization and set name.
-            //TODO: need call `timer.async_schedule()` in tokioRuntime.block_on();
-            thread_spawn(move || tokio_runtime_ref.block_on(async { loop {} }));
-            self.other_runtimes.tokio = Some(tokio_runtime);
-        }
-    );
-}
-
 impl Default for DelayTimer {
     fn default() -> Self {
         DelayTimer::new()
@@ -136,26 +111,6 @@ impl DelayTimer {
     pub fn new() -> DelayTimer {
         Self::init_by_shared_header(SharedHeader::default())
     }
-
-    //TODO:笔记
-    //条件编译的 cfg 标记是以item为单位的，可以理解为一个函数单元
-    //不能在函数内部，一半用cfg标记，一半不用
-    //如果需要根据不同 cfg 标记调用不同的 statement 单元，用方法包住
-    //让用户选择去调用。
-    cfg_tokio_support!(
-        pub fn new_with_tokio() -> DelayTimer {
-            let mut shared_header = SharedHeader::default();
-            shared_header.register_tokio_runtime();
-            Self::init_by_shared_header(shared_header)
-        }
-    );
-
-    //TODO:分多个 impl 去 给类型实现方法
-    cfg_tokio_support!(
-        fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
-            unbounded_channel::<TimerEvent>()
-        }
-    );
 
     #[cfg(not(feature = "tokio-support"))]
     fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
@@ -171,28 +126,21 @@ impl DelayTimer {
         let event_handle = EventHandle::new(
             timer_event_receiver,
             timer_event_sender.clone(),
-            shared_header,
+            shared_header.clone(),
         );
 
+        let delay_timer = DelayTimer {
+            timer_event_sender,
+            shared_header,
+        };
         //assign task.
-        Self::assign_task(timer, event_handle);
+        delay_timer.assign_task(timer, event_handle);
 
-        DelayTimer { timer_event_sender }
+        delay_timer
     }
 
-    fn assign_task(mut timer: Timer, mut event_handle: EventHandle) {
-        // When the method finishes executing,
-        // the pool has been dropped. When these two tasks finish executing,
-        // the two threads will automatically release their resources after a single experience.
-
-        Builder::new()
-            .name("async_schedule".into())
-            .spawn(move || {
-                smol::block_on(async {
-                    timer.async_schedule().await;
-                })
-            })
-            .expect("async_schedule can't start.");
+    fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
+        self.run_async_schedule(timer);
 
         Builder::new()
             .name("handle_event".into())
@@ -204,8 +152,21 @@ impl DelayTimer {
             .expect("handle_event can't start.");
     }
 
+    #[cfg(not(feature = "tokio-support"))]
+    fn run_async_schedule(&self, mut timer: Timer) {
+        Builder::new()
+            .name("async_schedule".into())
+            .spawn(move || {
+                smol::block_on(async {
+                    timer.async_schedule().await;
+                })
+            })
+            .expect("async_schedule can't start.");
+    }
+
     cfg_status_report!(
         // if open "status-report", then register task 3s auto-run report
+        //TODO: needs run in runtime.
         pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
             let mut task_builder = TaskBuilder::default();
             let status_report_arc = Arc::new(status_report);
@@ -259,15 +220,71 @@ impl DelayTimer {
             .try_send(event)
             .with_context(|| "Failed Send Event from seed_timer_event".to_string())
     }
-
-    cfg_tokio_support!(
-        fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
-            self.timer_event_sender
-                .send(event)
-                .with_context(|| "Failed Send Event from seed_timer_event".to_string())
-        }
-    );
 }
+
+//TODO:笔记
+//条件编译的 cfg 标记是以item为单位的，可以理解为一个函数单元
+//不能在函数内部，一半用cfg标记，一半不用
+//如果需要根据不同 cfg 标记调用不同的 statement 单元，用方法包住
+//让用户选择去调用。
+
+cfg_tokio_support!(
+   impl DelayTimer{
+    fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
+        self.timer_event_sender
+            .send(event)
+            .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+    }
+
+    fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
+        unbounded_channel::<TimerEvent>()
+    }
+
+    fn run_async_schedule(&self, mut timer: Timer){
+       if let Some(ref tokio_runtime_ref) = self.shared_header.other_runtimes.tokio{
+           let tokio_runtime = tokio_runtime_ref.clone();
+        Builder::new()
+        .name("async_schedule".into())
+        .spawn(move || {
+            tokio_runtime.block_on(async {
+                timer.async_schedule().await;
+            })
+        })
+        .expect("async_schedule can't start.");
+       }
+
+    }
+
+    pub fn new_with_tokio() -> DelayTimer {
+        let mut shared_header = SharedHeader::default();
+        shared_header.register_tokio_runtime();
+        Self::init_by_shared_header(shared_header)
+    }
+   }
+
+   impl SharedHeader {
+        pub(crate) fn tokio_support() -> Option<Runtime> {
+            TokioBuilder::new_multi_thread()
+                .thread_name_fn(|| {
+                    static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                    let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("tokio-{}", id)
+                })
+                .on_thread_start(|| {
+                    println!("tokio-thread started");
+                })
+                .build()
+                .ok()
+        }
+
+        pub(crate) fn register_tokio_runtime(&mut self) {
+            let tokio_runtime = Arc::new(Self::tokio_support().unwrap());
+            self.other_runtimes.tokio = Some(tokio_runtime);
+        }
+    }
+
+
+);
 
 //TODO: Translate to english.
 //usein LRU cache...

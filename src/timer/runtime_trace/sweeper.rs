@@ -1,5 +1,4 @@
 use crate::{yield_now, AsyncMutex};
-use smol::{future, lock::Mutex};
 
 #[cfg(not(feature = "tokio-support"))]
 use smol::channel::TryRecvError::*;
@@ -63,7 +62,7 @@ impl PartialEq for RecycleUnit {
 ///RecyclingBins is resource recycler, excute timeout task-handle.
 pub(crate) struct RecyclingBins {
     ///storage all task-handle in there.
-    recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>>,
+    recycle_unit_heap: AsyncMutex<BinaryHeap<Reverse<RecycleUnit>>>,
 
     /// use it to recieve source-data build recycle-unit.
     recycle_unit_sources: AsyncMutex<AsyncReceiver<RecycleUnit>>,
@@ -78,8 +77,8 @@ impl RecyclingBins {
         recycle_unit_sources: AsyncReceiver<RecycleUnit>,
         timer_event_sender: TimerEventSender,
     ) -> Self {
-        let recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>> =
-            Mutex::new(BinaryHeap::new());
+        let recycle_unit_heap: AsyncMutex<BinaryHeap<Reverse<RecycleUnit>>> =
+            AsyncMutex::new(BinaryHeap::new());
         let recycle_unit_sources = AsyncMutex::new(recycle_unit_sources);
 
         RecyclingBins {

@@ -13,6 +13,8 @@ use delay_timer::{tokio_async_spawn, DelayTaskHandler};
 
 use anyhow::Result;
 
+//FIXME:async-io AND smol-x  don't need run.
+
 fn main() {
     let delay_timer = DelayTimer::new_with_tokio();
     let task_builder = TaskBuilder::default();
@@ -67,11 +69,13 @@ pub fn generate_closure_template(
 }
 
 pub async fn async_template(id: i32, name: String) -> Result<()> {
-    let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
+    //TODO:Optimize.
+    // let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
     // Still inside `async fn main`...
     let client = Client::new();
     // Await the response...
-    let res = client.get(Uri::from_maybe_shared(url).unwrap()).await?;
+    let uri: Uri = "https://httpbin.org/get?id=1".parse().unwrap();
+    let res = client.get(uri).await?;
     println!("Response: {}", res.status());
     // Concatenate the body stream into a single buffer...
     let buf = hyper::body::to_bytes(res).await?;
