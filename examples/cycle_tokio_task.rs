@@ -61,6 +61,7 @@ pub fn generate_closure_template(
     name: String,
 ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
     move || {
+        dbg!("generate_closure_template");
         create_delay_task_handler(tokio_async_spawn(async_template(
             get_timestamp() as i32,
             name.clone(),
@@ -75,6 +76,7 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
     let client = Client::new();
     // Await the response...
     let uri: Uri = "https://httpbin.org/get?id=1".parse().unwrap();
+    dbg!(&uri);
     let res = client.get(uri).await?;
     println!("Response: {}", res.status());
     // Concatenate the body stream into a single buffer...

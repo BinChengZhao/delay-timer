@@ -29,7 +29,7 @@ use waitmap::WaitMap;
 
 use smol::{
     channel::{unbounded, Sender},
-    future::{FutureExt},
+    future::FutureExt,
 };
 use std::thread::spawn as thread_spawn;
 cfg_tokio_support!(

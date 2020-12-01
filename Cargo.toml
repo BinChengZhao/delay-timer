@@ -16,14 +16,15 @@ license = "Apache-2.0 OR MIT"
 name = "delay_timer"
 
 [features]
-default = []
-full = ["tokio-support", "status-report"]
+default = ["smol-support"]
+tokio-full = ["tokio-support", "status-report"]
 status-report = ["async-trait"]
 tokio-support = ["tokio"]
+smol-support = ["smol"]
 
 
 [dependencies]
-smol = "1.0.0"
+smol = { version = "1.2.4" , optional = true }
 cron_clock = "0.6.6"
 anyhow = "1.0.31"
 rs-snowflake = "0.3.0"

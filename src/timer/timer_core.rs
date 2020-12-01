@@ -149,7 +149,7 @@ impl Timer {
         timestamp: u64,
         second_hand: u64,
     ) -> Option<()> {
-        let task_id = task.task_id;
+        let task_id = dbg!(task.task_id);
         let task_handler_box = (task.get_body())();
 
         let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();

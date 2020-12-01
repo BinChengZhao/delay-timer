@@ -214,7 +214,7 @@ impl DelayTaskHandler for ChildGuardList {
 }
 
 //When SmolTask is dropped, async task is cancel.
-impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<Result<T>> {
+impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<T> {
     fn quit(self: Box<Self>) -> Result<()> {
         smol::spawn(async {
             self.cancel().await;
@@ -226,7 +226,7 @@ impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<Result<T>> {
 
 cfg_tokio_support!(
     use tokio::task::JoinHandle;
-    impl<T: Send + Sync + 'static> DelayTaskHandler for JoinHandle<Result<T>> {
+    impl<T: Send + Sync + 'static> DelayTaskHandler for JoinHandle<T> {
         fn quit(self: Box<Self>) -> Result<()> {
             (&*self).abort();
             Ok(())
