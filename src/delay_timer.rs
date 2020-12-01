@@ -31,6 +31,8 @@ cfg_status_report!(
 use anyhow::{Context, Result};
 //TODO:收到一个口
 use futures::executor::block_on;
+//FIXME: not AND any "tokio-support" or "tokio-xxx"
+#[cfg(not(feature = "tokio-support"))]
 use smol::channel::unbounded;
 
 use std::sync::{

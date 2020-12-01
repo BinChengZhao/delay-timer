@@ -27,10 +27,14 @@ use std::sync::{
 };
 use waitmap::WaitMap;
 
-use smol::{
-    channel::{unbounded, Sender},
-    future::FutureExt,
-};
+cfg_smol_support!(
+    use smol::{
+        channel::{unbounded, Sender},
+        future::FutureExt,
+    };
+);
+
+use crate::async_spawn;
 use std::thread::spawn as thread_spawn;
 cfg_tokio_support!(
     use tokio::sync::mpsc::unbounded_channel;
@@ -76,13 +80,9 @@ impl EventHandle {
         //not use race, use commone futures::join or others.
         //mutex
         //TODO:optimize.
-        smol::spawn(
-            recycling_bins
-                .clone()
-                .add_recycle_unit()
-                .race(recycling_bins.recycle()),
-        )
-        .detach();
+        //FIXME:在这里王event_handle里面塞值。
+
+        Self::recycling_task(recycling_bins);
 
         EventHandle {
             task_trace,
@@ -99,12 +99,26 @@ impl EventHandle {
         {
             unbounded_channel::<RecycleUnit>()
         }
+
+        fn recycling_task(recycling_bins:Arc<RecyclingBins>){
+            async_spawn(recycling_bins.clone().add_recycle_unit());
+
+            async_spawn(recycling_bins.recycle());
+        }
     );
 
-    #[cfg(not(feature = "tokio-support"))]
-    fn recycle_unit_sources_channel() -> (AsyncSender<RecycleUnit>, AsyncReceiver<RecycleUnit>) {
-        unbounded::<RecycleUnit>()
-    }
+    cfg_smol_support!(
+        fn recycle_unit_sources_channel() -> (AsyncSender<RecycleUnit>, AsyncReceiver<RecycleUnit>)
+        {
+            unbounded::<RecycleUnit>()
+        }
+
+        fn recycling_task(recycling_bins:Arc<RecyclingBins>){
+            async_spawn(recycling_bins.clone().add_recycle_unit()).detach();
+
+            async_spawn(recycling_bins.recycle()).detach();
+        }
+    );
 
     #[allow(dead_code)]
     pub(crate) fn set_status_report_sender(&mut self, status_report_sender: AsyncSender<i32>) {

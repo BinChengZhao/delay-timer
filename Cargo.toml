@@ -30,7 +30,7 @@ anyhow = "1.0.31"
 rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
-tokio = { version = "0.3.3", features = ["rt", "rt-multi-thread", "net", "process", "time", "fs"] , optional = true }
+tokio = { version = "0.3.3", features = ["full"] , optional = true }
 async-trait = { version = "0.1.41", optional = true }
 futures = "0.3.8"
 

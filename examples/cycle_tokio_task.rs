@@ -9,7 +9,7 @@ use std::thread::{current, park, Thread};
 
 use delay_timer::timer::timer_core::get_timestamp;
 //TODO: When you try to run that's example nedd add feature `tokio-support`.
-use delay_timer::{tokio_async_spawn, DelayTaskHandler};
+use delay_timer::{async_spawn, DelayTaskHandler};
 
 use anyhow::Result;
 
@@ -62,7 +62,7 @@ pub fn generate_closure_template(
 ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
     move || {
         dbg!("generate_closure_template");
-        create_delay_task_handler(tokio_async_spawn(async_template(
+        create_delay_task_handler(async_spawn(async_template(
             get_timestamp() as i32,
             name.clone(),
         )))
