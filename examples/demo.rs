@@ -44,7 +44,6 @@ fn build_task1(mut task_builder: TaskBuilder) -> Task {
         Timer::after(Duration::from_secs(3)).await;
 
         println!("create_async_fn_body:i'success");
-        Ok(())
     });
     task_builder
         .set_task_id(1)
@@ -57,8 +56,6 @@ fn build_task2(mut task_builder: TaskBuilder) -> Task {
     let body = create_async_fn_body!({
         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
         dbg!(res.body_string().await.unwrap());
-
-        Ok(())
     });
     task_builder
         .set_frequency(Frequency::CountDown(2, "0/8 * * * * * *"))

@@ -19,7 +19,6 @@ use crate::{cfg_status_report, cfg_tokio_support, AsyncReceiver, AsyncSender};
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::thread::spawn as thread_spawn;
     use tokio::sync::mpsc::unbounded_channel;
 );
 
@@ -29,7 +28,7 @@ cfg_status_report!(
 );
 
 use anyhow::{Context, Result};
-//TODO:收到一个口
+#[warn(unused_imports)]
 use futures::executor::block_on;
 //FIXME: not AND any "tokio-support" or "tokio-xxx"
 #[cfg(not(feature = "tokio-support"))]
@@ -142,6 +141,7 @@ impl DelayTimer {
         delay_timer
     }
 
+    #[cfg(not(feature = "tokio-support"))]
     fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
         self.run_async_schedule(timer);
 
@@ -154,6 +154,24 @@ impl DelayTimer {
             })
             .expect("handle_event can't start.");
     }
+
+    cfg_tokio_support!(
+        fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
+            self.run_async_schedule(timer);
+
+            if let Some(ref tokio_runtime_ref) = self.shared_header.other_runtimes.tokio {
+                let tokio_runtime = tokio_runtime_ref.clone();
+                Builder::new()
+                    .name("handle_event_tokio".into())
+                    .spawn(move || {
+                        tokio_runtime.block_on(async {
+                            event_handle.handle_event().await;
+                        })
+                    })
+                    .expect("async_schedule can't start.");
+            }
+        }
+    );
 
     #[cfg(not(feature = "tokio-support"))]
     fn run_async_schedule(&self, mut timer: Timer) {
@@ -249,6 +267,8 @@ cfg_tokio_support!(
         Builder::new()
         .name("async_schedule_tokio".into())
         .spawn(move || {
+            dbg!(&tokio_runtime);
+
             tokio_runtime.block_on(async {
                 timer.async_schedule().await;
             })
@@ -267,7 +287,7 @@ cfg_tokio_support!(
 
    impl SharedHeader {
         pub(crate) fn tokio_support() -> Option<Runtime> {
-            TokioBuilder::new_multi_thread()
+            TokioBuilder::new_multi_thread().enable_all()
                 .thread_name_fn(|| {
                     static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
                     let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);

@@ -7,15 +7,13 @@ cfg_tokio_support!(
 );
 
 use std::{
-    cell::RefCell,
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse},
     collections::BinaryHeap,
     sync::Arc,
-    thread::spawn as thread_spawn,
 };
 
 use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
-use crate::{AsyncReceiver, AsyncSender};
+use crate::AsyncReceiver;
 
 #[derive(Default, Eq, Debug, Copy, Clone)]
 /// recycle unit.

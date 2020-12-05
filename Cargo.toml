@@ -18,7 +18,7 @@ name = "delay_timer"
 [features]
 default = ["smol-support"]
 tokio-full = ["tokio-support", "status-report"]
-status-report = ["async-trait"]
+status-report = ["smol-support", "async-trait"]
 tokio-support = ["tokio"]
 smol-support = ["smol"]
 
@@ -30,14 +30,15 @@ anyhow = "1.0.31"
 rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
-tokio = { version = "0.3.3", features = ["full"] , optional = true }
+tokio = { version = "~0.3.3", features = ["full"] , optional = true }
 async-trait = { version = "0.1.41", optional = true }
 futures = "0.3.8"
 
 [dev-dependencies]
 surf = "2.1.0"
-tokio = { version = "0.3.3", features = ["full"] }
-hyper = "0.13"
+tokio = { version = "~0.3.3", features = ["full"] }
+hyper= {path = "../../others/hyper" , features = ["full"] }
+pretty_env_logger = "0.4"
 
 [dev-dependencies.async-std]
 version = "1.6.3"

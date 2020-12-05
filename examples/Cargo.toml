@@ -7,9 +7,7 @@ edition = "2018"
 # If you copy one of the examples into a new project, you should be using
 # [dependencies] instead.
 [dependencies]
-delay_timer = { version = "0.2.0", path = "../", features = ["full"] }
-futures = "0.3.0"
-http = "0.2"
+delay_timer = { version = "0.2.0", path = "../", features = ["tokio-support"] }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"

@@ -8,14 +8,62 @@ pub(crate) use crate::{AsyncReceiver, AsyncSender};
 use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
-use smol::Timer as SmolTimer;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
 
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
+
+cfg_tokio_support!(
+    use tokio::time::{Interval, interval_at, self, Instant};
+
+    #[derive(Debug)]
+    struct Clock{
+        inner : Interval
+    }
+
+    impl Clock{
+
+        pub fn new(start: time::Instant, period: Duration) -> Self{
+            let inner = interval_at(start, period);
+            Clock{inner}
+        }
+
+        pub async fn tick(&mut self){
+            self.inner.tick().await;
+        }
+    }
+
+);
+
+cfg_smol_support!(
+use std::time::{Instant};
+    use smol::Timer as smolTimer;
+    use futures::StreamExt;
+
+
+    #[derive(Debug)]
+    struct Clock{
+        inner : smolTimer,
+        period:Duration
+    }
+
+    impl Clock{
+
+        pub fn new(start: Instant, period: Duration) -> Self{
+           let inner= smolTimer::interval_at(start,period);
+           Clock{inner, period}
+        }
+
+        pub async fn tick(&mut self){
+            self.inner.next().await;
+
+        }
+    }
+);
+
 //warning: large size difference between variants
 #[derive(Debug)]
 pub(crate) enum TimerEvent {
@@ -64,10 +112,9 @@ impl Timer {
     ///Return a future can pool it for schedule all cycles task.
     pub(crate) async fn async_schedule(&mut self) {
         //if that overtime , i run it not block
-        let mut now;
-        let mut when;
         let mut second_hand;
         let mut timestamp;
+        let mut clock = Clock::new(Instant::now(), Duration::from_secs(1));
 
         //TODO:auto-get nodeid and machineid.
         let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
@@ -78,8 +125,6 @@ impl Timer {
             }
 
             second_hand = self.next_position();
-            now = Instant::now();
-            when = now + Duration::from_secs(1);
             timestamp = get_timestamp();
             self.shared_header.global_time.store(timestamp, Release);
             let task_ids;
@@ -113,7 +158,8 @@ impl Timer {
                 }
             }
 
-            SmolTimer::at(when).await;
+            //FIXME: dependent logic, tokio / smol.
+            clock.tick().await;
         }
     }
 
@@ -149,7 +195,7 @@ impl Timer {
         timestamp: u64,
         second_hand: u64,
     ) -> Option<()> {
-        let task_id = dbg!(task.task_id);
+        let task_id = task.task_id;
         let task_handler_box = (task.get_body())();
 
         let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();

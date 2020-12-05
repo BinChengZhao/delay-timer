@@ -65,6 +65,7 @@ cfg_smol_support!(
 //TODO: Maybe can independent bench mod to one project.
 //Or via `rustversion` Isolation of different modules.
 //TODO: Add a prelude.
+//FIXME:发版之前：dev-依赖：hyper，更正为支持 tokio ~0.3.* 的版本.
 #[cfg(test)]
 mod tests {
     use smol::{channel::unbounded, future::block_on};

@@ -3,7 +3,8 @@ use delay_timer::{
     timer::task::{Frequency, Task, TaskBuilder},
     utils::functions::{create_default_delay_task_handler, create_delay_task_handler},
 };
-use hyper::{Client, Uri};
+use hyper::{body::HttpBody as _, Client, Uri};
+use tokio::io::{self, AsyncWriteExt as _};
 
 use std::thread::{current, park, Thread};
 
@@ -14,6 +15,8 @@ use delay_timer::{async_spawn, DelayTaskHandler};
 use anyhow::Result;
 
 //FIXME:async-io AND smol-x  don't need run.
+//TODO: hyper 的依赖有问题，hyper目前是依赖到0.2.23. 我本地跑的tokio是 0.3.*的，所以不兼容。
+//TODO:cargo run --example=cycle_tokio_task --features=tokio-support http://baidu.com
 
 fn main() {
     let delay_timer = DelayTimer::new_with_tokio();
@@ -34,7 +37,7 @@ fn build_task(mut task_builder: TaskBuilder) -> Task {
             "10,15,25,50 0/1 * * Jan-Dec * 2020-2100",
         ))
         .set_task_id(5)
-        .set_maximum_running_time(5)
+        .set_maximum_running_time(15)
         .spawn(body)
         .unwrap()
 }
@@ -52,7 +55,7 @@ fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
     task_builder
         .set_frequency(Frequency::Once("0 * * * Jan-Dec * 2020-2100"))
         .set_task_id(7)
-        .set_maximum_running_time(5)
+        .set_maximum_running_time(50)
         .spawn(body)
         .unwrap()
 }
@@ -61,7 +64,6 @@ pub fn generate_closure_template(
     name: String,
 ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
     move || {
-        dbg!("generate_closure_template");
         create_delay_task_handler(async_spawn(async_template(
             get_timestamp() as i32,
             name.clone(),
@@ -75,7 +77,8 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
     // Still inside `async fn main`...
     let client = Client::new();
     // Await the response...
-    let uri: Uri = "https://httpbin.org/get?id=1".parse().unwrap();
+    // let uri: Uri = "https://httpbin.org/get?id=1".parse().unwrap();
+    let uri: Uri = "https://baidu.com".parse().unwrap();
     dbg!(&uri);
     let res = client.get(uri).await?;
     println!("Response: {}", res.status());

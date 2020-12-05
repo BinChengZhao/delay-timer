@@ -35,9 +35,13 @@ cfg_smol_support!(
 );
 
 use crate::async_spawn;
-use std::thread::spawn as thread_spawn;
 cfg_tokio_support!(
     use tokio::sync::mpsc::unbounded_channel;
+    use crate::TaskBuilder;
+    use crate::{
+        utils::functions::{create_default_delay_task_handler},
+    };
+    use crate::Frequency;
 );
 
 //TaskTrace: use event mes update.
@@ -82,15 +86,17 @@ impl EventHandle {
         //TODO:optimize.
         //FIXME:在这里王event_handle里面塞值。
 
-        Self::recycling_task(recycling_bins);
-
-        EventHandle {
+        let mut event_handle = EventHandle {
             task_trace,
             timer_event_receiver,
             status_report_sender,
             recycle_unit_sources_sender,
             shared_header,
-        }
+        };
+
+        event_handle.recycling_task(recycling_bins);
+
+        event_handle
     }
 
     //TODO:分多个 impl 去 给类型实现方法
@@ -100,10 +106,34 @@ impl EventHandle {
             unbounded_channel::<RecycleUnit>()
         }
 
-        fn recycling_task(recycling_bins:Arc<RecyclingBins>){
-            async_spawn(recycling_bins.clone().add_recycle_unit());
+        fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
+            let mut task_builder = TaskBuilder::default();
 
-            async_spawn(recycling_bins.recycle());
+            let recycling_bins_ref = recycling_bins.clone();
+            let body = move || {
+                let recycling_bins_ref_ref = recycling_bins_ref.clone();
+                async_spawn(recycling_bins_ref_ref.add_recycle_unit());
+                create_default_delay_task_handler()
+            };
+            let task = task_builder
+                .set_frequency(Frequency::Once("@secondly"))
+                .set_task_id(0)
+                .spawn(body)
+                .unwrap();
+            self.add_task(task);
+
+            let body = move || {
+                let recycling_bins_ref = recycling_bins.clone();
+                async_spawn(recycling_bins_ref.recycle());
+                create_default_delay_task_handler()
+            };
+            //FIXME:set_task_id != 1
+            let task = task_builder
+                .set_frequency(Frequency::Once("@secondly"))
+                .set_task_id(1)
+                .spawn(body)
+                .unwrap();
+            self.add_task(task);
         }
     );
 
@@ -113,9 +143,8 @@ impl EventHandle {
             unbounded::<RecycleUnit>()
         }
 
-        fn recycling_task(recycling_bins:Arc<RecyclingBins>){
+        fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
             async_spawn(recycling_bins.clone().add_recycle_unit()).detach();
-
             async_spawn(recycling_bins.recycle()).detach();
         }
     );
