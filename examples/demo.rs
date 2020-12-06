@@ -2,12 +2,17 @@ use delay_timer::{
     create_async_fn_body,
     delay_timer::DelayTimer,
     timer::task::{Frequency, Task, TaskBuilder},
-    utils::functions::{create_delay_task_handler, unblock_process_task_fn},
+    utils::functions::{
+        create_default_delay_task_handler, create_delay_task_handler, unblock_process_task_fn,
+    },
 };
 use smol::Timer;
-use std::thread::sleep;
 use std::time::Duration;
 use surf;
+
+use hyper::{Client, Uri};
+
+use std::thread::{current, park, sleep, Thread};
 
 use delay_timer::timer::timer_core::get_timestamp;
 use delay_timer::{async_spawn, DelayTaskHandler};
@@ -33,7 +38,8 @@ fn main() {
     // Development of a version of delay_timer that supports rustc-stable,
     // with full canca support is expected to be completed in version 0.2.0.
 
-    sleep(Duration::new(90, 0));
+    delay_timer.add_task(build_wake_task(task_builder)).unwrap();
+    park();
     delay_timer.stop_delay_timer().unwrap();
 }
 
@@ -104,4 +110,21 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
     dbg!(res.body_string().await.unwrap());
 
     Ok(())
+}
+
+fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
+    let thread: Thread = current();
+    let body = move || {
+        println!("bye bye");
+        thread.unpark();
+        create_default_delay_task_handler()
+    };
+
+    //TODO:use candy.
+    task_builder
+        .set_frequency(Frequency::Once("0 * * * Jan-Dec * 2020-2100"))
+        .set_task_id(700)
+        .set_maximum_running_time(50)
+        .spawn(body)
+        .unwrap()
 }

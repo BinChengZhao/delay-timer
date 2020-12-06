@@ -3,8 +3,7 @@ use delay_timer::{
     timer::task::{Frequency, Task, TaskBuilder},
     utils::functions::{create_default_delay_task_handler, create_delay_task_handler},
 };
-use hyper::{body::HttpBody as _, Client, Uri};
-use tokio::io::{self, AsyncWriteExt as _};
+use hyper::{Client, Uri};
 
 use std::thread::{current, park, Thread};
 
@@ -14,15 +13,14 @@ use delay_timer::{async_spawn, DelayTaskHandler};
 
 use anyhow::Result;
 
-//FIXME:async-io AND smol-x  don't need run.
-//TODO: hyper 的依赖有问题，hyper目前是依赖到0.2.23. 我本地跑的tokio是 0.3.*的，所以不兼容。
-//TODO:cargo run --example=cycle_tokio_task --features=tokio-support http://baidu.com
+//TODO: hyper 的依赖有问题，hyper目前是依赖tokio到0.2.23. 我本地跑的tokio是 0.3.*的，所以不兼容。
+//TODO:cargo run --example=cycle_tokio_task --features=tokio-support
 
 fn main() {
-    let delay_timer = DelayTimer::new_with_tokio();
+    let delay_timer = DelayTimer::new_with_tokio(None);
     let task_builder = TaskBuilder::default();
     delay_timer.add_task(build_task(task_builder)).unwrap();
-    // delay_timer.add_task(build_wake_task(task_builder)).unwrap();
+    delay_timer.add_task(build_wake_task(task_builder)).unwrap();
 
     park();
     delay_timer.stop_delay_timer().unwrap();
@@ -74,11 +72,11 @@ pub fn generate_closure_template(
 pub async fn async_template(id: i32, name: String) -> Result<()> {
     //TODO:Optimize.
     // let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
-    // Still inside `async fn main`...
     let client = Client::new();
-    // Await the response...
-    // let uri: Uri = "https://httpbin.org/get?id=1".parse().unwrap();
-    let uri: Uri = "https://baidu.com".parse().unwrap();
+    //TODO:The default connector does not handle TLS.
+    //Speaking to https destinations will require configuring a connector that implements TLS.
+    //So use http for test.
+    let uri: Uri = "http://baidu.com".parse().unwrap();
     dbg!(&uri);
     let res = client.get(uri).await?;
     println!("Response: {}", res.status());

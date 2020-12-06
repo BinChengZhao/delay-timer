@@ -267,9 +267,9 @@ cfg_tokio_support!(
         Builder::new()
         .name("async_schedule_tokio".into())
         .spawn(move || {
-            dbg!(&tokio_runtime);
 
             tokio_runtime.block_on(async {
+
                 timer.async_schedule().await;
             })
         })
@@ -278,9 +278,9 @@ cfg_tokio_support!(
 
     }
 
-    pub fn new_with_tokio() -> DelayTimer {
+    pub fn new_with_tokio(rt:Option<Arc<Runtime>>) -> DelayTimer {
         let mut shared_header = SharedHeader::default();
-        shared_header.register_tokio_runtime();
+        shared_header.register_tokio_runtime(rt);
         Self::init_by_shared_header(shared_header)
     }
    }
@@ -300,9 +300,13 @@ cfg_tokio_support!(
                 .ok()
         }
 
-        pub(crate) fn register_tokio_runtime(&mut self) {
-            let tokio_runtime = Arc::new(Self::tokio_support().unwrap());
-            self.other_runtimes.tokio = Some(tokio_runtime);
+        pub(crate) fn register_tokio_runtime(&mut self,mut rt:Option<Arc<Runtime>>) {
+
+            if rt.is_none(){
+              rt = Some(Arc::new(Self::tokio_support().expect("init tokioRuntime is fail.")));
+            }
+
+            self.other_runtimes.tokio = rt;
         }
     }
 
