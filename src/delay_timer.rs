@@ -13,8 +13,7 @@ use super::timer::{
     task::{Task, TaskMark},
     timer_core::{Slot, Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
 };
-
-use crate::{cfg_status_report, cfg_tokio_support, AsyncReceiver, AsyncSender};
+use crate::prelude::*;
 
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
@@ -28,11 +27,11 @@ cfg_status_report!(
 );
 
 use anyhow::{Context, Result};
-#[warn(unused_imports)]
-use futures::executor::block_on;
 //FIXME: not AND any "tokio-support" or "tokio-xxx"
-#[cfg(not(feature = "tokio-support"))]
-use smol::channel::unbounded;
+cfg_smol_support!(
+    use futures::executor::block_on;
+    use smol::channel::unbounded;
+);
 
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
@@ -53,7 +52,6 @@ pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
 //The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 
-#[warn(dead_code)]
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
     shared_header: SharedHeader,
@@ -141,19 +139,20 @@ impl DelayTimer {
         delay_timer
     }
 
-    #[cfg(not(feature = "tokio-support"))]
-    fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
-        self.run_async_schedule(timer);
-
-        Builder::new()
-            .name("handle_event".into())
-            .spawn(move || {
-                block_on(async {
-                    event_handle.handle_event().await;
+    cfg_smol_support!(
+        fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
+            self.run_async_schedule(timer);
+    
+            Builder::new()
+                .name("handle_event".into())
+                .spawn(move || {
+                    block_on(async {
+                        event_handle.handle_event().await;
+                    })
                 })
-            })
-            .expect("handle_event can't start.");
-    }
+                .expect("handle_event can't start.");
+        }
+    );
 
     cfg_tokio_support!(
         fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {

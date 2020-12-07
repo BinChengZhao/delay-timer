@@ -9,8 +9,7 @@ use std::thread::{current, park, Thread};
 
 use delay_timer::timer::timer_core::get_timestamp;
 //TODO: When you try to run that's example nedd add feature `tokio-support`.
-use delay_timer::{async_spawn, DelayTaskHandler};
-
+use delay_timer::prelude::*;
 use anyhow::Result;
 
 //TODO: hyper 的依赖有问题，hyper目前是依赖tokio到0.2.23. 我本地跑的tokio是 0.3.*的，所以不兼容。
@@ -69,7 +68,7 @@ pub fn generate_closure_template(
     }
 }
 
-pub async fn async_template(id: i32, name: String) -> Result<()> {
+pub async fn async_template(_id: i32, _name: String) -> Result<()> {
     //TODO:Optimize.
     // let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
     let client = Client::new();

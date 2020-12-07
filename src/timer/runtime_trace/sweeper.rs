@@ -1,4 +1,5 @@
-use crate::{yield_now, AsyncMutex};
+use crate::prelude::*;
+
 
 #[cfg(not(feature = "tokio-support"))]
 use smol::channel::TryRecvError::*;
@@ -13,7 +14,6 @@ use std::{
 };
 
 use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
-use crate::AsyncReceiver;
 
 #[derive(Default, Eq, Debug, Copy, Clone)]
 /// recycle unit.
@@ -177,7 +177,6 @@ impl RecyclingBins {
 }
 
 mod tests {
-    use std::thread::spawn as thread_spawn;
 
     #[test]
     fn test_task_valid() {
@@ -187,7 +186,7 @@ mod tests {
             channel::{unbounded, TryRecvError},
             future::FutureExt,
         };
-        use std::{sync::Arc, thread::park_timeout, time::Duration};
+        use std::{sync::Arc, thread::{park_timeout, spawn as thread_spawn}, time::Duration};
 
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
         let (recycle_unit_sender, recycle_unit_receiver) = unbounded::<RecycleUnit>();

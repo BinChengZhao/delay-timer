@@ -4,11 +4,12 @@
 //! if you need to create closures dynamically,
 //! refer to generate_closure_template in convenience mod).
 /// Create a closure that return a DelayTaskHandel by macro.
+use crate::prelude::*;
 #[macro_export]
 macro_rules! create_async_fn_body {
     ($async_body:block) => {
         || {
-            let handle = delay_timer::async_spawn(async { $async_body });
+            let handle = async_spawn(async { $async_body });
             create_delay_task_handler(handle)
         }
     };
@@ -19,7 +20,7 @@ cfg_tokio_support!(
     macro_rules! create_async_fn_tokio_body {
         ($async_body:block) => {
             || {
-                let handle = delay_timer::tokio_async_spawn(async { $async_body });
+                let handle = tokio_async_spawn(async { $async_body });
                 create_delay_task_handler(handle)
             }
         };

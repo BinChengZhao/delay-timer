@@ -15,7 +15,7 @@ use hyper::{Client, Uri};
 use std::thread::{current, park, sleep, Thread};
 
 use delay_timer::timer::timer_core::get_timestamp;
-use delay_timer::{async_spawn, DelayTaskHandler};
+use delay_timer::prelude::*;
 
 use anyhow::Result;
 
