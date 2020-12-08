@@ -30,14 +30,12 @@ use waitmap::WaitMap;
 
 cfg_smol_support!(
     use smol::{
-        channel::{unbounded, Sender},
-        future::FutureExt,
+        channel::{unbounded},
     };
 );
 
 cfg_tokio_support!(
     use tokio::sync::mpsc::unbounded_channel;
-    use crate::prelude::*;
 );
 
 //TaskTrace: use event mes update.

@@ -13,9 +13,8 @@ impl DelayTaskHandler for MyUnit {
 pub mod functions {
 
     use super::{super::parse_and_run, Result};
-    use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
     use crate::prelude::*;
-
+    use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
     cfg_smol_support!(
         pub fn unblock_process_task_fn(
@@ -39,8 +38,8 @@ pub mod functions {
                 create_delay_task_handler(async_spawn(async {
                     unblock_spawn(move || parse_and_run(&shell_command_clone))
                         .await
-                        .unwrap_or_else(|e| println!("unblock task run fail.{}", e))
-                        .unwrap_or_else(|e| println!("parse_and_run excute fail.{}", e));
+                        .expect("unblock task run fail.")
+                        .expect("parse_and_run excute fail.");
                 }))
             }
         }

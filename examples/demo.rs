@@ -1,26 +1,13 @@
-use delay_timer::{
-    create_async_fn_body,
-    delay_timer::DelayTimer,
-    timer::task::{Frequency, Task, TaskBuilder},
-    utils::functions::{
-        create_default_delay_task_handler, create_delay_task_handler, unblock_process_task_fn,
-    },
-};
+use anyhow::Result;
+use delay_timer::prelude::*;
+use delay_timer::timer::timer_core::get_timestamp;
 use smol::Timer;
+use std::thread::{current, park, sleep, Thread};
 use std::time::Duration;
 use surf;
 
-use hyper::{Client, Uri};
-
-use std::thread::{current, park, sleep, Thread};
-
-use delay_timer::timer::timer_core::get_timestamp;
-use delay_timer::prelude::*;
-
-use anyhow::Result;
-
 fn main() {
-    let mut delay_timer = DelayTimer::new();
+    let delay_timer = DelayTimer::new();
     let task_builder = TaskBuilder::default();
 
     delay_timer.add_task(build_task1(task_builder)).unwrap();

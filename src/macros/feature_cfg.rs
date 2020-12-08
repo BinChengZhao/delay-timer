@@ -10,8 +10,7 @@ macro_rules! cfg_tokio_support {
 macro_rules! cfg_smol_support {
     ($($item:item)*) => {
         $(
-            //FIXME: any tokio-full and tokio-support
-#[cfg(not(feature = "tokio-support"))]
+#[cfg(not(any(feature = "tokio-support", eature = "tokio-full")))]
 #[cfg(feature = "smol-support")]
             $item
         )*

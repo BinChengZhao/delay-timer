@@ -1,5 +1,5 @@
 #![feature(ptr_internals)]
-use delay_timer::{prelude::*};
+use delay_timer::prelude::*;
 
 use std::{
     ptr::Unique,
@@ -84,6 +84,5 @@ fn get_async_fn() -> impl Copy + Fn() -> Box<dyn DelayTaskHandler> {
         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
         let body_str = res.body_string().await.unwrap();
         println!("{}", body_str);
-        Ok(())
     })
 }

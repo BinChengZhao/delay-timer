@@ -22,8 +22,7 @@ cfg_tokio_support!(
 );
 
 cfg_status_report!(
-    use crate::utils::{StatusReport, functions::create_default_delay_task_handler};
-    use crate::{TaskBuilder, Frequency, async_spawn};
+    use crate::utils::{StatusReport};
 );
 
 use anyhow::{Context, Result};
@@ -54,6 +53,7 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
+    #[allow(dead_code)]
     shared_header: SharedHeader,
 }
 
@@ -142,7 +142,7 @@ impl DelayTimer {
     cfg_smol_support!(
         fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
             self.run_async_schedule(timer);
-    
+
             Builder::new()
                 .name("handle_event".into())
                 .spawn(move || {
@@ -187,31 +187,59 @@ impl DelayTimer {
     cfg_status_report!(
         // if open "status-report", then register task 3s auto-run report
         //TODO: needs run in runtime.
-        pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
-            let mut task_builder = TaskBuilder::default();
-            let status_report_arc = Arc::new(status_report);
+        cfg_tokio_support!(
+            pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
+                let mut task_builder = TaskBuilder::default();
+                let status_report_arc = Arc::new(status_report);
 
-            let body = move || {
-                let status_report_ref = status_report_arc.clone();
-                async_spawn(async move {
-                    let report_result = status_report_ref.report(None).await;
+                let body = move || {
+                    let status_report_ref = status_report_arc.clone();
+                    async_spawn(async move {
+                        let _report_result = status_report_ref.report(None).await;
 
-                    // if report_result.is_err() {
-                    //     status_report.help();
-                    // }
-                })
-                .detach();
+                        // if report_result.is_err() {
+                        //     status_report.help();
+                        // }
+                    });
 
-                create_default_delay_task_handler()
-            };
+                    create_default_delay_task_handler()
+                };
 
-            task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
-            //single use.
-            task_builder.set_task_id(0);
-            let task = task_builder.spawn(body).unwrap();
+                task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
+                //single use.
+                task_builder.set_task_id(0);
+                let task = task_builder.spawn(body).unwrap();
 
-            self.add_task(task)
-        }
+                self.add_task(task)
+            }
+        );
+
+        cfg_smol_support!(
+            pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
+                let mut task_builder = TaskBuilder::default();
+                let status_report_arc = Arc::new(status_report);
+
+                let body = move || {
+                    let status_report_ref = status_report_arc.clone();
+                    async_spawn(async move {
+                        let _report_result = status_report_ref.report(None).await;
+
+                        // if report_result.is_err() {
+                        //     status_report.help();
+                        // }
+                    }).detach();
+
+                    create_default_delay_task_handler()
+                };
+
+                task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
+                //single use.
+                task_builder.set_task_id(0);
+                let task = task_builder.spawn(body).unwrap();
+
+                self.add_task(task)
+            }
+        );
     );
 
     /// Add a task in timer_core by event-channel.

@@ -31,9 +31,9 @@ pub(crate) use utils::parse::shell_command::{ChildGuard, ChildGuardList};
 #[macro_use]
 pub mod macros;
 pub mod delay_timer;
+pub mod prelude;
 pub mod timer;
 pub mod utils;
-pub mod prelude;
 
 //TODO: Maybe can independent bench mod to one project.
 //Or via `rustversion` Isolation of different modules.
