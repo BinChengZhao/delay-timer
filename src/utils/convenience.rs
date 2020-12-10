@@ -82,13 +82,25 @@ pub mod functions {
 }
 
 pub mod cron_expression_grammatical_candy {
+    use std::ops::Deref;
 
     //TODO: Support a customer-CronCandy in future.
     // let c = customer-CronCandy::new();
     // c.add_cron_candy("@fuzzy", "* * * * * * 2020");
 
     #[derive(Debug, Copy, Clone)]
-    pub enum CronCandy {
+    pub struct CandyCronStr(pub &'static str);
+
+    impl Deref for CandyCronStr {
+        type Target = &'static str;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub enum CandyCron {
         Secondly,
         Minutely,
         Hourly,
@@ -97,20 +109,31 @@ pub mod cron_expression_grammatical_candy {
         Monthly,
         Yearly,
     }
-    use CronCandy::*;
+    use CandyCron::*;
 
-    impl Into<&'static str> for CronCandy {
-        fn into(self) -> &'static str {
+    impl Into<CandyCronStr> for CandyCron {
+        fn into(self) -> CandyCronStr {
             match self {
-                Secondly => "@secondly",
-                Minutely => "@minutely",
-                Hourly => "@hourly",
-                Daily => "@daily",
-                Weekly => "@weekly",
-                Monthly => "@monthly",
-                Yearly => "@yearly",
+                Secondly => CandyCronStr("@secondly"),
+                Minutely => CandyCronStr("@minutely"),
+                Hourly => CandyCronStr("@hourly"),
+                Daily => CandyCronStr("@daily"),
+                Weekly => CandyCronStr("@weekly"),
+                Monthly => CandyCronStr("@monthly"),
+                Yearly => CandyCronStr("@yearly"),
             }
         }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    ///Enumerated values of repeating types.
+    pub enum CandyFrequency<T: Into<CandyCronStr>> {
+        ///Repeat once.
+        Once(T),
+        ///Repeat ad infinitum.
+        Repeated(T),
+        ///Type of countdown.
+        CountDown(u32, T),
     }
 }
 
@@ -130,17 +153,50 @@ mod tests {
 
     #[test]
     fn test_cron_candy() {
-        use super::cron_expression_grammatical_candy::CronCandy;
+        use super::cron_expression_grammatical_candy::{CandyCron, CandyCronStr};
 
         let mut s: &'static str;
 
-        s = CronCandy::Daily.into();
+        s = <CandyCron as Into<CandyCronStr>>::into(CandyCron::Daily).0;
         assert_eq!(s, "@daily");
 
-        s = CronCandy::Yearly.into();
+        s = *<CandyCron as Into<CandyCronStr>>::into(CandyCron::Yearly);
         assert_eq!(s, "@yearly");
 
-        s = CronCandy::Secondly.into();
+        s = *<CandyCron as Into<CandyCronStr>>::into(CandyCron::Secondly);
+
         assert_eq!(s, "@secondly");
+    }
+
+    #[test]
+    fn test_customization_cron_candy() {
+        use super::cron_expression_grammatical_candy::{CandyCronStr};
+        use std::convert::Into;
+
+        struct CustomizationCandyCron(i32);
+
+        impl Into<CandyCronStr> for CustomizationCandyCron{
+            fn into(self) -> CandyCronStr{
+
+              let s =  match self.0{
+                    0 => "1 1 1 1 1 1 1",
+                    1 => "0 59 23 18 11 3 2100",
+                    _ => "* * * * * * *"
+                };
+                CandyCronStr(s)
+            }
+        }
+
+        let mut candy_cron_str:CandyCronStr;
+
+        candy_cron_str = CustomizationCandyCron(0).into();
+        assert_eq!(dbg!(*candy_cron_str), "1 1 1 1 1 1 1");
+
+        candy_cron_str = CustomizationCandyCron(1).into();
+        assert_eq!(dbg!(*candy_cron_str), "0 59 23 18 11 3 2100");
+
+        candy_cron_str = CustomizationCandyCron(999).into();
+        assert_eq!(dbg!(*candy_cron_str), "* * * * * * *");
+
     }
 }

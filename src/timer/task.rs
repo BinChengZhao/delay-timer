@@ -1,4 +1,5 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
+use crate::prelude::*;
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
 use std::cell::RefCell;
@@ -148,6 +149,27 @@ impl<'a> TaskBuilder<'a> {
         self
     }
 
+    #[inline(always)]
+    pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
+        &mut self,
+        frequency: CandyFrequency<T>,
+    ) -> &mut Self {
+        let frequency = match frequency {
+            CandyFrequency::Once(candy_cron_middle_str) => {
+                Frequency::Once(candy_cron_middle_str.into().0)
+            }
+            CandyFrequency::Repeated(candy_cron_middle_str) => {
+                Frequency::Repeated(candy_cron_middle_str.into().0)
+            }
+            CandyFrequency::CountDown(exec_count, candy_cron_middle_str) => {
+                Frequency::CountDown(exec_count, candy_cron_middle_str.into().0)
+            }
+        };
+
+        self.frequency = Some(frequency);
+        self
+    }
+
     ///Set task-id.
     #[inline(always)]
     pub fn set_task_id(&mut self, task_id: u64) -> &mut Self {
@@ -178,8 +200,7 @@ impl<'a> TaskBuilder<'a> {
             }
         };
 
-        //TODO: to_owned is redundant
-        let taskschedule = Self::analyze_cron_expression(expression_str.to_owned())?;
+        let taskschedule = Self::analyze_cron_expression(expression_str)?;
 
         //Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
@@ -195,8 +216,9 @@ impl<'a> TaskBuilder<'a> {
         ))
     }
 
+    // Analyze expressions, get cache.
     fn analyze_cron_expression(
-        cron_expression: String,
+        cron_expression: &str,
     ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
 
@@ -343,6 +365,28 @@ mod tests {
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
+        let mut task: Task = task_builder
+            .spawn(|| create_default_delay_task_handler())
+            .unwrap();
+
+        assert!(task.is_can_running());
+
+        task.set_cylinder_line(1);
+        assert!(!task.is_can_running());
+
+        assert!(task.check_arrived());
+    }
+
+    // struct CandyCron
+
+    #[test]
+    fn test_candy_cron() {
+        use super::{CandyCron, CandyFrequency, Task, TaskBuilder};
+        use crate::utils::convenience::functions::create_default_delay_task_handler;
+        let mut task_builder = TaskBuilder::default();
+
+        //The third run returns to an invalid state.
+        task_builder.set_frequency_by_candy(CandyFrequency::CountDown(5, CandyCron::Minutely));
         let mut task: Task = task_builder
             .spawn(|| create_default_delay_task_handler())
             .unwrap();

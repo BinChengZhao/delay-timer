@@ -1,7 +1,9 @@
 use crate::prelude::*;
 
-#[cfg(not(feature = "tokio-support"))]
-use smol::channel::TryRecvError::*;
+cfg_smol_support!(
+    use smol::channel::TryRecvError::*;
+);
+
 cfg_tokio_support!(
     use tokio::sync::mpsc::error::TryRecvError::*;
 );

@@ -7,6 +7,7 @@ use std::thread::{current, park, Thread};
 //TODO: hyper 的依赖有问题，hyper目前是依赖tokio到0.2.23. 我本地跑的tokio是 0.3.*的，所以不兼容。
 //TODO:cargo run --example=cycle_tokio_task --features=tokio-support
 
+//FIXME:为了能够运行 cargo test， 应该把examles 下面的每个case设置单独的依赖
 fn main() {
     let delay_timer = DelayTimer::new_with_tokio(None);
     let task_builder = TaskBuilder::default();
