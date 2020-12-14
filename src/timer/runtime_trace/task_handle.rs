@@ -73,7 +73,7 @@ pub trait DelayTaskHandler: Send + Sync {
     fn quit(self: Box<Self>) -> Result<()>;
 }
 
-pub(crate) struct SafeStructBoxedDelayTaskHandler(pub(crate) Box<dyn DelayTaskHandler>);
+pub struct SafeStructBoxedDelayTaskHandler(pub(crate) Box<dyn DelayTaskHandler>);
 impl Debug for SafeStructBoxedDelayTaskHandler {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         <&Self as Pointer>::fmt(&self, f).unwrap();
@@ -93,7 +93,7 @@ impl SafeStructBoxedDelayTaskHandler {
 // generics Type will single state just store one type in TaskTrace.
 // Multi-DelayTaskHandlerBox record_id can same, because one task can spawn Multi-process.
 #[derive(Debug)]
-pub(crate) struct DelayTaskHandlerBox {
+pub struct DelayTaskHandlerBox {
     ///Task Handle is most important part of DelayTaskHandlerBox.
     pub(crate) task_handler: Option<SafeStructBoxedDelayTaskHandler>,
     ///task_id.

@@ -58,7 +58,7 @@ pub struct DelayTimer {
 }
 
 #[derive(Clone)]
-pub(crate) struct SharedHeader {
+pub struct SharedHeader {
     //The task wheel has a slot dimension.
     pub(crate) wheel_queue: SharedTaskWheel,
     //Task distribution map to track where tasks are in a slot for easy removal.

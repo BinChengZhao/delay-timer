@@ -11,7 +11,7 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
-pub use crate::delay_timer::{get_timestamp, DelayTimer};
+pub use crate::entity::{get_timestamp, DelayTimer};
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use crate::timer::task::{Frequency, Task, TaskBuilder};

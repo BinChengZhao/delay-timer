@@ -8,7 +8,7 @@
 //! 2. A communication center for internal and external workers.
 
 pub(crate) use super::{
-    super::delay_timer::{SharedHeader, SharedTaskWheel},
+    super::entity::{SharedHeader, SharedTaskWheel},
     runtime_trace::{
         sweeper::{RecycleUnit, RecyclingBins},
         task_handle::TaskTrace,

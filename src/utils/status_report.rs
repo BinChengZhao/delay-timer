@@ -32,7 +32,7 @@ use async_trait::async_trait;
         ///
         /// ```
         //TODO: use async Trait.
-        async fn report(self:Arc<Self>, _t: Option<AsyncReceiver<i32>>) -> Self::Situation {
+       pub async fn report(self:Arc<Self>, _t: Option<AsyncReceiver<i32>>) -> Self::Situation {
             // Ok(true)
            todo!();
             // t is alies of LinkedList<record> or Vec<record> or ...T<record>
@@ -40,7 +40,7 @@ use async_trait::async_trait;
     
         // if report error or world destory... call help ..... call user....
         //Self::Exception
-        async fn help(self:Arc<Self>, _expression: String) {}
+        pub async fn help(self:Arc<Self>, _expression: String) {}
     }
     
 );

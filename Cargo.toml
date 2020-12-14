@@ -6,9 +6,13 @@ edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
 documentation = "https://docs.rs/delay_timer"
 readme = "README.md"
+homepage = "https://hyper.rs"
 description = "Time-manager of delayed tasks. Like crontab, but synchronous asynchronous tasks are possible, and dynamic add/cancel/remove is supported."
 keywords = [ "cron", "schedule", "repeat", "periodic", "time" ]
 license = "Apache-2.0 OR MIT"
+categories = ["network-programming", "web-programming::http-client", "web-programming::http-server"]
+
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -25,22 +29,60 @@ status-report = ["async-trait"]
 
 
 [dependencies]
-smol = { version = "1.2.4" , optional = true }
 cron_clock = "0.6.6"
 anyhow = "1.0.31"
 rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
+futures = "0.3.8"
+
+# Optional
 tokio = { version = "~0.3.3", features = ["full"] , optional = true }
 async-trait = { version = "0.1.41", optional = true }
-futures = "0.3.8"
+smol = { version = "1.2.4" , optional = true }
+
 
 [dev-dependencies]
 surf = "2.1.0"
 tokio = { version = "~0.3.3", features = ["full"] }
 hyper= {path = "../../others/hyper" , features = ["full"] }
 pretty_env_logger = "0.4"
+mockall = "0.8.2"
 
 [dev-dependencies.async-std]
 version = "1.6.3"
 features = ["attributes"]
+
+
+[package.metadata.docs.rs]
+features = ["status-report"]
+#all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+# Whether to pass `--no-default-features` to Cargo (default: false)
+no-default-features = true
+
+[package.metadata.playground]
+features = []
+
+[[example]]
+name = "cycle_tokio_task"
+path = "examples/cycle_tokio_task.rs"
+required-features = ["tokio-support"]
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+required-features = []
+
+
+#[[bench]]
+#name = "demo"
+#path = "benches/demo.rs"
+#required-features = ["full"]
+
+
+#[[test]]
+#name = "demo"
+#path = "tests/demo.rs"
+#required-features = ["full"]

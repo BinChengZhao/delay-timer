@@ -1,18 +1,17 @@
-use crate::prelude::*;
-use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
-use anyhow::Result;
+use crate::prelude::{async_spawn, AnyResult, DelayTaskHandler};
+
 ///No size type, API compliant consistency.
 pub struct MyUnit;
 
 impl DelayTaskHandler for MyUnit {
-    fn quit(self: Box<Self>) -> Result<()> {
+    fn quit(self: Box<Self>) -> AnyResult<()> {
         Ok(())
     }
 }
 
 pub mod functions {
 
-    use super::{super::parse_and_run, Result};
+    use super::{super::parse_and_run, AnyResult};
     use crate::prelude::*;
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
@@ -61,7 +60,7 @@ pub mod functions {
     #[inline(always)]
     ///Generate a list of processes from a string of shell commands,
     ///and let it convert to a `DelayTaskHander`.
-    pub fn create_process_task(shell_command: &str) -> Result<Box<dyn DelayTaskHandler>> {
+    pub fn create_process_task(shell_command: &str) -> AnyResult<Box<dyn DelayTaskHandler>> {
         let process_linked_list = parse_and_run(shell_command)?;
         Ok(create_delay_task_handler(process_linked_list))
     }
@@ -145,7 +144,7 @@ pub fn generate_closure_template(
     move || self::functions::create_delay_task_handler(async_spawn(async_template(a, b.clone())))
 }
 
-pub async fn async_template(_: i32, _: String) -> Result<()> {
+pub async fn async_template(_: i32, _: String) -> AnyResult<()> {
     Ok(())
 }
 
@@ -170,24 +169,23 @@ mod tests {
 
     #[test]
     fn test_customization_cron_candy() {
-        use super::cron_expression_grammatical_candy::{CandyCronStr};
+        use super::cron_expression_grammatical_candy::CandyCronStr;
         use std::convert::Into;
 
         struct CustomizationCandyCron(i32);
 
-        impl Into<CandyCronStr> for CustomizationCandyCron{
-            fn into(self) -> CandyCronStr{
-
-              let s =  match self.0{
+        impl Into<CandyCronStr> for CustomizationCandyCron {
+            fn into(self) -> CandyCronStr {
+                let s = match self.0 {
                     0 => "1 1 1 1 1 1 1",
                     1 => "0 59 23 18 11 3 2100",
-                    _ => "* * * * * * *"
+                    _ => "* * * * * * *",
                 };
                 CandyCronStr(s)
             }
         }
 
-        let mut candy_cron_str:CandyCronStr;
+        let mut candy_cron_str: CandyCronStr;
 
         candy_cron_str = CustomizationCandyCron(0).into();
         assert_eq!(dbg!(*candy_cron_str), "1 1 1 1 1 1 1");
@@ -197,6 +195,5 @@ mod tests {
 
         candy_cron_str = CustomizationCandyCron(999).into();
         assert_eq!(dbg!(*candy_cron_str), "* * * * * * *");
-
     }
 }

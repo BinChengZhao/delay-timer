@@ -3,7 +3,7 @@ pub(crate) use super::runtime_trace::task_handle::DelayTaskHandlerBox;
 use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
-pub use crate::delay_timer::get_timestamp;
+pub use crate::entity::get_timestamp;
 use crate::prelude::*;
 use snowflake::SnowflakeIdBucket;
 
@@ -66,7 +66,7 @@ use std::time::{Instant};
 
 //warning: large size difference between variants
 #[derive(Debug)]
-pub(crate) enum TimerEvent {
+pub enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
     RemoveTask(u64),
@@ -74,7 +74,7 @@ pub(crate) enum TimerEvent {
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
 #[derive(Clone)]
-pub(crate) struct Timer {
+pub struct Timer {
     pub(crate) timer_event_sender: TimerEventSender,
     status_report_sender: Option<AsyncSender<i32>>,
     pub(crate) shared_header: SharedHeader,
@@ -84,7 +84,7 @@ pub(crate) struct Timer {
 //and task-Fn determines which runtime to put the internal task in when it is generated.
 //just provice api and struct ,less is more.
 impl Timer {
-    pub(crate) fn new(timer_event_sender: TimerEventSender, shared_header: SharedHeader) -> Self {
+    pub fn new(timer_event_sender: TimerEventSender, shared_header: SharedHeader) -> Self {
         Timer {
             timer_event_sender,
             status_report_sender: None,
@@ -188,7 +188,7 @@ impl Timer {
     );
 
     #[inline(always)]
-    pub(crate) async fn maintain_task(
+    pub async fn maintain_task(
         &mut self,
         mut task: Task,
         record_id: i64,
