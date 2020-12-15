@@ -17,8 +17,8 @@ macro_rules! cfg_smol_support {
         $(
             // features "smol-support" or "smol-support, status-report" can compile
             // features  "smol-support, tokio-support" or "smol-support, tokio-full" can't compile.
-#[cfg(not(any(feature = "tokio-support", feature = "tokio-full")))]
-#[cfg(feature = "smol-support")]
+            #[cfg(not(any(feature = "tokio-support", feature = "tokio-full")))]
+            #[cfg(feature = "smol-support")]
             $item
         )*
     }

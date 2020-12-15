@@ -38,31 +38,26 @@ cfg_tokio_support!(
 
 );
 
-cfg_smol_support!(
-use std::time::{Instant};
-    use smol::Timer as smolTimer;
-    use futures::StreamExt;
+use futures::StreamExt;
+use smol::Timer as smolTimer;
+use std::time::Instant;
 
+#[derive(Debug)]
+struct Clock {
+    inner: smolTimer,
+    period: Duration,
+}
 
-    #[derive(Debug)]
-    struct Clock{
-        inner : smolTimer,
-        period:Duration
+impl Clock {
+    pub fn new(start: Instant, period: Duration) -> Self {
+        let inner = smolTimer::interval_at(start, period);
+        Clock { inner, period }
     }
 
-    impl Clock{
-
-        pub fn new(start: Instant, period: Duration) -> Self{
-           let inner= smolTimer::interval_at(start,period);
-           Clock{inner, period}
-        }
-
-        pub async fn tick(&mut self){
-            self.inner.next().await;
-
-        }
+    pub async fn tick(&mut self) {
+        self.inner.next().await;
     }
-);
+}
 
 //warning: large size difference between variants
 #[derive(Debug)]
@@ -163,7 +158,6 @@ impl Timer {
         }
     }
 
-    #[cfg(not(feature = "tokio-support"))]
     pub(crate) async fn send_timer_event(
         &mut self,
         task_id: u64,

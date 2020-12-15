@@ -28,11 +28,7 @@ use std::sync::{
 };
 use waitmap::WaitMap;
 
-cfg_smol_support!(
-    use smol::{
-        channel::{unbounded},
-    };
-);
+use smol::channel::unbounded;
 
 cfg_tokio_support!(
     use tokio::sync::mpsc::unbounded_channel;
@@ -131,17 +127,14 @@ impl EventHandle {
         }
     );
 
-    cfg_smol_support!(
-        fn recycle_unit_sources_channel() -> (AsyncSender<RecycleUnit>, AsyncReceiver<RecycleUnit>)
-        {
-            unbounded::<RecycleUnit>()
-        }
+    fn recycle_unit_sources_channel() -> (AsyncSender<RecycleUnit>, AsyncReceiver<RecycleUnit>) {
+        unbounded::<RecycleUnit>()
+    }
 
-        fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
-            async_spawn(recycling_bins.clone().add_recycle_unit()).detach();
-            async_spawn(recycling_bins.recycle()).detach();
-        }
-    );
+    fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
+        async_spawn(recycling_bins.clone().add_recycle_unit()).detach();
+        async_spawn(recycling_bins.recycle()).detach();
+    }
 
     #[allow(dead_code)]
     pub(crate) fn set_status_report_sender(&mut self, status_report_sender: AsyncSender<i32>) {

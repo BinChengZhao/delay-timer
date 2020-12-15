@@ -20,11 +20,10 @@ categories = ["network-programming", "web-programming::http-client", "web-progra
 name = "delay_timer"
 
 [features]
-default = ["smol-support"]
+default = []
 tokio-full = ["tokio-support","status-report"]
-smol-full = ["smol-support","status-report"]
+smol-full = ["status-report"]
 tokio-support = ["tokio"]
-smol-support = ["smol"]
 status-report = ["async-trait"]
 
 
@@ -35,11 +34,12 @@ rs-snowflake = "0.3.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
 futures = "0.3.8"
+smol = "1.2.4"
+
 
 # Optional
 tokio = { version = "~0.3.3", features = ["full"] , optional = true }
 async-trait = { version = "0.1.41", optional = true }
-smol = { version = "1.2.4" , optional = true }
 
 
 [dev-dependencies]
@@ -55,7 +55,7 @@ features = ["attributes"]
 
 
 [package.metadata.docs.rs]
-features = ["status-report"]
+#features = ["status-report"]
 #all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 

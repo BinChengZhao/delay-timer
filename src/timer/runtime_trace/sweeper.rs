@@ -4,9 +4,8 @@ cfg_tokio_support!(
     use tokio::sync::mpsc::error::TryRecvError::*;
 );
 
-cfg_smol_support!(
-    use smol::channel::TryRecvError::*;
-);
+use smol::channel::TryRecvError::*;
+
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse},
     collections::BinaryHeap,
@@ -130,7 +129,6 @@ impl RecyclingBins {
         }
     }
 
-    #[cfg(not(feature = "tokio-support"))]
     pub(crate) async fn send_timer_event(&self, event: TimerEvent) {
         self.timer_event_sender
             .send(event)

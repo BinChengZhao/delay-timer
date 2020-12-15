@@ -26,11 +26,8 @@ cfg_status_report!(
 );
 
 use anyhow::{Context, Result};
-//FIXME: not AND any "tokio-support" or "tokio-xxx"
-cfg_smol_support!(
-    use futures::executor::block_on;
-    use smol::channel::unbounded;
-);
+use futures::executor::block_on;
+use smol::channel::unbounded;
 
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
@@ -112,7 +109,6 @@ impl DelayTimer {
         Self::init_by_shared_header(SharedHeader::default())
     }
 
-    #[cfg(not(feature = "tokio-support"))]
     fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
         unbounded::<TimerEvent>()
     }
@@ -139,40 +135,20 @@ impl DelayTimer {
         delay_timer
     }
 
-    cfg_smol_support!(
-        fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
-            self.run_async_schedule(timer);
+    fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
+        self.run_async_schedule(timer);
 
-            Builder::new()
-                .name("handle_event".into())
-                .spawn(move || {
-                    block_on(async {
-                        event_handle.handle_event().await;
-                    })
+        Builder::new()
+            .name("handle_event".into())
+            .spawn(move || {
+                block_on(async {
+                    event_handle.handle_event().await;
                 })
-                .expect("handle_event can't start.");
-        }
-    );
+            })
+            .expect("handle_event can't start.");
+    }
 
-    cfg_tokio_support!(
-        fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
-            self.run_async_schedule(timer);
 
-            if let Some(ref tokio_runtime_ref) = self.shared_header.other_runtimes.tokio {
-                let tokio_runtime = tokio_runtime_ref.clone();
-                Builder::new()
-                    .name("handle_event_tokio".into())
-                    .spawn(move || {
-                        tokio_runtime.block_on(async {
-                            event_handle.handle_event().await;
-                        })
-                    })
-                    .expect("async_schedule can't start.");
-            }
-        }
-    );
-
-    #[cfg(not(feature = "tokio-support"))]
     fn run_async_schedule(&self, mut timer: Timer) {
         Builder::new()
             .name("async_schedule".into())
@@ -262,7 +238,6 @@ impl DelayTimer {
     }
 
     /// Send a event to event-handle.
-    #[cfg(not(feature = "tokio-support"))]
     fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
         self.timer_event_sender
             .try_send(event)
@@ -270,25 +245,37 @@ impl DelayTimer {
     }
 }
 
-//TODO:笔记
-//条件编译的 cfg 标记是以item为单位的，可以理解为一个函数单元
-//不能在函数内部，一半用cfg标记，一半不用
-//如果需要根据不同 cfg 标记调用不同的 statement 单元，用方法包住
-//让用户选择去调用。
 
 cfg_tokio_support!(
    impl DelayTimer{
-    fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
-        self.timer_event_sender
-            .send(event)
-            .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+    // fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
+    //     self.timer_event_sender
+    //         .send(event)
+    //         .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+    // }
+
+    // fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
+    //     unbounded_channel::<TimerEvent>()
+    // }
+
+    //TODO:change name.
+    fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
+        self.run_async_schedule_by_tokio(timer);
+
+        if let Some(ref tokio_runtime_ref) = self.shared_header.other_runtimes.tokio {
+            let tokio_runtime = tokio_runtime_ref.clone();
+            Builder::new()
+                .name("handle_event_tokio".into())
+                .spawn(move || {
+                    tokio_runtime.block_on(async {
+                        event_handle.handle_event().await;
+                    })
+                })
+                .expect("async_schedule can't start.");
+        }
     }
 
-    fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
-        unbounded_channel::<TimerEvent>()
-    }
-
-    fn run_async_schedule(&self, mut timer: Timer){
+    fn run_async_schedule_by_tokio(&self, mut timer: Timer){
        if let Some(ref tokio_runtime_ref) = self.shared_header.other_runtimes.tokio{
            let tokio_runtime = tokio_runtime_ref.clone();
         Builder::new()

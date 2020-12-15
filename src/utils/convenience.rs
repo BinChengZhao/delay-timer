@@ -15,21 +15,19 @@ pub mod functions {
     use crate::prelude::*;
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
-    cfg_smol_support!(
-        pub fn unblock_process_task_fn(
-            shell_command: String,
-        ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-            move || {
-                let shell_command_clone = shell_command.clone();
-                create_delay_task_handler(async_spawn(async {
-                    unblock_spawn(move || parse_and_run(&shell_command_clone)).await
-                }))
-            }
+    pub fn unblock_process_task_fn(
+        shell_command: String,
+    ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+        move || {
+            let shell_command_clone = shell_command.clone();
+            create_delay_task_handler(async_spawn(async {
+                unblock_spawn(move || parse_and_run(&shell_command_clone)).await
+            }))
         }
-    );
+    }
 
     cfg_tokio_support!(
-        pub fn unblock_process_task_fn(
+        pub fn tokio_unblock_process_task_fn(
             shell_command: String,
         ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
             move || {
