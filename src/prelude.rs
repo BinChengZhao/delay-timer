@@ -38,6 +38,7 @@ cfg_tokio_support!(
     pub(crate) use tokio::task::yield_now;
 );
 
+//TODO:channel 统一用 smol的。
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 pub use smol::future as future_lite;
 pub(crate) use smol::future::yield_now;
