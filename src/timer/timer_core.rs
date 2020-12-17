@@ -8,6 +8,8 @@ use crate::prelude::*;
 use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
+pub(crate) use crate::entity::RuntimeKind;
+use std::mem::replace;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::time::Duration;
 
@@ -17,14 +19,14 @@ pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 
 cfg_tokio_support!(
-    use tokio::time::{Interval, interval_at, self, Instant};
+    use tokio::time::{Interval, interval_at, self};
 
     #[derive(Debug)]
-    struct Clock{
+    struct TokioClock{
         inner : Interval
     }
 
-    impl Clock{
+    impl TokioClock{
 
         pub fn new(start: time::Instant, period: Duration) -> Self{
             let inner = interval_at(start, period);
@@ -38,7 +40,6 @@ cfg_tokio_support!(
 
 );
 
-use futures::StreamExt;
 use smol::Timer as smolTimer;
 use std::time::Instant;
 
@@ -50,12 +51,13 @@ struct Clock {
 
 impl Clock {
     pub fn new(start: Instant, period: Duration) -> Self {
-        let inner = smolTimer::interval_at(start, period);
+        let inner = smolTimer::at(start + period);
         Clock { inner, period }
     }
 
     pub async fn tick(&mut self) {
-        self.inner.next().await;
+        let new_inner = smolTimer::after(self.period);
+        replace(&mut self.inner, new_inner).await;
     }
 }
 
@@ -109,7 +111,15 @@ impl Timer {
         //if that overtime , i run it not block
         let mut second_hand;
         let mut timestamp;
-        let mut clock = Clock::new(Instant::now(), Duration::from_secs(1));
+        let mut clock;
+
+        let runtime_kind = self.shared_header.runtime_instance.kind;
+
+        match runtime_kind {
+            RuntimeKind::Smol => clock = Clock::new(Instant::now(), Duration::from_secs(1)),
+            #[cfg(feature = "tokio-support")]
+            RuntimeKind::Tokio => clock = TokioClock::new(Instant::now(), Duration::from_secs(1)),
+        }
 
         //TODO:auto-get nodeid and machineid.
         let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
@@ -169,17 +179,17 @@ impl Timer {
             .unwrap_or_else(|e| println!("{}", e));
     }
 
-    cfg_tokio_support!(
-        pub(crate) async fn send_timer_event(
-            &mut self,
-            task_id: u64,
-            tmp_task_handler_box: DelayTaskHandlerBox,
-        ) {
-            self.timer_event_sender
-                .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
-                .unwrap_or_else(|e| println!("{}", e));
-        }
-    );
+    // cfg_tokio_support!(
+    //     pub(crate) async fn send_timer_event(
+    //         &mut self,
+    //         task_id: u64,
+    //         tmp_task_handler_box: DelayTaskHandlerBox,
+    //     ) {
+    //         self.timer_event_sender
+    //             .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
+    //             .unwrap_or_else(|e| println!("{}", e));
+    //     }
+    // );
 
     #[inline(always)]
     pub async fn maintain_task(

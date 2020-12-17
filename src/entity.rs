@@ -18,7 +18,6 @@ use crate::prelude::*;
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use tokio::sync::mpsc::unbounded_channel;
 );
 
 cfg_status_report!(
@@ -66,14 +65,28 @@ pub struct SharedHeader {
     pub(crate) global_time: GlobalTime,
     //Delay_timer flag for running
     pub(crate) shared_motivation: SharedMotivation,
-    //OtherRuntimes
-    pub(crate) other_runtimes: OtherRuntimes,
+    //RuntimeInstance
+    pub(crate) runtime_instance: RuntimeInstance,
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct OtherRuntimes {
+pub(crate) struct RuntimeInstance {
+    //smol have no instance.
     #[cfg(feature = "tokio-support")]
-    pub(crate) tokio: Option<Arc<Runtime>>,
+    pub(crate) inner: Option<Arc<Runtime>>,
+    pub(crate) kind: RuntimeKind,
+}
+#[derive(Clone, Debug, Copy)]
+pub(crate) enum RuntimeKind {
+    Smol,
+    #[cfg(feature = "tokio-support")]
+    Tokio,
+}
+
+impl Default for RuntimeKind {
+    fn default() -> Self {
+        RuntimeKind::Smol
+    }
 }
 
 impl Default for SharedHeader {
@@ -83,7 +96,7 @@ impl Default for SharedHeader {
         let second_hand = Arc::new(AtomicU64::new(0));
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
-        let other_runtimes = OtherRuntimes::default();
+        let runtime_instance = RuntimeInstance::default();
 
         SharedHeader {
             wheel_queue,
@@ -91,7 +104,7 @@ impl Default for SharedHeader {
             second_hand,
             global_time,
             shared_motivation,
-            other_runtimes,
+            runtime_instance,
         }
     }
 }
@@ -109,13 +122,13 @@ impl DelayTimer {
         Self::init_by_shared_header(SharedHeader::default())
     }
 
-    fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
-        unbounded::<TimerEvent>()
-    }
+    // fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
+    //     unbounded::<TimerEvent>()
+    // }
 
     fn init_by_shared_header(shared_header: SharedHeader) -> DelayTimer {
         //init reader sender for timer-event handle.
-        let (timer_event_sender, timer_event_receiver) = Self::timer_event_channel();
+        let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
         let timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
 
         //what is `ascription`.
@@ -125,12 +138,18 @@ impl DelayTimer {
             shared_header.clone(),
         );
 
+        let runtimer_kind = shared_header.runtime_instance.kind;
         let delay_timer = DelayTimer {
             timer_event_sender,
             shared_header,
         };
+
         //assign task.
-        delay_timer.assign_task(timer, event_handle);
+        match runtimer_kind {
+            RuntimeKind::Smol => delay_timer.assign_task(timer, event_handle),
+            #[cfg(feature = "tokio-support")]
+            RuntimeKind::Tokio => delay_timer.assign_task_by_tokio(timer, event_handle),
+        };
 
         delay_timer
     }
@@ -147,7 +166,6 @@ impl DelayTimer {
             })
             .expect("handle_event can't start.");
     }
-
 
     fn run_async_schedule(&self, mut timer: Timer) {
         Builder::new()
@@ -245,7 +263,6 @@ impl DelayTimer {
     }
 }
 
-
 cfg_tokio_support!(
    impl DelayTimer{
     // fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
@@ -259,10 +276,10 @@ cfg_tokio_support!(
     // }
 
     //TODO:change name.
-    fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
+    fn assign_task_by_tokio(&self, timer: Timer, mut event_handle: EventHandle) {
         self.run_async_schedule_by_tokio(timer);
 
-        if let Some(ref tokio_runtime_ref) = self.shared_header.other_runtimes.tokio {
+        if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner {
             let tokio_runtime = tokio_runtime_ref.clone();
             Builder::new()
                 .name("handle_event_tokio".into())
@@ -276,7 +293,7 @@ cfg_tokio_support!(
     }
 
     fn run_async_schedule_by_tokio(&self, mut timer: Timer){
-       if let Some(ref tokio_runtime_ref) = self.shared_header.other_runtimes.tokio{
+       if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner{
            let tokio_runtime = tokio_runtime_ref.clone();
         Builder::new()
         .name("async_schedule_tokio".into())
@@ -320,7 +337,8 @@ cfg_tokio_support!(
               rt = Some(Arc::new(Self::tokio_support().expect("init tokioRuntime is fail.")));
             }
 
-            self.other_runtimes.tokio = rt;
+            self.runtime_instance.inner = rt;
+            self.runtime_instance.kind = RuntimeKind::Tokio;
         }
     }
 

@@ -30,9 +30,6 @@ use waitmap::WaitMap;
 
 use smol::channel::unbounded;
 
-cfg_tokio_support!(
-    use tokio::sync::mpsc::unbounded_channel;
-);
 
 //TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
@@ -91,10 +88,6 @@ impl EventHandle {
 
     //TODO:分多个 impl 去 给类型实现方法
     cfg_tokio_support!(
-        fn recycle_unit_sources_channel() -> (AsyncSender<RecycleUnit>, AsyncReceiver<RecycleUnit>)
-        {
-            unbounded_channel::<RecycleUnit>()
-        }
 
         fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
             let mut task_builder = TaskBuilder::default();
@@ -131,9 +124,9 @@ impl EventHandle {
         unbounded::<RecycleUnit>()
     }
 
-    fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
-        async_spawn(recycling_bins.clone().add_recycle_unit()).detach();
-        async_spawn(recycling_bins.recycle()).detach();
+    fn recycling_task_by_tokio(&mut self, recycling_bins: Arc<RecyclingBins>) {
+        async_spawn_by_tokio(recycling_bins.clone().add_recycle_unit());
+        async_spawn_by_tokio(recycling_bins.recycle());
     }
 
     #[allow(dead_code)]
@@ -143,19 +136,18 @@ impl EventHandle {
 
     //handle all event.
     //TODO:Add TestUnit.
-    #[cfg(not(feature = "tokio-support"))]
     pub(crate) async fn handle_event(&mut self) {
         while let Ok(event) = self.timer_event_receiver.recv().await {
             self.event_dispatch(event).await;
         }
     }
-    cfg_tokio_support!(
-        pub(crate) async fn handle_event(&mut self) {
-            while let Some(event) = self.timer_event_receiver.recv().await {
-                self.event_dispatch(event).await;
-            }
-        }
-    );
+    // cfg_tokio_support!(
+    //     pub(crate) async fn handle_event(&mut self) {
+    //         while let Some(event) = self.timer_event_receiver.recv().await {
+    //             self.event_dispatch(event).await;
+    //         }
+    //     }
+    // );
 
     pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) {
         match event {
@@ -191,7 +183,6 @@ impl EventHandle {
         }
     }
 
-    #[cfg(not(feature = "tokio-support"))]
     pub(crate) async fn send_recycle_unit_sources_sender(&self, recycle_unit: RecycleUnit) {
         self.recycle_unit_sources_sender
             .send(recycle_unit)
@@ -199,13 +190,13 @@ impl EventHandle {
             .unwrap_or_else(|e| println!("{}", e));
     }
 
-    cfg_tokio_support!(
-        pub(crate) async fn send_recycle_unit_sources_sender(&self, recycle_unit: RecycleUnit) {
-            self.recycle_unit_sources_sender
-                .send(recycle_unit)
-                .unwrap_or_else(|e| println!("{}", e));
-        }
-    );
+    // cfg_tokio_support!(
+    //     pub(crate) async fn send_recycle_unit_sources_sender(&self, recycle_unit: RecycleUnit) {
+    //         self.recycle_unit_sources_sender
+    //             .send(recycle_unit)
+    //             .unwrap_or_else(|e| println!("{}", e));
+    //     }
+    // );
 
     //TODO:
     //cancel for exit running task.

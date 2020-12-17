@@ -32,11 +32,10 @@ pub mod functions {
         ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
             move || {
                 let shell_command_clone = shell_command.clone();
-                create_delay_task_handler(async_spawn(async {
+                create_delay_task_handler(async_spawn_by_tokio(async {
                     unblock_spawn(move || parse_and_run(&shell_command_clone))
                         .await
-                        .expect("unblock task run fail.")
-                        .expect("parse_and_run excute fail.");
+                        .expect("unblock task run fail.");
                 }))
             }
         }

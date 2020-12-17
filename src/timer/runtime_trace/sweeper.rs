@@ -1,9 +1,5 @@
 use crate::prelude::{get_timestamp, yield_now, AsyncMutex, AsyncReceiver};
 
-cfg_tokio_support!(
-    use tokio::sync::mpsc::error::TryRecvError::*;
-);
-
 use smol::channel::TryRecvError::*;
 
 use std::{
@@ -136,13 +132,13 @@ impl RecyclingBins {
             .unwrap_or_else(|e| println!("{}", e));
     }
 
-    cfg_tokio_support!(
-        pub(crate) async fn send_timer_event(&self, event: TimerEvent) {
-            self.timer_event_sender
-                .send(event)
-                .unwrap_or_else(|e| println!("{}", e));
-        }
-    );
+    // cfg_tokio_support!(
+    //     pub(crate) async fn send_timer_event(&self, event: TimerEvent) {
+    //         self.timer_event_sender
+    //             .send(event)
+    //             .unwrap_or_else(|e| println!("{}", e));
+    //     }
+    // );
     /// alternate run fn between recycle and  add_recycle_unit.
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {
         'loopLayer: loop {
