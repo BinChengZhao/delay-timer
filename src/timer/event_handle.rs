@@ -30,7 +30,6 @@ use waitmap::WaitMap;
 
 use smol::channel::unbounded;
 
-
 //TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
 // maybe cancelAll msg before last `update msg`  check the
@@ -86,47 +85,46 @@ impl EventHandle {
         event_handle
     }
 
+    fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
+        let mut task_builder = TaskBuilder::default();
+
+        let recycling_bins_ref = recycling_bins.clone();
+        let body = move || {
+            let recycling_bins_ref_ref = recycling_bins_ref.clone();
+            async_spawn(recycling_bins_ref_ref.add_recycle_unit());
+            create_default_delay_task_handler()
+        };
+        let task = task_builder
+            .set_frequency(Frequency::Once("@secondly"))
+            .set_task_id(0)
+            .spawn(body)
+            .unwrap();
+        self.add_task(task);
+
+        let body = move || {
+            let recycling_bins_ref = recycling_bins.clone();
+            async_spawn(recycling_bins_ref.recycle());
+            create_default_delay_task_handler()
+        };
+        //FIXME:set_task_id != 1
+        let task = task_builder
+            .set_frequency(Frequency::Once("@secondly"))
+            .set_task_id(1)
+            .spawn(body)
+            .unwrap();
+        self.add_task(task);
+    }
+
     //TODO:分多个 impl 去 给类型实现方法
     cfg_tokio_support!(
-
-        fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
-            let mut task_builder = TaskBuilder::default();
-
-            let recycling_bins_ref = recycling_bins.clone();
-            let body = move || {
-                let recycling_bins_ref_ref = recycling_bins_ref.clone();
-                async_spawn(recycling_bins_ref_ref.add_recycle_unit());
-                create_default_delay_task_handler()
-            };
-            let task = task_builder
-                .set_frequency(Frequency::Once("@secondly"))
-                .set_task_id(0)
-                .spawn(body)
-                .unwrap();
-            self.add_task(task);
-
-            let body = move || {
-                let recycling_bins_ref = recycling_bins.clone();
-                async_spawn(recycling_bins_ref.recycle());
-                create_default_delay_task_handler()
-            };
-            //FIXME:set_task_id != 1
-            let task = task_builder
-                .set_frequency(Frequency::Once("@secondly"))
-                .set_task_id(1)
-                .spawn(body)
-                .unwrap();
-            self.add_task(task);
+        fn recycling_task_by_tokio(&mut self, recycling_bins: Arc<RecyclingBins>) {
+            async_spawn_by_tokio(recycling_bins.clone().add_recycle_unit());
+            async_spawn_by_tokio(recycling_bins.recycle());
         }
     );
 
     fn recycle_unit_sources_channel() -> (AsyncSender<RecycleUnit>, AsyncReceiver<RecycleUnit>) {
         unbounded::<RecycleUnit>()
-    }
-
-    fn recycling_task_by_tokio(&mut self, recycling_bins: Arc<RecyclingBins>) {
-        async_spawn_by_tokio(recycling_bins.clone().add_recycle_unit());
-        async_spawn_by_tokio(recycling_bins.recycle());
     }
 
     #[allow(dead_code)]

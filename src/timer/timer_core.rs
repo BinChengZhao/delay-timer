@@ -18,6 +18,46 @@ pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 
+struct Clock {
+    inner: ClockInner,
+}
+
+enum ClockInner {
+    sc(SmolClock),
+    #[cfg(feature = "tokio-support")]
+    tc(TokioClock),
+}
+
+impl Clock {
+    fn new(runtime_kind: RuntimeKind) -> Clock {
+        let inner = ClockInner::new(runtime_kind);
+        Clock { inner }
+    }
+}
+impl ClockInner {
+    fn new(runtime_kind: RuntimeKind) -> ClockInner {
+        match runtime_kind {
+            RuntimeKind::Smol => {
+                ClockInner::sc(SmolClock::new(Instant::now(), Duration::from_secs(1)))
+            }
+            #[cfg(feature = "tokio-support")]
+            RuntimeKind::Tokio => ClockInner::tc(TokioClock::new(
+                time::Instant::now(),
+                Duration::from_secs(1),
+            )),
+        }
+    }
+}
+
+impl Clock {
+    async fn tick(&mut self) {
+        match self.inner {
+            ClockInner::sc(ref mut smol_clock) => smol_clock.tick().await,
+            #[cfg(feature = "tokio-support")]
+            ClockInner::tc(ref mut tokio_clock) => tokio_clock.tick().await,
+        }
+    }
+}
 cfg_tokio_support!(
     use tokio::time::{Interval, interval_at, self};
 
@@ -30,7 +70,7 @@ cfg_tokio_support!(
 
         pub fn new(start: time::Instant, period: Duration) -> Self{
             let inner = interval_at(start, period);
-            Clock{inner}
+            TokioClock{inner}
         }
 
         pub async fn tick(&mut self){
@@ -44,15 +84,15 @@ use smol::Timer as smolTimer;
 use std::time::Instant;
 
 #[derive(Debug)]
-struct Clock {
+struct SmolClock {
     inner: smolTimer,
     period: Duration,
 }
 
-impl Clock {
+impl SmolClock {
     pub fn new(start: Instant, period: Duration) -> Self {
         let inner = smolTimer::at(start + period);
-        Clock { inner, period }
+        SmolClock { inner, period }
     }
 
     pub async fn tick(&mut self) {
@@ -111,15 +151,9 @@ impl Timer {
         //if that overtime , i run it not block
         let mut second_hand;
         let mut timestamp;
-        let mut clock;
 
         let runtime_kind = self.shared_header.runtime_instance.kind;
-
-        match runtime_kind {
-            RuntimeKind::Smol => clock = Clock::new(Instant::now(), Duration::from_secs(1)),
-            #[cfg(feature = "tokio-support")]
-            RuntimeKind::Tokio => clock = TokioClock::new(Instant::now(), Duration::from_secs(1)),
-        }
+        let mut clock = Clock::new(runtime_kind);
 
         //TODO:auto-get nodeid and machineid.
         let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
