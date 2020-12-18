@@ -72,6 +72,8 @@ impl EventHandle {
         //TODO:optimize.
         //FIXME:在这里王event_handle里面塞值。
 
+        let runtime_kind = shared_header.runtime_instance.kind;
+
         let mut event_handle = EventHandle {
             task_trace,
             timer_event_receiver,
@@ -80,39 +82,18 @@ impl EventHandle {
             shared_header,
         };
 
-        event_handle.recycling_task(recycling_bins);
+        match runtime_kind {
+            RuntimeKind::Smol => event_handle.recycling_task(recycling_bins),
+            #[cfg(feature = "tokio-support")]
+            RuntimeKind::Tokio => event_handle.recycling_task_by_tokio(recycling_bins),
+        };
 
         event_handle
     }
 
     fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
-        let mut task_builder = TaskBuilder::default();
-
-        let recycling_bins_ref = recycling_bins.clone();
-        let body = move || {
-            let recycling_bins_ref_ref = recycling_bins_ref.clone();
-            async_spawn(recycling_bins_ref_ref.add_recycle_unit());
-            create_default_delay_task_handler()
-        };
-        let task = task_builder
-            .set_frequency(Frequency::Once("@secondly"))
-            .set_task_id(0)
-            .spawn(body)
-            .unwrap();
-        self.add_task(task);
-
-        let body = move || {
-            let recycling_bins_ref = recycling_bins.clone();
-            async_spawn(recycling_bins_ref.recycle());
-            create_default_delay_task_handler()
-        };
-        //FIXME:set_task_id != 1
-        let task = task_builder
-            .set_frequency(Frequency::Once("@secondly"))
-            .set_task_id(1)
-            .spawn(body)
-            .unwrap();
-        self.add_task(task);
+        async_spawn(recycling_bins.clone().add_recycle_unit()).detach();
+        async_spawn(recycling_bins.recycle()).detach();
     }
 
     //TODO:分多个 impl 去 给类型实现方法

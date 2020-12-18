@@ -53,7 +53,7 @@ pub fn generate_closure_template(
     name: String,
 ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
     move || {
-        create_delay_task_handler(async_spawn(async_template(
+        create_delay_task_handler(async_spawn_by_tokio(async_template(
             get_timestamp() as i32,
             name.clone(),
         )))

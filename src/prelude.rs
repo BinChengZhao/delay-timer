@@ -23,18 +23,18 @@ pub use crate::utils::convenience::functions::{
 };
 pub use anyhow::Result as AnyResult;
 pub use cron_clock;
+pub use smol::future as future_lite;
+pub use smol::spawn as async_spawn;
+pub use smol::unblock as unblock_spawn;
+
+//TODO:Try to unify with smol channel.
+pub(crate) use crate::entity::RuntimeKind;
+pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
+pub(crate) use smol::future::yield_now;
+pub(crate) use smol::lock::Mutex as AsyncMutex;
 
 cfg_tokio_support!(
     //TODO: tokio async_spawn need unique name.
-
     pub use tokio::task::spawn as async_spawn_by_tokio;
     pub use tokio::task::spawn_blocking as unblock_spawn_by_tokio;
 );
-
-//TODO:Try to unify with smol channel.
-pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
-pub use smol::future as future_lite;
-pub(crate) use smol::future::yield_now;
-pub(crate) use smol::lock::Mutex as AsyncMutex;
-pub use smol::spawn as async_spawn;
-pub use smol::unblock as unblock_spawn;
