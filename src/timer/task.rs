@@ -16,19 +16,36 @@ thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<String, ScheduleIte
 pub(crate) struct TaskMark {
     pub(crate) task_id: u64,
     slot_mark: u64,
+    parallel_runable_num: u64,
 }
 
 impl TaskMark {
-    pub(crate) fn new(task_id: u64, slot_mark: u64) -> Self {
-        TaskMark { task_id, slot_mark }
+    pub(crate) fn new(task_id: u64, slot_mark: u64, parallel_runable_num: u64) -> Self {
+        TaskMark {
+            task_id,
+            slot_mark,
+            parallel_runable_num,
+        }
     }
 
     pub(crate) fn get_slot_mark(&self) -> u64 {
         self.slot_mark
     }
 
+    pub(crate) fn get_parallel_runable_num(&self) -> u64 {
+        self.parallel_runable_num
+    }
+
     pub(crate) fn set_slot_mark(&mut self, slot_mark: u64) {
         self.slot_mark = slot_mark;
+    }
+
+    pub(crate) fn inc_parallel_runable_num(&mut self) {
+        self.parallel_runable_num = self.parallel_runable_num + 1;
+    }
+
+    pub(crate) fn dec_parallel_runable_num(&mut self) {
+        self.parallel_runable_num = self.parallel_runable_num.checked_sub(1).unwrap_or_default();
     }
 }
 //TODO: Add CronCandy version.
@@ -85,7 +102,6 @@ impl FrequencyInner {
     }
 }
 
-//TODO: Add maximun_parallel_runable_num.
 #[derive(Debug, Default, Copy, Clone)]
 ///Cycle plan task builder.
 pub struct TaskBuilder<'a> {
@@ -97,14 +113,13 @@ pub struct TaskBuilder<'a> {
 
     ///Maximum execution time (optional).
     maximum_running_time: Option<u64>,
+
+    ///Maximum parallel runable num (optional).
+    maximun_parallel_runable_num: Option<u64>,
 }
 
 //TODO: 张老师建议参考 ruby 那些库，设计的很人性化.
 
-//TODO:油条哥建议 cron 表达式的提供几个快捷enum， 这样IDE提示更方便。。
-//太细节了。
-
-//TODO:油条哥建议去除 api前的 set_，看起来更人性化。  但是有待权衡
 //TASK 执行完了，支持找新的Slot
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
 type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
@@ -131,6 +146,8 @@ pub struct Task {
     cylinder_line: u64,
     ///Validity.
     valid: bool,
+    ///Maximum parallel runable num (optional).
+    pub(crate) maximun_parallel_runable_num: u64,
 }
 
 //bak type BoxFn
@@ -213,6 +230,7 @@ impl<'a> TaskBuilder<'a> {
             frequency_inner,
             Box::new(body),
             self.maximum_running_time,
+            self.maximun_parallel_runable_num.unwrap(),
         ))
     }
 
@@ -243,6 +261,7 @@ impl Task {
         frequency: FrequencyInner,
         body: SafeBoxFn,
         maximum_running_time: Option<u64>,
+        maximun_parallel_runable_num: u64,
     ) -> Task {
         let body = SafeStructBoxedFn(body);
         Task {
@@ -252,6 +271,7 @@ impl Task {
             maximum_running_time,
             cylinder_line: 0,
             valid: true,
+            maximun_parallel_runable_num,
         }
     }
 

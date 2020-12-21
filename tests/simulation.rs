@@ -17,7 +17,7 @@ use std::{
 
 #[test]
 fn go_works() {
-    let mut delay_timer = DelayTimer::new();
+    let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
 
@@ -50,7 +50,7 @@ fn go_works() {
 
 #[test]
 fn tests_countdown() {
-    let mut delay_timer = DelayTimer::new();
+    let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicUsize::new(3));
     let share_num_bunshin = share_num.clone();
     let body = move || {

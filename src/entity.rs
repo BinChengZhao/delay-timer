@@ -28,6 +28,7 @@ use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
 
+use snowflake::SnowflakeIdBucket;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
     Arc,
@@ -67,6 +68,8 @@ pub struct SharedHeader {
     pub(crate) shared_motivation: SharedMotivation,
     //RuntimeInstance
     pub(crate) runtime_instance: RuntimeInstance,
+    //Unique id generator.
+    pub(crate) snowflakeid_bucket: SnowflakeIdBucket,
 }
 
 #[derive(Clone, Default)]
@@ -97,6 +100,7 @@ impl Default for SharedHeader {
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
         let runtime_instance = RuntimeInstance::default();
+        let snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
 
         SharedHeader {
             wheel_queue,
@@ -105,6 +109,7 @@ impl Default for SharedHeader {
             global_time,
             shared_motivation,
             runtime_instance,
+            snowflakeid_bucket,
         }
     }
 }

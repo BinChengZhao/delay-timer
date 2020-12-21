@@ -5,7 +5,6 @@ pub(crate) use super::slot::Slot;
 pub(crate) use super::task::Task;
 pub use crate::entity::get_timestamp;
 use crate::prelude::*;
-use snowflake::SnowflakeIdBucket;
 
 pub(crate) use super::task::TaskMark;
 pub(crate) use crate::entity::RuntimeKind;
@@ -155,8 +154,6 @@ impl Timer {
         let runtime_kind = self.shared_header.runtime_instance.kind;
         let mut clock = Clock::new(runtime_kind);
 
-        //TODO:auto-get nodeid and machineid.
-        let mut snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
         loop {
             //TODO: replenish ending single, for stop current jod and thread.
             if !self.shared_header.shared_motivation.load(Acquire) {
@@ -192,8 +189,7 @@ impl Timer {
                 }
 
                 if let Some(task) = task_option {
-                    self.maintain_task(task, snowflakeid_bucket.get_id(), timestamp, second_hand)
-                        .await;
+                    self.maintain_task(task, timestamp, second_hand).await;
                 }
             }
 
@@ -229,11 +225,24 @@ impl Timer {
     pub async fn maintain_task(
         &mut self,
         mut task: Task,
-        record_id: i64,
         timestamp: u64,
         second_hand: u64,
     ) -> Option<()> {
-        let task_id = task.task_id;
+        let record_id: i64 = self.shared_header.snowflakeid_bucket.get_id();
+        let task_id: u64 = task.task_id;
+        let parallel_runable_num: u64;
+
+        {
+            let task_flag_map = self.shared_header.task_flag_map.get(&task_id)?;
+            parallel_runable_num = task_flag_map.value().get_parallel_runable_num();
+        }
+
+        //if runable_task.parallel_runable_num >= task.maximun_parallel_runable_num doesn't run it.
+
+        if parallel_runable_num >= task.maximun_parallel_runable_num {
+            return self.handle_task(task, timestamp, second_hand);
+        }
+
         let task_handler_box = (task.get_body())();
 
         let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
@@ -250,6 +259,18 @@ impl Timer {
         if !task_valid {
             return Some(());
         }
+
+        self.handle_task(task, timestamp, second_hand)
+    }
+
+    pub(crate) fn handle_task(
+        &mut self,
+        mut task: Task,
+        timestamp: u64,
+        second_hand: u64,
+    ) -> Option<()> {
+        let task_id: u64 = task.task_id;
+
         //Next execute timestamp.
         let task_excute_timestamp = task.get_next_exec_timestamp();
 
@@ -272,6 +293,7 @@ impl Timer {
             let mut task_flag_map = self.shared_header.task_flag_map.get_mut(&task_id)?;
 
             task_flag_map.value_mut().set_slot_mark(slot_seed);
+            task_flag_map.value_mut().inc_parallel_runable_num();
         }
         Some(())
     }

@@ -228,7 +228,7 @@ impl EventHandle {
             .value_mut()
             .add_task(task);
 
-        TaskMark::new(task_id, slot_seed)
+        TaskMark::new(task_id, slot_seed, 1)
     }
 
     //for record task-mark.
@@ -253,6 +253,12 @@ impl EventHandle {
     }
 
     pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+        self.shared_header
+            .task_flag_map
+            .get_mut(&task_id)
+            .unwrap()
+            .value_mut()
+            .dec_parallel_runable_num();
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 

@@ -37,18 +37,3 @@ pub mod utils;
 //Or via `rustversion` Isolation of different modules.
 //TODO: Add a prelude.
 //FIXME:发版之前：dev-依赖：hyper，更正为支持 tokio ~0.3.* 的版本.
-#[cfg(test)]
-mod tests {
-    use mockall::{automock, mock, predicate::*};
-    #[cfg_attr(test, automock)]
-    trait MyTrait {
-        fn foo(&self, x: u32) -> u32;
-    }
-
-    #[test]
-    fn mytest() {
-        let mut mock = MockMyTrait::new();
-        mock.expect_foo().with(eq(4)).times(1).returning(|x| x + 1);
-        assert_eq!(5, mock.foo(4));
-    }
-}
