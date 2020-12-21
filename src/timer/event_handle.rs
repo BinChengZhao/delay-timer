@@ -20,15 +20,17 @@ pub(crate) use super::{
 };
 
 use crate::prelude::*;
-
 use anyhow::Result;
+use smol::channel::unbounded;
 use std::sync::{
     atomic::Ordering::{Acquire, Release},
     Arc,
 };
 use waitmap::WaitMap;
 
-use smol::channel::unbounded;
+cfg_tokio_support!(
+    use snowflake::SnowflakeIdGenerator;
+);
 
 //TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
@@ -96,11 +98,39 @@ impl EventHandle {
         async_spawn(recycling_bins.recycle()).detach();
     }
 
-    //TODO:分多个 impl 去 给类型实现方法
     cfg_tokio_support!(
+        // `async_spawn_by_tokio` 'must be called from the context of Tokio runtime configured
+        // with either `basic_scheduler` or `threaded_scheduler`'.
         fn recycling_task_by_tokio(&mut self, recycling_bins: Arc<RecyclingBins>) {
-            async_spawn_by_tokio(recycling_bins.clone().add_recycle_unit());
-            async_spawn_by_tokio(recycling_bins.recycle());
+            let mut id_generator = SnowflakeIdGenerator::new(2, 2);
+            let mut task_builder = TaskBuilder::default();
+
+            let recycling_bins_ref = recycling_bins.clone();
+            let body = move || {
+                let recycling_bins_ref_data = recycling_bins_ref.clone();
+                create_delay_task_handler(async_spawn_by_tokio(
+                    recycling_bins_ref_data.add_recycle_unit(),
+                ))
+            };
+
+            let add_recycle_unit_task = task_builder
+                .set_frequency(Frequency::Once("@secondly"))
+                .set_task_id(id_generator.generate() as u64)
+                .spawn(body)
+                .unwrap();
+            self.add_task(add_recycle_unit_task);
+
+            let body = move || {
+                let recycling_bins_ref = recycling_bins.clone();
+                create_delay_task_handler(async_spawn_by_tokio(recycling_bins_ref.recycle()))
+            };
+
+            let recycle_task = task_builder
+                .set_frequency(Frequency::Once("@secondly"))
+                .set_task_id(id_generator.generate() as u64)
+                .spawn(body)
+                .unwrap();
+            self.add_task(recycle_task);
         }
     );
 
@@ -168,14 +198,6 @@ impl EventHandle {
             .await
             .unwrap_or_else(|e| println!("{}", e));
     }
-
-    // cfg_tokio_support!(
-    //     pub(crate) async fn send_recycle_unit_sources_sender(&self, recycle_unit: RecycleUnit) {
-    //         self.recycle_unit_sources_sender
-    //             .send(recycle_unit)
-    //             .unwrap_or_else(|e| println!("{}", e));
-    //     }
-    // );
 
     //TODO:
     //cancel for exit running task.

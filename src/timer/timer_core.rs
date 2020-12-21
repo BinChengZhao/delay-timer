@@ -23,9 +23,9 @@ struct Clock {
 }
 
 enum ClockInner {
-    sc(SmolClock),
+    Sc(SmolClock),
     #[cfg(feature = "tokio-support")]
-    tc(TokioClock),
+    Tc(TokioClock),
 }
 
 impl Clock {
@@ -38,10 +38,10 @@ impl ClockInner {
     fn new(runtime_kind: RuntimeKind) -> ClockInner {
         match runtime_kind {
             RuntimeKind::Smol => {
-                ClockInner::sc(SmolClock::new(Instant::now(), Duration::from_secs(1)))
+                ClockInner::Sc(SmolClock::new(Instant::now(), Duration::from_secs(1)))
             }
             #[cfg(feature = "tokio-support")]
-            RuntimeKind::Tokio => ClockInner::tc(TokioClock::new(
+            RuntimeKind::Tokio => ClockInner::Tc(TokioClock::new(
                 time::Instant::now(),
                 Duration::from_secs(1),
             )),
@@ -52,9 +52,9 @@ impl ClockInner {
 impl Clock {
     async fn tick(&mut self) {
         match self.inner {
-            ClockInner::sc(ref mut smol_clock) => smol_clock.tick().await,
+            ClockInner::Sc(ref mut smol_clock) => smol_clock.tick().await,
             #[cfg(feature = "tokio-support")]
-            ClockInner::tc(ref mut tokio_clock) => tokio_clock.tick().await,
+            ClockInner::Tc(ref mut tokio_clock) => tokio_clock.tick().await,
         }
     }
 }
@@ -117,7 +117,7 @@ pub struct Timer {
     pub(crate) shared_header: SharedHeader,
 }
 
-//In any case, the task is not executed in the scheduler,
+//In any case, the task is not executed in the Scheduler,
 //and task-Fn determines which runtime to put the internal task in when it is generated.
 //just provice api and struct ,less is more.
 impl Timer {
@@ -146,7 +146,7 @@ impl Timer {
             .unwrap_or_else(|e| e)
     }
 
-    ///Return a future can pool it for schedule all cycles task.
+    ///Return a future can pool it for Schedule all cycles task.
     pub(crate) async fn async_schedule(&mut self) {
         //if that overtime , i run it not block
         let mut second_hand;

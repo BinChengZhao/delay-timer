@@ -34,7 +34,6 @@ pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
 
 cfg_tokio_support!(
-    //TODO: tokio async_spawn need unique name.
     pub use tokio::task::spawn as async_spawn_by_tokio;
     pub use tokio::task::spawn_blocking as unblock_spawn_by_tokio;
 );
