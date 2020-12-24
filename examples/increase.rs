@@ -50,8 +50,8 @@ fn main() {
 
 fn get_increase_fn(
     run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
-) -> impl Copy + Fn() -> Box<dyn DelayTaskHandler> {
-    move || {
+) -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
+    move |context| {
         let local_run_flag = run_flag_ref.unwrap().as_ptr();
 
         unsafe {
@@ -64,8 +64,8 @@ fn get_increase_fn(
 fn get_end_fn(
     thread: Thread,
     run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
-) -> impl Fn() -> Box<dyn DelayTaskHandler> {
-    move || {
+) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
+    move |context| {
         let local_run_flag = run_flag_ref.unwrap().as_ptr();
         unsafe {
             println!(
@@ -79,7 +79,7 @@ fn get_end_fn(
     }
 }
 
-fn get_async_fn() -> impl Copy + Fn() -> Box<dyn DelayTaskHandler> {
+fn get_async_fn() -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
     create_async_fn_body!({
         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
         let body_str = res.body_string().await.unwrap();

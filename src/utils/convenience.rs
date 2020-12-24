@@ -1,4 +1,4 @@
-use crate::prelude::{async_spawn, AnyResult, DelayTaskHandler};
+use crate::prelude::*;
 
 ///No size type, API compliant consistency.
 pub struct MyUnit;
@@ -17,8 +17,8 @@ pub mod functions {
 
     pub fn unblock_process_task_fn(
         shell_command: String,
-    ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-        move || {
+    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+        move |_| {
             let shell_command_clone = shell_command.clone();
             create_delay_task_handler(async_spawn(async {
                 unblock_spawn(move || parse_and_run(&shell_command_clone)).await
@@ -29,8 +29,8 @@ pub mod functions {
     cfg_tokio_support!(
         pub fn tokio_unblock_process_task_fn(
             shell_command: String,
-        ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-            move || {
+        ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+            move |_| {
                 let shell_command_clone = shell_command.clone();
                 create_delay_task_handler(async_spawn_by_tokio(async {
                     unblock_spawn(move || parse_and_run(&shell_command_clone))
@@ -45,8 +45,8 @@ pub mod functions {
     ///Generate a closure from a string of shell commands that will generate a list of processes.
     pub fn create_process_task_fn(
         shell_command: String,
-    ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-        move || {
+    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+        move |context| {
             create_process_task(&shell_command).unwrap_or_else(|e| {
                 println!("create-process:error:{}", e);
                 create_default_delay_task_handler()

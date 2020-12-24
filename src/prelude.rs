@@ -15,6 +15,7 @@ pub use crate::entity::{get_timestamp, DelayTimer};
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use crate::timer::task::{Frequency, Task, TaskBuilder};
+pub use crate::timer::timer_core::TimerEvent;
 pub use crate::utils::convenience::cron_expression_grammatical_candy::{
     CandyCron, CandyCronStr, CandyFrequency,
 };
@@ -26,12 +27,16 @@ pub use cron_clock;
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
+pub use crate::timer::task::TaskContext;
 
 //TODO:Try to unify with smol channel.
 pub(crate) use crate::entity::RuntimeKind;
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
+
+pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
+pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 
 cfg_tokio_support!(
     pub use tokio::task::spawn as async_spawn_by_tokio;

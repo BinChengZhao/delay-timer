@@ -14,9 +14,6 @@ use std::time::Duration;
 
 pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
 
-pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
-pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
-
 struct Clock {
     inner: ClockInner,
 }
@@ -107,6 +104,7 @@ pub enum TimerEvent {
     AddTask(Box<Task>),
     RemoveTask(u64),
     CancelTask(u64, i64),
+    FinishTask(u64, i64),
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
 #[derive(Clone)]
@@ -230,20 +228,29 @@ impl Timer {
     ) -> Option<()> {
         let record_id: i64 = self.shared_header.snowflakeid_bucket.get_id();
         let task_id: u64 = task.task_id;
-        let parallel_runable_num: u64;
 
-        {
-            let task_flag_map = self.shared_header.task_flag_map.get(&task_id)?;
-            parallel_runable_num = task_flag_map.value().get_parallel_runable_num();
+        if let Some(maximun_parallel_runable_num) = task.maximun_parallel_runable_num {
+            let parallel_runable_num: u64;
+
+            {
+                let task_flag_map = self.shared_header.task_flag_map.get(&task_id)?;
+                parallel_runable_num = task_flag_map.value().get_parallel_runable_num();
+            }
+
+            //if runable_task.parallel_runable_num >= task.maximun_parallel_runable_num doesn't run it.
+
+            if parallel_runable_num >= maximun_parallel_runable_num {
+                return self.handle_task(task, timestamp, second_hand);
+            }
         }
 
-        //if runable_task.parallel_runable_num >= task.maximun_parallel_runable_num doesn't run it.
+        let mut task_context = TaskContext::default();
+        task_context
+            .task_id(task_id)
+            .record_id(record_id)
+            .timer_event_sender(self.timer_event_sender.clone());
 
-        if parallel_runable_num >= task.maximun_parallel_runable_num {
-            return self.handle_task(task, timestamp, second_hand);
-        }
-
-        let task_handler_box = (task.get_body())();
+        let task_handler_box = (task.get_body())(task_context);
 
         let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
         let tmp_task_handler_box = delay_task_handler_box_builder

@@ -8,8 +8,20 @@ use crate::prelude::*;
 #[macro_export]
 macro_rules! create_async_fn_body {
     ($async_body:block) => {
-        || {
-            let handle = async_spawn(async { $async_body });
+        |context: TaskContext| {
+            let f = async move {
+                let future_inner = async move { $async_body };
+
+                future_inner.await;
+
+                if let Some(timer_event_sender) = context.timer_event_sender {
+                    timer_event_sender
+                        .send(TimerEvent::FinishTask(context.task_id, context.record_id))
+                        .await
+                        .unwrap();
+                }
+            };
+            let handle = async_spawn(f);
             create_delay_task_handler(handle)
         }
     };
@@ -19,8 +31,8 @@ cfg_tokio_support!(
     #[macro_export]
     macro_rules! create_async_fn_tokio_body {
         ($async_body:block) => {
-            || {
-                let handle = tokio_async_spawn(async { $async_body });
+            |context| {
+                let handle = tokio_async_spawn(async move { $async_body });
                 create_delay_task_handler(handle)
             }
         };

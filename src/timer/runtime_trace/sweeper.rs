@@ -1,4 +1,4 @@
-use crate::prelude::{get_timestamp, yield_now, AsyncMutex, AsyncReceiver};
+use crate::prelude::*;
 
 use smol::channel::TryRecvError::*;
 
@@ -7,8 +7,6 @@ use std::{
     collections::BinaryHeap,
     sync::Arc,
 };
-
-use super::super::timer_core::{TimerEvent, TimerEventSender};
 
 #[derive(Default, Eq, Debug, Copy, Clone)]
 /// recycle unit.

@@ -112,6 +112,9 @@ pub struct TaskBuilder<'a> {
     task_id: u64,
 
     ///Maximum execution time (optional).
+    ///  it can be use to deadline (excution-time + maximum_running_time).
+    /// TODO: whether auto cancel.
+    /// Zip other future to auto cancel it be poll when  first future-task finished.
     maximum_running_time: Option<u64>,
 
     ///Maximum parallel runable num (optional).
@@ -120,9 +123,38 @@ pub struct TaskBuilder<'a> {
 
 //TODO: 张老师建议参考 ruby 那些库，设计的很人性化.
 
-//TASK 执行完了，支持找新的Slot
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
-type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+
+#[derive(Debug, Clone, Default)]
+pub struct TaskContext {
+    pub task_id: u64,
+    pub record_id: i64,
+    pub then_fn: Option<fn()>,
+    pub timer_event_sender: Option<TimerEventSender>,
+}
+
+impl TaskContext {
+    pub fn task_id(&mut self, task_id: u64) -> &mut Self {
+        self.task_id = task_id;
+        self
+    }
+
+    pub fn record_id(&mut self, record_id: i64) -> &mut Self {
+        self.record_id = record_id;
+        self
+    }
+
+    pub(crate) fn timer_event_sender(&mut self, timer_event_sender: TimerEventSender) -> &mut Self {
+        self.timer_event_sender = Some(timer_event_sender);
+        self
+    }
+
+    pub fn then_fn(&mut self, then_fn: fn()) -> &mut Self {
+        self.then_fn = Some(then_fn);
+        self
+    }
+}
 
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
 impl fmt::Debug for SafeStructBoxedFn {
@@ -147,7 +179,7 @@ pub struct Task {
     ///Validity.
     valid: bool,
     ///Maximum parallel runable num (optional).
-    pub(crate) maximun_parallel_runable_num: u64,
+    pub(crate) maximun_parallel_runable_num: Option<u64>,
 }
 
 //bak type BoxFn
@@ -204,7 +236,7 @@ impl<'a> TaskBuilder<'a> {
     ///Spawn a task.
     pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where
-        F: Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
+        F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
         let frequency_inner;
 
@@ -230,7 +262,7 @@ impl<'a> TaskBuilder<'a> {
             frequency_inner,
             Box::new(body),
             self.maximum_running_time,
-            self.maximun_parallel_runable_num.unwrap(),
+            self.maximun_parallel_runable_num,
         ))
     }
 
@@ -261,7 +293,7 @@ impl Task {
         frequency: FrequencyInner,
         body: SafeBoxFn,
         maximum_running_time: Option<u64>,
-        maximun_parallel_runable_num: u64,
+        maximun_parallel_runable_num: Option<u64>,
     ) -> Task {
         let body = SafeStructBoxedFn(body);
         Task {
@@ -369,7 +401,7 @@ mod tests {
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
         let mut task: Task = task_builder
-            .spawn(|| create_default_delay_task_handler())
+            .spawn(|context| create_default_delay_task_handler())
             .unwrap();
 
         assert!(task.down_count_and_set_vaild());
@@ -386,7 +418,7 @@ mod tests {
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
         let mut task: Task = task_builder
-            .spawn(|| create_default_delay_task_handler())
+            .spawn(|context| create_default_delay_task_handler())
             .unwrap();
 
         assert!(task.is_can_running());
@@ -408,7 +440,7 @@ mod tests {
         //The third run returns to an invalid state.
         task_builder.set_frequency_by_candy(CandyFrequency::CountDown(5, CandyCron::Minutely));
         let mut task: Task = task_builder
-            .spawn(|| create_default_delay_task_handler())
+            .spawn(|context| create_default_delay_task_handler())
             .unwrap();
 
         assert!(task.is_can_running());

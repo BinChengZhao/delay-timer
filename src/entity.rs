@@ -11,7 +11,7 @@
 use super::timer::{
     event_handle::EventHandle,
     task::{Task, TaskMark},
-    timer_core::{Slot, Timer, TimerEvent, TimerEventSender, DEFAULT_TIMER_SLOT_COUNT},
+    timer_core::{Slot, Timer, TimerEvent, DEFAULT_TIMER_SLOT_COUNT},
 };
 use crate::prelude::*;
 

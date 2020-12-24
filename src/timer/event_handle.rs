@@ -13,10 +13,7 @@ pub(crate) use super::{
         sweeper::{RecycleUnit, RecyclingBins},
         task_handle::TaskTrace,
     },
-    timer_core::{
-        Slot, Task, TaskMark, TimerEvent, TimerEventReceiver, TimerEventSender,
-        DEFAULT_TIMER_SLOT_COUNT,
-    },
+    timer_core::{Slot, Task, TaskMark, TimerEvent, DEFAULT_TIMER_SLOT_COUNT},
 };
 
 use crate::prelude::*;
@@ -189,6 +186,11 @@ impl EventHandle {
 
                 self.task_trace.insert(task_id, delay_task_handler_box);
             }
+
+            TimerEvent::FinishTask(task_id, record_id) => {
+                dbg!(task_id, record_id, "FinishTask");
+                self.cancel_task(task_id, record_id);
+            }
         }
     }
 
@@ -259,6 +261,7 @@ impl EventHandle {
             .unwrap()
             .value_mut()
             .dec_parallel_runable_num();
+
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 

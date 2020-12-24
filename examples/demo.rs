@@ -82,8 +82,8 @@ fn build_task5(mut task_builder: TaskBuilder) -> Task {
 
 pub fn generate_closure_template(
     name: String,
-) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move || {
+) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+    move |context| {
         create_delay_task_handler(async_spawn(async_template(
             get_timestamp() as i32,
             name.clone(),
@@ -101,7 +101,7 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
 
 fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
     let thread: Thread = current();
-    let body = move || {
+    let body = move |context| {
         println!("bye bye");
         thread.unpark();
         create_default_delay_task_handler()
