@@ -18,15 +18,18 @@ pub mod functions {
     pub fn unblock_process_task_fn(
         shell_command: String,
     ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-        move |_| {
+        move |context: TaskContext| {
             let shell_command_clone = shell_command.clone();
-            create_delay_task_handler(async_spawn(async {
-                unblock_spawn(move || parse_and_run(&shell_command_clone)).await
+            create_delay_task_handler(async_spawn(async move {
+                 unblock_spawn(move || parse_and_run(&shell_command_clone)).await
+                //FIXME: poll childs Waiting end then call finish.
+                // context.finishe_task().await;
             }))
         }
     }
 
     cfg_tokio_support!(
+        //FIXME:unblock_spawn needed update.
         pub fn tokio_unblock_process_task_fn(
             shell_command: String,
         ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
@@ -45,8 +48,8 @@ pub mod functions {
     ///Generate a closure from a string of shell commands that will generate a list of processes.
     pub fn create_process_task_fn(
         shell_command: String,
-    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-        move |context| {
+    ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+        move || {
             create_process_task(&shell_command).unwrap_or_else(|e| {
                 println!("create-process:error:{}", e);
                 create_default_delay_task_handler()

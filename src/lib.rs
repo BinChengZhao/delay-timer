@@ -9,7 +9,7 @@
 //!
 //! 1. Mission deployment.
 //!
-//! 除了简单的没几秒执行一次
+//! Except for the simple execution in a few seconds
 
 //!，还可以指定 特定日期，比如周日的凌晨4点执行一个备份任务
 

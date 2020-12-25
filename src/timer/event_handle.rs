@@ -103,7 +103,7 @@ impl EventHandle {
             let mut task_builder = TaskBuilder::default();
 
             let recycling_bins_ref = recycling_bins.clone();
-            let body = move || {
+            let body = move |_| {
                 let recycling_bins_ref_data = recycling_bins_ref.clone();
                 create_delay_task_handler(async_spawn_by_tokio(
                     recycling_bins_ref_data.add_recycle_unit(),
@@ -117,7 +117,7 @@ impl EventHandle {
                 .unwrap();
             self.add_task(add_recycle_unit_task);
 
-            let body = move || {
+            let body = move |_| {
                 let recycling_bins_ref = recycling_bins.clone();
                 create_delay_task_handler(async_spawn_by_tokio(recycling_bins_ref.recycle()))
             };

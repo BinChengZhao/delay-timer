@@ -154,6 +154,15 @@ impl TaskContext {
         self.then_fn = Some(then_fn);
         self
     }
+
+    pub async fn finishe_task(self) {
+        if let Some(timer_event_sender) = self.timer_event_sender {
+            timer_event_sender
+                .send(TimerEvent::FinishTask(self.task_id, self.record_id))
+                .await
+                .unwrap();
+        }
+    }
 }
 
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);

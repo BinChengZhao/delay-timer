@@ -38,14 +38,14 @@ smol = "1.2.4"
 
 
 # Optional
-tokio = { version = "~0.3.3", features = ["full"] , optional = true }
+tokio = { version = "~1.0.0", features = ["full"] , optional = true }
 async-trait = { version = "0.1.41", optional = true }
 
 
 [dev-dependencies]
 surf = "2.1.0"
-tokio = { version = "~0.3.3", features = ["full"] }
-hyper= {path = "../../others/hyper" , features = ["full"] }
+tokio = { version = "~1.0.0", features = ["full"] }
+hyper= {version  = "0.14.1" , features = ["full"] }
 pretty_env_logger = "0.4"
 mockall = "0.8.2"
 

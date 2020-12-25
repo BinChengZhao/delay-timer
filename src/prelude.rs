@@ -14,6 +14,7 @@
 pub use crate::entity::{get_timestamp, DelayTimer};
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
+pub use crate::timer::task::TaskContext;
 pub use crate::timer::task::{Frequency, Task, TaskBuilder};
 pub use crate::timer::timer_core::TimerEvent;
 pub use crate::utils::convenience::cron_expression_grammatical_candy::{
@@ -27,7 +28,6 @@ pub use cron_clock;
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
-pub use crate::timer::task::TaskContext;
 
 //TODO:Try to unify with smol channel.
 pub(crate) use crate::entity::RuntimeKind;

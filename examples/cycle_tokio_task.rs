@@ -1,11 +1,10 @@
-use anyhow::Result;
 use delay_timer::prelude::*;
 use hyper::{Client, Uri};
+use std::ops::Deref;
 use std::thread::{current, park, Thread};
 
-//TODO: When you try to run that's example nedd add feature `tokio-support`.
-//TODO: hyper 的依赖有问题，hyper目前是依赖tokio到0.2.23. 我本地跑的tokio是 0.3.*的，所以不兼容。
-//TODO:cargo run --example=cycle_tokio_task --features=tokio-support
+//When you try to run that's example nedd add feature `tokio-support`.
+//cargo run --example=cycle_tokio_task --features=tokio-support
 
 fn main() {
     let delay_timer = DelayTimer::new_with_tokio(None);
@@ -18,7 +17,7 @@ fn main() {
 }
 
 fn build_task(mut task_builder: TaskBuilder) -> Task {
-    let body = generate_closure_template("delay_timer is easy to use. .".into());
+    let body = generate_closure_template("'delay_timer-is-easy-to-use.'".into());
 
     //TODO:use candy.
     task_builder
@@ -34,7 +33,7 @@ fn build_task(mut task_builder: TaskBuilder) -> Task {
 fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
     // let body = create_default_delay_task_handler;
     let thread: Thread = current();
-    let body = move || {
+    let body = move |_| {
         println!("bye bye");
         thread.unpark();
         create_default_delay_task_handler()
@@ -51,28 +50,31 @@ fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
 
 pub fn generate_closure_template(
     name: String,
-) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move || {
-        create_delay_task_handler(async_spawn_by_tokio(async_template(
-            get_timestamp() as i32,
-            name.clone(),
-        )))
+) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+    move |context| {
+        let future_inner = async_template(get_timestamp() as i32, name.clone());
+
+        let future = async move {
+            future_inner.await;
+            context.finishe_task().await;
+        };
+
+        create_delay_task_handler(async_spawn_by_tokio(future))
     }
 }
 
-pub async fn async_template(_id: i32, _name: String) -> Result<()> {
-    //TODO:Optimize.
-    // let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
+pub async fn async_template(id: i32, name: String) {
     let client = Client::new();
-    //TODO:The default connector does not handle TLS.
+
+    //The default connector does not handle TLS.
     //Speaking to https destinations will require configuring a connector that implements TLS.
     //So use http for test.
-    let uri: Uri = "http://baidu.com".parse().unwrap();
-    dbg!(&uri);
-    let res = client.get(uri).await?;
+    let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
+    let uri: Uri = url.parse().unwrap();
+
+    let res = client.get(uri).await.unwrap();
     println!("Response: {}", res.status());
     // Concatenate the body stream into a single buffer...
-    let buf = hyper::body::to_bytes(res).await?;
+    let buf = hyper::body::to_bytes(res).await.unwrap();
     println!("body: {:?}", buf);
-    Ok(())
 }
