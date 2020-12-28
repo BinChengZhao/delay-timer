@@ -41,4 +41,6 @@ pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 cfg_tokio_support!(
     pub use tokio::task::spawn as async_spawn_by_tokio;
     pub use tokio::task::spawn_blocking as unblock_spawn_by_tokio;
+    pub use tokio::time::sleep as sleep_by_tokio;
+
 );

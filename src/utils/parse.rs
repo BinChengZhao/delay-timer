@@ -1,12 +1,13 @@
 pub mod shell_command {
     use anyhow::*;
+    use std::collections::LinkedList;
     use std::fs::{File, OpenOptions};
+    use std::io::Result as IoResult;
     use std::iter::Iterator;
     use std::mem;
+    use std::ops::{Deref, DerefMut};
     use std::path::Path;
-    use std::process::{Child, Command, Stdio};
-
-    use std::collections::LinkedList;
+    use std::process::{Child, Command, ExitStatus, Stdio};
 
     pub type ChildGuardList = LinkedList<ChildGuard>;
     #[derive(Debug)]
@@ -25,6 +26,35 @@ pub mod shell_command {
             self.child.kill().unwrap_or_else(|e| println!("{}", e));
         }
     }
+
+    impl Deref for ChildGuard {
+        type Target = Child;
+        fn deref(&self) -> &Self::Target {
+            &self.child
+        }
+    }
+
+    impl DerefMut for ChildGuard {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.child
+        }
+    }
+
+    pub(crate) trait RunningMarker {
+        fn get_running_marker(&mut self) -> bool;
+    }
+
+    impl RunningMarker for LinkedList<ChildGuard> {
+        fn get_running_marker(&mut self) -> bool {
+            self.iter_mut()
+                .map(|c| c.try_wait())
+                .collect::<Vec<IoResult<Option<ExitStatus>>>>()
+                .into_iter()
+                .find(|c| matches!(c, Ok(None)))
+                .is_some()
+        }
+    }
+
     //that code base on 'build-your-own-shell-rust'. Thanks you Josh Mcguigan.
 
     /// Generate a list of processes from a string of shell commands.

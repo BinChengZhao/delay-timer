@@ -1,10 +1,10 @@
+use surf;
+use smol::Timer;
 use anyhow::Result;
 use delay_timer::prelude::*;
 use delay_timer::timer::timer_core::get_timestamp;
-use smol::Timer;
 use std::thread::{current, park, sleep, Thread};
 use std::time::Duration;
-use surf;
 
 fn main() {
     let delay_timer = DelayTimer::new();
@@ -112,7 +112,7 @@ fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
 
     //TODO:use candy.
     task_builder
-        .set_frequency(Frequency::Once("0 * * * Jan-Dec * 2020-2100"))
+        .set_frequency(Frequency::Once("@minutely"))
         .set_task_id(700)
         .set_maximum_running_time(50)
         .spawn(body)

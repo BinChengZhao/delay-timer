@@ -11,6 +11,11 @@ impl DelayTaskHandler for MyUnit {
 
 pub mod functions {
 
+    use smol::Timer;
+
+    use super::super::parse::shell_command::RunningMarker;
+    use std::time::Duration;
+
     use super::{super::parse_and_run, AnyResult};
     use crate::prelude::*;
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
@@ -21,24 +26,41 @@ pub mod functions {
         move |context: TaskContext| {
             let shell_command_clone = shell_command.clone();
             create_delay_task_handler(async_spawn(async move {
-                 unblock_spawn(move || parse_and_run(&shell_command_clone)).await
-                //FIXME: poll childs Waiting end then call finish.
-                // context.finishe_task().await;
+                let mut childs = unblock_spawn(move || parse_and_run(&shell_command_clone))
+                    .await
+                    .unwrap();
+
+                loop {
+                    if !childs.get_running_marker() {
+                        return context.finishe_task().await;
+                    }
+
+                    Timer::after(Duration::from_secs(1)).await;
+                }
             }))
         }
     }
 
     cfg_tokio_support!(
-        //FIXME:unblock_spawn needed update.
         pub fn tokio_unblock_process_task_fn(
             shell_command: String,
         ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-            move |_| {
+            move |context: TaskContext| {
                 let shell_command_clone = shell_command.clone();
                 create_delay_task_handler(async_spawn_by_tokio(async {
-                    unblock_spawn(move || parse_and_run(&shell_command_clone))
-                        .await
-                        .expect("unblock task run fail.");
+                    let mut childs =
+                        unblock_spawn_by_tokio(move || parse_and_run(&shell_command_clone))
+                            .await
+                            .expect("unblock task run fail.")
+                            .expect("parse_and_run task run fail.");
+
+                    loop {
+                        if !childs.get_running_marker() {
+                            return context.finishe_task().await;
+                        }
+
+                        sleep_by_tokio(Duration::from_secs(1)).await;
+                    }
                 }))
             }
         }
