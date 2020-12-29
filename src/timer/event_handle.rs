@@ -42,98 +42,81 @@ pub(crate) struct EventHandle {
     //TODO:Reporter.
     #[warn(dead_code)]
     pub(crate) status_report_sender: Option<AsyncSender<i32>>,
-    //Data Senders for Resource Recyclers.
-    pub(crate) recycle_unit_sources_sender: AsyncSender<RecycleUnit>,
+    //The sub-workers of EventHandle.
+    pub(crate) sub_wokers: SubWorkers,
     //Shared header information.
     pub(crate) shared_header: SharedHeader,
 }
 
+/// These sub-workers are the left and right arms of `EventHandle`
+/// and are responsible for helping it maintain global events.
+pub(crate) struct SubWorkers {
+    recycling_bin_woker: RecyclingBinWorker,
+}
+
+pub(crate) struct RecyclingBinWorker {
+    inner: Arc<RecyclingBins>,
+    //Data Senders for Resource Recyclers.
+    sender: AsyncSender<RecycleUnit>,
+}
+
 impl EventHandle {
+    /// New a instance of EventHandle.
+    ///
+    /// The first parameter `timer_event_receiver` is used by EventHandle
+    /// to accept all internal events.
+    ///
+    /// event may come from user application or sub-worker.
+    ///
+    /// The second parameter `timer_event_sender` is used by sub-workers
+    /// report processed events.
+    ///
+    /// The thrid parameter is used to shared delay-timer core data.
     pub(crate) fn new(
         timer_event_receiver: TimerEventReceiver,
         timer_event_sender: TimerEventSender,
         shared_header: SharedHeader,
     ) -> Self {
+
         let status_report_sender: Option<AsyncSender<i32>> = None;
         let task_trace = TaskTrace::default();
+        let sub_wokers = SubWorkers::new(timer_event_sender);
 
-        let (recycle_unit_sources_sender, recycle_unit_sources_reciver) =
-            Self::recycle_unit_sources_channel();
-
-        let recycling_bins = Arc::new(RecyclingBins::new(
-            recycle_unit_sources_reciver,
-            timer_event_sender,
-        ));
-
-        //TODO: need spawn in runtime or single thread because tokio just can spawn in runtime.
-        //not use race, use commone futures::join or others.
-        //mutex
-        //TODO:optimize.
-        //FIXME:在这里王event_handle里面塞值。
-
-        let runtime_kind = shared_header.runtime_instance.kind;
-
-        let mut event_handle = EventHandle {
+        EventHandle {
             task_trace,
             timer_event_receiver,
             status_report_sender,
-            recycle_unit_sources_sender,
+            sub_wokers,
             shared_header,
-        };
-
-        match runtime_kind {
-            RuntimeKind::Smol => event_handle.recycling_task(recycling_bins),
-            #[cfg(feature = "tokio-support")]
-            RuntimeKind::Tokio => event_handle.recycling_task_by_tokio(recycling_bins),
-        };
-
-        event_handle
+        }
     }
 
-    fn recycling_task(&mut self, recycling_bins: Arc<RecyclingBins>) {
-        async_spawn(recycling_bins.clone().add_recycle_unit()).detach();
-        async_spawn(recycling_bins.recycle()).detach();
+    fn recycling_task(&mut self) {
+        async_spawn(
+            self.sub_wokers
+                .recycling_bin_woker
+                .inner
+                .clone()
+                .add_recycle_unit(),
+        )
+        .detach();
+        async_spawn(self.sub_wokers.recycling_bin_woker.inner.clone().recycle()).detach();
     }
 
     cfg_tokio_support!(
         // `async_spawn_by_tokio` 'must be called from the context of Tokio runtime configured
         // with either `basic_scheduler` or `threaded_scheduler`'.
         fn recycling_task_by_tokio(&mut self, recycling_bins: Arc<RecyclingBins>) {
-            let mut id_generator = SnowflakeIdGenerator::new(2, 2);
-            let mut task_builder = TaskBuilder::default();
-
-            let recycling_bins_ref = recycling_bins.clone();
-            let body = move |_| {
-                let recycling_bins_ref_data = recycling_bins_ref.clone();
-                create_delay_task_handler(async_spawn_by_tokio(
-                    recycling_bins_ref_data.add_recycle_unit(),
-                ))
-            };
-
-            let add_recycle_unit_task = task_builder
-                .set_frequency(Frequency::Once("@secondly"))
-                .set_task_id(id_generator.generate() as u64)
-                .spawn(body)
-                .unwrap();
-            self.add_task(add_recycle_unit_task);
-
-            let body = move |_| {
-                let recycling_bins_ref = recycling_bins.clone();
-                create_delay_task_handler(async_spawn_by_tokio(recycling_bins_ref.recycle()))
-            };
-
-            let recycle_task = task_builder
-                .set_frequency(Frequency::Once("@secondly"))
-                .set_task_id(id_generator.generate() as u64)
-                .spawn(body)
-                .unwrap();
-            self.add_task(recycle_task);
+            async_spawn_by_tokio(
+                self.sub_wokers
+                    .recycling_bin_woker
+                    .inner
+                    .clone()
+                    .add_recycle_unit(),
+            );
+            async_spawn_by_tokio(self.sub_wokers.recycling_bin_woker.inner.clone().recycle());
         }
     );
-
-    fn recycle_unit_sources_channel() -> (AsyncSender<RecycleUnit>, AsyncReceiver<RecycleUnit>) {
-        unbounded::<RecycleUnit>()
-    }
 
     #[allow(dead_code)]
     pub(crate) fn set_status_report_sender(&mut self, status_report_sender: AsyncSender<i32>) {
@@ -143,19 +126,28 @@ impl EventHandle {
     //handle all event.
     //TODO:Add TestUnit.
     pub(crate) async fn handle_event(&mut self) {
+        self.init_sub_workers();
+
         while let Ok(event) = self.timer_event_receiver.recv().await {
             self.event_dispatch(event).await;
         }
     }
-    // cfg_tokio_support!(
-    //     pub(crate) async fn handle_event(&mut self) {
-    //         while let Some(event) = self.timer_event_receiver.recv().await {
-    //             self.event_dispatch(event).await;
-    //         }
-    //     }
-    // );
+
+    fn init_sub_workers(&mut self) {
+        let runtime_kind = self.shared_header.runtime_instance.kind;
+
+        match runtime_kind {
+            RuntimeKind::Smol => self.recycling_task(),
+            #[cfg(feature = "tokio-support")]
+            RuntimeKind::Tokio => self.recycling_task_by_tokio(),
+        };
+    }
 
     pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) {
+        //#[cfg(features="status-report")]
+        //And event isn't `AddTask`, use channel sent(event) to report_channel.
+        //defined a new outside-event support user.
+
         match event {
             TimerEvent::StopTimer => {
                 self.shared_header.shared_motivation.store(false, Release);
@@ -195,7 +187,9 @@ impl EventHandle {
     }
 
     pub(crate) async fn send_recycle_unit_sources_sender(&self, recycle_unit: RecycleUnit) {
-        self.recycle_unit_sources_sender
+        self.sub_wokers
+            .recycling_bin_woker
+            .sender
             .send(recycle_unit)
             .await
             .unwrap_or_else(|e| println!("{}", e));
@@ -273,5 +267,32 @@ impl EventHandle {
         }
 
         Arc::new(task_wheel)
+    }
+}
+
+impl SubWorkers {
+    fn new(timer_event_sender: TimerEventSender) -> Self {
+        let recycling_bin_woker = RecyclingBinWorker::new(timer_event_sender.clone());
+
+        SubWorkers {
+            recycling_bin_woker,
+        }
+    }
+}
+
+impl RecyclingBinWorker {
+    fn new(timer_event_sender: TimerEventSender) -> Self {
+        let (recycle_unit_sources_sender, recycle_unit_sources_reciver) =
+            unbounded::<RecycleUnit>();
+
+        let inner = Arc::new(RecyclingBins::new(
+            recycle_unit_sources_reciver,
+            timer_event_sender,
+        ));
+
+        RecyclingBinWorker {
+            inner,
+            sender: recycle_unit_sources_sender,
+        }
     }
 }

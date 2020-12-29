@@ -7,13 +7,11 @@ The underlying runtime is based on the optional smol and tokio, and you can buil
 
 Since the library currently includes features such as #[bench], it needs to be developed in a nightly version.
 
-//TODO:修正格式， 并翻译。
+Except for the simple execution in a few seconds, you can also specify a specific date, 
+such as Sunday at 4am to execute a backup task.
 
-除了简单的没几秒执行一次
+Supports configuration of the maximum number of parallelism of tasks.
 
-，还可以指定 特定日期，比如周日的凌晨4点执行一个备份任务 
-
-还支持判断前一个任务没执行完成时，是否并行，最大并行数量
 
 [![Build](https://github.com/BinChengZhao/delay-timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay-timer/actions)
@@ -135,7 +133,7 @@ Licensed under either of
 
 ## To Do List
 - [x] Support async-local-executor API and defalut start.
-- [x] Support tokio Ecology.
+- [√] Support tokio Ecology.
 - [x] Disable unwrap related methods that will panic.
 - [x] Thread and running task quit when delayTimer drop.
 - [x] error handle need supplement.

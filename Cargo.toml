@@ -24,7 +24,7 @@ default = []
 tokio-full = ["tokio-support","status-report"]
 smol-full = ["status-report"]
 tokio-support = ["tokio"]
-status-report = ["async-trait"]
+status-report = []
 
 
 [dependencies]
@@ -39,7 +39,6 @@ smol = "1.2.4"
 
 # Optional
 tokio = { version = "~1.0.0", features = ["full"] , optional = true }
-async-trait = { version = "0.1.41", optional = true }
 
 
 [dev-dependencies]

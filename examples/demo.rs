@@ -1,10 +1,10 @@
-use surf;
-use smol::Timer;
 use anyhow::Result;
 use delay_timer::prelude::*;
 use delay_timer::timer::timer_core::get_timestamp;
+use smol::Timer;
 use std::thread::{current, park, sleep, Thread};
 use std::time::Duration;
+use surf;
 
 fn main() {
     let delay_timer = DelayTimer::new();

@@ -21,7 +21,7 @@ fn go_works() {
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
 
-    let body = move || {
+    let body = move |_| {
         share_num_bunshin.fetch_add(1, Release);
         create_default_delay_task_handler()
     };
@@ -53,7 +53,7 @@ fn tests_countdown() {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicUsize::new(3));
     let share_num_bunshin = share_num.clone();
-    let body = move || {
+    let body = move |_| {
         share_num_bunshin.fetch_sub(1, Release);
         create_default_delay_task_handler()
     };

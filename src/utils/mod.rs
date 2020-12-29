@@ -3,10 +3,10 @@
 pub mod convenience;
 pub mod parse;
 
-cfg_status_report!(
-    pub mod status_report;
-    pub use status_report::StatusReport;
-);
+//FIXME:
+// cfg_status_report!(
+pub mod status_report;
+// );
 
 pub use convenience::functions;
 pub use parse::shell_command::parse_and_run;

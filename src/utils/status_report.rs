@@ -1,46 +1,41 @@
 // status_report is mod  for report node heathy
 // if open feature status-report, then compile that mod .
 // mapping
-pub(crate) use crate::prelude::*;
+use crate::prelude::*;
+use std::convert::TryFrom;
 
-use std::sync::Arc;
-cfg_status_report!(
+#[derive(Debug, Clone)]
+struct StatusReport {
+    inner: AsyncReceiver<PublicEvent>,
+}
 
-use async_trait::async_trait;
-
-    #[async_trait]
-    pub trait StatusReport: Send + Sync + 'static {
-        type Situation = Result<Self::Normal, Self::Exception>;
-        type Normal = bool;
-        type Exception = String;
-    
-        // type
-    
-        // new a delaytimer::Task to run it....!
-    
-        //
-        ///
-        /// ```
-        /// let example_task  = Task::spawn( ||{
-        ///         let result = report.report().await;
-        ///
-        ///         if result.is_err() {
-        ///            report.help().await;
-        ///         }
-        ///
-        /// } ).detach();
-        ///
-        /// ```
-        //TODO: use async Trait.
-       pub async fn report(self:Arc<Self>, _t: Option<AsyncReceiver<i32>>) -> Self::Situation {
-            // Ok(true)
-           todo!();
-            // t is alies of LinkedList<record> or Vec<record> or ...T<record>
-        }
-    
-        // if report error or world destory... call help ..... call user....
-        //Self::Exception
-        pub async fn help(self:Arc<Self>, _expression: String) {}
+impl StatusReport {
+    pub fn get_public_event(&self) -> AnyResult<PublicEvent> {
+        let event = self.inner.try_recv()?;
+        Ok(event)
     }
-    
-);
+}
+
+#[derive(Debug, Copy, Clone)]
+enum PublicEvent {
+    RemoveTask(u64),
+    CancelTask(u64, i64),
+    FinishTask(u64, i64),
+}
+
+impl TryFrom<TimerEvent> for PublicEvent {
+    type Error = &'static str;
+
+    fn try_from(timer_event: TimerEvent) -> Result<Self, Self::Error> {
+        match timer_event {
+            TimerEvent::RemoveTask(task_id) => Ok(PublicEvent::RemoveTask(task_id)),
+            TimerEvent::CancelTask(task_id, record_id) => {
+                Ok(PublicEvent::CancelTask(task_id, record_id))
+            }
+            TimerEvent::FinishTask(task_id, record_id) => {
+                Ok(PublicEvent::FinishTask(task_id, record_id))
+            }
+            _ => Err("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!"),
+        }
+    }
+}

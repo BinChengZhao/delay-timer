@@ -20,10 +20,6 @@ cfg_tokio_support!(
     use std::sync::atomic::{AtomicUsize, Ordering};
 );
 
-cfg_status_report!(
-    use crate::utils::{StatusReport};
-);
-
 use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
@@ -120,16 +116,11 @@ impl Default for DelayTimer {
     }
 }
 
-//TODO:支持tokio，我只启动一个runtime，跟暴露几个API
 impl DelayTimer {
     /// New a DelayTimer.
     pub fn new() -> DelayTimer {
         Self::init_by_shared_header(SharedHeader::default())
     }
-
-    // fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
-    //     unbounded::<TimerEvent>()
-    // }
 
     fn init_by_shared_header(shared_header: SharedHeader) -> DelayTimer {
         //init reader sender for timer-event handle.
@@ -159,17 +150,9 @@ impl DelayTimer {
         delay_timer
     }
 
-    fn assign_task(&self, timer: Timer, mut event_handle: EventHandle) {
+    fn assign_task(&self, timer: Timer, event_handle: EventHandle) {
         self.run_async_schedule(timer);
-
-        Builder::new()
-            .name("handle_event".into())
-            .spawn(move || {
-                block_on(async {
-                    event_handle.handle_event().await;
-                })
-            })
-            .expect("handle_event can't start.");
+        self.run_event_handle(event_handle);
     }
 
     fn run_async_schedule(&self, mut timer: Timer) {
@@ -183,63 +166,18 @@ impl DelayTimer {
             .expect("async_schedule can't start.");
     }
 
-    cfg_status_report!(
-        // if open "status-report", then register task 3s auto-run report
-        //TODO: needs run in runtime.
-        cfg_tokio_support!(
-            pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
-                let mut task_builder = TaskBuilder::default();
-                let status_report_arc = Arc::new(status_report);
+    fn run_event_handle(&self, mut event_handle: EventHandle) {
+        Builder::new()
+            .name("handle_event".into())
+            .spawn(move || {
+                block_on(async {
+                    event_handle.handle_event().await;
+                })
+            })
+            .expect("handle_event can't start.");
+    }
 
-                let body = move || {
-                    let status_report_ref = status_report_arc.clone();
-                    async_spawn(async move {
-                        let _report_result = status_report_ref.report(None).await;
-
-                        // if report_result.is_err() {
-                        //     status_report.help();
-                        // }
-                    });
-
-                    create_default_delay_task_handler()
-                };
-
-                task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
-                //single use.
-                task_builder.set_task_id(0);
-                let task = task_builder.spawn(body).unwrap();
-
-                self.add_task(task)
-            }
-        );
-
-        cfg_smol_support!(
-            pub fn set_status_reporter(&self, status_report: impl StatusReport) -> Result<()> {
-                let mut task_builder = TaskBuilder::default();
-                let status_report_arc = Arc::new(status_report);
-
-                let body = move || {
-                    let status_report_ref = status_report_arc.clone();
-                    async_spawn(async move {
-                        let _report_result = status_report_ref.report(None).await;
-
-                        // if report_result.is_err() {
-                        //     status_report.help();
-                        // }
-                    }).detach();
-
-                    create_default_delay_task_handler()
-                };
-
-                task_builder.set_frequency(Frequency::Repeated("0/3 * * * * * *"));
-                //single use.
-                task_builder.set_task_id(0);
-                let task = task_builder.spawn(body).unwrap();
-
-                self.add_task(task)
-            }
-        );
-    );
+    cfg_status_report!();
 
     /// Add a task in timer_core by event-channel.
     pub fn add_task(&self, task: Task) -> Result<()> {
@@ -270,20 +208,28 @@ impl DelayTimer {
 
 cfg_tokio_support!(
    impl DelayTimer{
-    // fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
-    //     self.timer_event_sender
-    //         .send(event)
-    //         .with_context(|| "Failed Send Event from seed_timer_event".to_string())
-    // }
 
-    // fn timer_event_channel() -> (AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>) {
-    //     unbounded_channel::<TimerEvent>()
-    // }
-
-    //TODO:change name.
-    fn assign_task_by_tokio(&self, timer: Timer, mut event_handle: EventHandle) {
+    fn assign_task_by_tokio(&self, timer: Timer,event_handle: EventHandle) {
         self.run_async_schedule_by_tokio(timer);
+        self.run_event_handle(run_event_handle);
+    }
 
+    fn run_async_schedule_by_tokio(&self, mut timer: Timer){
+       if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner{
+           let tokio_runtime = tokio_runtime_ref.clone();
+        Builder::new()
+        .name("async_schedule_tokio".into())
+        .spawn(move || {
+            tokio_runtime.block_on(async {
+                timer.async_schedule().await;
+            })
+        })
+        .expect("async_schedule can't start.");
+       }
+
+    }
+
+    fn run_event_handle_by_tokio(&self, mut event_handle: EventHandle){
         if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner {
             let tokio_runtime = tokio_runtime_ref.clone();
             Builder::new()
@@ -293,26 +239,10 @@ cfg_tokio_support!(
                         event_handle.handle_event().await;
                     })
                 })
-                .expect("async_schedule can't start.");
+                .expect("run_event_handle_by_tokio can't start.");
         }
-    }
 
-    fn run_async_schedule_by_tokio(&self, mut timer: Timer){
-       if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner{
-           let tokio_runtime = tokio_runtime_ref.clone();
-        Builder::new()
-        .name("async_schedule_tokio".into())
-        .spawn(move || {
-
-            tokio_runtime.block_on(async {
-
-                timer.async_schedule().await;
-            })
-        })
-        .expect("async_schedule can't start.");
-       }
-
-    }
+     }
 
     pub fn new_with_tokio(rt:Option<Arc<Runtime>>) -> DelayTimer {
         let mut shared_header = SharedHeader::default();
