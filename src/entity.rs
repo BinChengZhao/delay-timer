@@ -122,12 +122,14 @@ impl DelayTimer {
         Self::init_by_shared_header(SharedHeader::default())
     }
 
+    //TODO:get_status_reporter.
+    // Hot-plug.
+
     fn init_by_shared_header(shared_header: SharedHeader) -> DelayTimer {
         //init reader sender for timer-event handle.
         let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
         let timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
 
-        //what is `ascription`.
         let event_handle = EventHandle::new(
             timer_event_receiver,
             timer_event_sender.clone(),
@@ -211,7 +213,7 @@ cfg_tokio_support!(
 
     fn assign_task_by_tokio(&self, timer: Timer,event_handle: EventHandle) {
         self.run_async_schedule_by_tokio(timer);
-        self.run_event_handle(run_event_handle);
+        self.run_event_handle_by_tokio(event_handle);
     }
 
     fn run_async_schedule_by_tokio(&self, mut timer: Timer){

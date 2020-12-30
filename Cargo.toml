@@ -30,7 +30,7 @@ status-report = []
 [dependencies]
 cron_clock = "0.6.6"
 anyhow = "1.0.31"
-rs-snowflake = "0.3.0"
+rs-snowflake = "0.4.0"
 waitmap = "1.1.0"
 lru = "0.6.1"
 futures = "0.3.8"

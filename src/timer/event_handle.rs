@@ -25,11 +25,7 @@ use std::sync::{
 };
 use waitmap::WaitMap;
 
-cfg_tokio_support!(
-    use snowflake::SnowflakeIdGenerator;
-);
-
-//TaskTrace: use event mes update.
+// TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
 // maybe cancelAll msg before last `update msg`  check the
 // flag_map slotid with biggest task-slotid in trace, if has one delay, send a msg for recycleer
@@ -77,7 +73,6 @@ impl EventHandle {
         timer_event_sender: TimerEventSender,
         shared_header: SharedHeader,
     ) -> Self {
-
         let status_report_sender: Option<AsyncSender<i32>> = None;
         let task_trace = TaskTrace::default();
         let sub_wokers = SubWorkers::new(timer_event_sender);
@@ -106,7 +101,7 @@ impl EventHandle {
     cfg_tokio_support!(
         // `async_spawn_by_tokio` 'must be called from the context of Tokio runtime configured
         // with either `basic_scheduler` or `threaded_scheduler`'.
-        fn recycling_task_by_tokio(&mut self, recycling_bins: Arc<RecyclingBins>) {
+        fn recycling_task_by_tokio(&mut self) {
             async_spawn_by_tokio(
                 self.sub_wokers
                     .recycling_bin_woker
