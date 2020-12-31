@@ -43,3 +43,7 @@ cfg_tokio_support!(
     pub use tokio::task::spawn_blocking as unblock_spawn_by_tokio;
     pub use tokio::time::sleep as sleep_by_tokio;
 );
+
+cfg_status_report!(
+    pub use crate::utils::status_report::PublicEvent;
+);

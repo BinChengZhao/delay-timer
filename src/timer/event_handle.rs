@@ -37,7 +37,8 @@ pub(crate) struct EventHandle {
     pub(crate) timer_event_receiver: TimerEventReceiver,
     //TODO:Reporter.
     #[warn(dead_code)]
-    pub(crate) status_report_sender: Option<AsyncSender<i32>>,
+    #[cfg(feature = "status-report")]
+    pub(crate) status_report_sender: Option<AsyncSender<PublicEvent>>,
     //The sub-workers of EventHandle.
     pub(crate) sub_wokers: SubWorkers,
     //Shared header information.
@@ -73,14 +74,12 @@ impl EventHandle {
         timer_event_sender: TimerEventSender,
         shared_header: SharedHeader,
     ) -> Self {
-        let status_report_sender: Option<AsyncSender<i32>> = None;
         let task_trace = TaskTrace::default();
         let sub_wokers = SubWorkers::new(timer_event_sender);
 
         EventHandle {
             task_trace,
             timer_event_receiver,
-            status_report_sender,
             sub_wokers,
             shared_header,
         }
@@ -112,11 +111,6 @@ impl EventHandle {
             async_spawn_by_tokio(self.sub_wokers.recycling_bin_woker.inner.clone().recycle());
         }
     );
-
-    #[allow(dead_code)]
-    pub(crate) fn set_status_report_sender(&mut self, status_report_sender: AsyncSender<i32>) {
-        self.status_report_sender = Some(status_report_sender);
-    }
 
     //handle all event.
     //TODO:Add TestUnit.
@@ -264,6 +258,17 @@ impl EventHandle {
         Arc::new(task_wheel)
     }
 }
+
+cfg_status_report!(
+   impl EventHandle{
+    pub(crate) fn set_status_report_sender(
+        &mut self,
+        status_report_sender: AsyncSender<PublicEvent>,
+    ) {
+        self.status_report_sender = Some(status_report_sender);
+    }
+   }
+);
 
 impl SubWorkers {
     fn new(timer_event_sender: TimerEventSender) -> Self {

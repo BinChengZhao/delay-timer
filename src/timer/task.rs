@@ -266,13 +266,17 @@ impl<'a> TaskBuilder<'a> {
             RepeatType::Num(repeat_count) => FrequencyInner::CountDown(repeat_count, taskschedule),
         };
 
-        Ok(Task::new(
-            self.task_id,
-            frequency_inner,
-            Box::new(body),
-            self.maximum_running_time,
-            self.maximun_parallel_runable_num,
-        ))
+        let body = SafeStructBoxedFn(Box::new(body));
+
+        Ok(Task {
+            task_id: self.task_id,
+            frequency: frequency_inner,
+            body,
+            maximum_running_time: self.maximum_running_time,
+            cylinder_line: 0,
+            valid: true,
+            maximun_parallel_runable_num: self.maximun_parallel_runable_num,
+        })
     }
 
     // Analyze expressions, get cache.
@@ -296,26 +300,6 @@ impl<'a> TaskBuilder<'a> {
 }
 
 impl Task {
-    #[inline(always)]
-    pub(crate) fn new(
-        task_id: u64,
-        frequency: FrequencyInner,
-        body: SafeBoxFn,
-        maximum_running_time: Option<u64>,
-        maximun_parallel_runable_num: Option<u64>,
-    ) -> Task {
-        let body = SafeStructBoxedFn(body);
-        Task {
-            task_id,
-            frequency,
-            body,
-            maximum_running_time,
-            cylinder_line: 0,
-            valid: true,
-            maximun_parallel_runable_num,
-        }
-    }
-
     // get SafeBoxFn of Task to call.
     #[inline(always)]
     pub(crate) fn get_body(&self) -> &SafeBoxFn {

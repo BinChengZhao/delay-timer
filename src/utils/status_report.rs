@@ -5,19 +5,23 @@ use crate::prelude::*;
 use std::convert::TryFrom;
 
 #[derive(Debug, Clone)]
-struct StatusReport {
+pub struct StatusReporter {
     inner: AsyncReceiver<PublicEvent>,
 }
 
-impl StatusReport {
+impl StatusReporter {
     pub fn get_public_event(&self) -> AnyResult<PublicEvent> {
         let event = self.inner.try_recv()?;
         Ok(event)
     }
+
+    pub(crate) fn new(inner: AsyncReceiver<PublicEvent>) -> Self {
+        Self { inner }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
-enum PublicEvent {
+pub enum PublicEvent {
     RemoveTask(u64),
     CancelTask(u64, i64),
     FinishTask(u64, i64),

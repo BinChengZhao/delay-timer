@@ -15,16 +15,12 @@ use super::timer::{
 };
 use crate::prelude::*;
 
-cfg_tokio_support!(
-    use tokio::runtime::{Builder as TokioBuilder, Runtime};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-);
-
 use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
 
 use snowflake::SnowflakeIdBucket;
+use std::fmt;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
     Arc,
@@ -32,6 +28,15 @@ use std::sync::{
 use std::thread::Builder;
 use std::time::SystemTime;
 use waitmap::WaitMap;
+
+cfg_tokio_support!(
+    use tokio::runtime::{Builder as TokioBuilder, Runtime};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+);
+
+cfg_status_report!(
+    use crate::utils::status_report::StatusReporter;
+);
 
 //TODO: Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
@@ -44,10 +49,43 @@ pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
 //The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 
+/// Builds DelayTimer with custom configuration values.
+///
+/// Methods can be chained in order to set the configuration values. The
+/// DelayTimer is constructed by calling [`build`].
+///
+/// # Examples
+///
+/// ```
+/// use delay_timer::entity::DelayTimerBuilder;
+///
+/// fn main() {
+///     // delay_timer
+///     let delay_timer = DelayTimerBuilder::default()
+///         .enable_status_report()
+///         .build()
+///         .unwrap();
+///
+///     // use delay_timer ...
+/// }
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct DelayTimerBuilder {
+    shared_header: SharedHeader,
+    timer_event_channel: Option<(AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>)>,
+    /// Whether or not to enable the status-report
+    #[cfg(feature = "status-report")]
+    enable_status_report: bool,
+    #[cfg(feature = "status-report")]
+    status_report_channel: Option<(AsyncSender<PublicEvent>, AsyncReceiver<PublicEvent>)>,
+}
+
 pub struct DelayTimer {
     timer_event_sender: TimerEventSender,
     #[allow(dead_code)]
     shared_header: SharedHeader,
+    #[cfg(feature = "status-report")]
+    status_reporter: Option<StatusReporter>,
 }
 
 #[derive(Clone)]
@@ -68,7 +106,19 @@ pub struct SharedHeader {
     pub(crate) snowflakeid_bucket: SnowflakeIdBucket,
 }
 
-#[derive(Clone, Default)]
+impl fmt::Debug for SharedHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("")
+            .field(&self.second_hand)
+            .field(&self.global_time)
+            .field(&self.shared_motivation)
+            .field(&self.runtime_instance)
+            .field(&self.snowflakeid_bucket)
+            .finish()
+    }
+}
+
+#[derive(Clone, Default, Debug)]
 pub(crate) struct RuntimeInstance {
     //smol have no instance.
     #[cfg(feature = "tokio-support")]
@@ -112,44 +162,35 @@ impl Default for SharedHeader {
 
 impl Default for DelayTimer {
     fn default() -> Self {
-        DelayTimer::new()
+        DelayTimerBuilder::default().build()
     }
 }
 
-impl DelayTimer {
-    /// New a DelayTimer.
-    pub fn new() -> DelayTimer {
-        Self::init_by_shared_header(SharedHeader::default())
+impl DelayTimerBuilder {
+    pub fn build(mut self) -> DelayTimer {
+        self.lauch();
+        self.init_delay_timer()
     }
 
-    //TODO:get_status_reporter.
-    // Hot-plug.
-
-    fn init_by_shared_header(shared_header: SharedHeader) -> DelayTimer {
-        //init reader sender for timer-event handle.
-        let (timer_event_sender, timer_event_receiver) = unbounded::<TimerEvent>();
-        let timer = Timer::new(timer_event_sender.clone(), shared_header.clone());
-
-        let event_handle = EventHandle::new(
-            timer_event_receiver,
-            timer_event_sender.clone(),
-            shared_header.clone(),
+    fn lauch(&mut self) {
+        let mut event_handle = EventHandle::new(
+            self.get_timer_event_receiver(),
+            self.get_timer_event_sender(),
+            self.shared_header.clone(),
         );
 
-        let runtimer_kind = shared_header.runtime_instance.kind;
-        let delay_timer = DelayTimer {
-            timer_event_sender,
-            shared_header,
-        };
+        #[cfg(feature = "status-report")]
+        if self.enable_status_report {
+            event_handle.set_status_report_sender(self.get_status_report_sender());
+        }
 
-        //assign task.
-        match runtimer_kind {
-            RuntimeKind::Smol => delay_timer.assign_task(timer, event_handle),
+        let timer = Timer::new(self.get_timer_event_sender(), self.shared_header.clone());
+
+        match self.shared_header.runtime_instance.kind {
+            RuntimeKind::Smol => self.assign_task(timer, event_handle),
             #[cfg(feature = "tokio-support")]
-            RuntimeKind::Tokio => delay_timer.assign_task_by_tokio(timer, event_handle),
+            RuntimeKind::Tokio => self.assign_task_by_tokio(timer, event_handle),
         };
-
-        delay_timer
     }
 
     fn assign_task(&self, timer: Timer, event_handle: EventHandle) {
@@ -177,6 +218,46 @@ impl DelayTimer {
                 })
             })
             .expect("handle_event can't start.");
+    }
+
+    fn init_delay_timer(&mut self) -> DelayTimer {
+        let timer_event_sender = self.get_timer_event_sender();
+
+        let shared_header = self.shared_header.clone();
+        DelayTimer {
+            timer_event_sender,
+            shared_header,
+        }
+    }
+
+    fn get_timer_event_sender(&mut self) -> AsyncSender<TimerEvent> {
+        self.timer_event_channel
+            .get_or_insert_with(unbounded::<TimerEvent>)
+            .0
+            .clone()
+    }
+
+    fn get_timer_event_receiver(&mut self) -> AsyncReceiver<TimerEvent> {
+        self.timer_event_channel
+            .get_or_insert_with(unbounded::<TimerEvent>)
+            .1
+            .clone()
+    }
+}
+
+cfg_status_report! {
+    impl DelayTimerBuilder{
+        pub fn enable_status_report(&mut self) -> &mut Self {
+            self.enable_status_report = true;
+            self
+        }
+    }
+}
+
+impl DelayTimer {
+    /// New a DelayTimer.
+    pub fn new() -> DelayTimer {
+        DelayTimerBuilder::default().build()
     }
 
     cfg_status_report!();
@@ -209,7 +290,7 @@ impl DelayTimer {
 }
 
 cfg_tokio_support!(
-   impl DelayTimer{
+   impl DelayTimerBuilder{
 
     fn assign_task_by_tokio(&self, timer: Timer,event_handle: EventHandle) {
         self.run_async_schedule_by_tokio(timer);
@@ -246,10 +327,8 @@ cfg_tokio_support!(
 
      }
 
-    pub fn new_with_tokio(rt:Option<Arc<Runtime>>) -> DelayTimer {
-        let mut shared_header = SharedHeader::default();
-        shared_header.register_tokio_runtime(rt);
-        Self::init_by_shared_header(shared_header)
+    pub fn tokio_runtime(&mut self, rt:Option<Arc<Runtime>>) {
+        self.shared_header.register_tokio_runtime(rt);
     }
    }
 
@@ -279,6 +358,25 @@ cfg_tokio_support!(
         }
     }
 
+
+);
+
+cfg_status_report!(
+    impl DelayTimerBuilder{
+        fn get_status_report_sender(&mut self) -> AsyncSender<PublicEvent> {
+            self.timer_event_channel
+                .get_or_insert_with(unbounded::<PublicEvent>)
+                .0
+                .clone()
+        }
+
+        fn get_status_report_receiver(&mut self) -> AsyncReceiver<PublicEvent> {
+            self.timer_event_channel
+                .get_or_insert_with(unbounded::<PublicEvent>)
+                .1
+                .clone()
+        }
+       }
 
 );
 
