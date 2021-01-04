@@ -6,8 +6,22 @@ use std::thread::{current, park, Thread};
 //When you try to run that's example nedd add feature `tokio-support`.
 //cargo run --example=cycle_tokio_task --features=tokio-support
 
+enum AuspiciousDay {
+    Work,
+    Wake
+}
+
+impl Into<CandyCronStr> for AuspiciousDay {
+    fn into(self) -> CandyCronStr {
+        match self {
+            Self::Work => CandyCronStr("10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+            Self::Wake => CandyCronStr("0 * * * Jan-Dec * 2020-2100"),
+        }
+    }
+}
+
 fn main() {
-    let delay_timer = DelayTimer::new_with_tokio(None);
+    let delay_timer = DelayTimerBuilder::default().build();
     let task_builder = TaskBuilder::default();
     delay_timer.add_task(build_task(task_builder)).unwrap();
     delay_timer.add_task(build_wake_task(task_builder)).unwrap();
@@ -19,11 +33,8 @@ fn main() {
 fn build_task(mut task_builder: TaskBuilder) -> Task {
     let body = generate_closure_template("'delay_timer-is-easy-to-use.'".into());
 
-    //TODO:use candy.
     task_builder
-        .set_frequency(Frequency::Repeated(
-            "10,15,25,50 0/1 * * Jan-Dec * 2020-2100",
-        ))
+        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousDay::Work))
         .set_task_id(5)
         .set_maximum_running_time(15)
         .spawn(body)
@@ -31,7 +42,6 @@ fn build_task(mut task_builder: TaskBuilder) -> Task {
 }
 
 fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
-    // let body = create_default_delay_task_handler;
     let thread: Thread = current();
     let body = move |_| {
         println!("bye bye");
@@ -39,9 +49,8 @@ fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
         create_default_delay_task_handler()
     };
 
-    //TODO:use candy.
     task_builder
-        .set_frequency(Frequency::Once("0 * * * Jan-Dec * 2020-2100"))
+        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousDay::Wake))
         .set_task_id(7)
         .set_maximum_running_time(50)
         .spawn(body)

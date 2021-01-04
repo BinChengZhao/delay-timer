@@ -36,6 +36,7 @@ cfg_tokio_support!(
 
 cfg_status_report!(
     use crate::utils::status_report::StatusReporter;
+    use anyhow::anyhow;
 );
 
 //TODO: Set it. Motivation to move forward.
@@ -59,7 +60,6 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 /// ```
 /// use delay_timer::entity::DelayTimerBuilder;
 ///
-/// fn main() {
 ///     // delay_timer
 ///     let delay_timer = DelayTimerBuilder::default()
 ///         .enable_status_report()
@@ -67,7 +67,6 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 ///         .unwrap();
 ///
 ///     // use delay_timer ...
-/// }
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct DelayTimerBuilder {
@@ -80,6 +79,7 @@ pub struct DelayTimerBuilder {
     status_report_channel: Option<(AsyncSender<PublicEvent>, AsyncReceiver<PublicEvent>)>,
 }
 
+#[derive(Clone, Debug)]
 pub struct DelayTimer {
     #[allow(dead_code)]
     shared_header: SharedHeader,
@@ -257,29 +257,11 @@ impl DelayTimerBuilder {
     }
 }
 
-cfg_status_report! {
-    impl DelayTimerBuilder{
-        pub fn enable_status_report(&mut self) -> &mut Self {
-            self.enable_status_report = true;
-            self
-        }
-    }
-
-    impl DelayTimer{
-
-        pub fn take_status_reporter(&mut self) -> Option<StatusReporter> {
-            self.status_reporter.take()
-        }
-    }
-}
-
 impl DelayTimer {
     /// New a DelayTimer.
     pub fn new() -> DelayTimer {
         DelayTimerBuilder::default().build()
     }
-
-    cfg_status_report!();
 
     /// Add a task in timer_core by event-channel.
     pub fn add_task(&self, task: Task) -> Result<()> {
@@ -378,10 +360,17 @@ cfg_tokio_support!(
     }
 
 
+
 );
 
 cfg_status_report!(
     impl DelayTimerBuilder{
+
+        pub fn enable_status_report(&mut self) -> &mut Self {
+            self.enable_status_report = true;
+            self
+        }
+
         fn get_status_report_sender(&mut self) -> AsyncSender<PublicEvent> {
             self.status_report_channel
                 .get_or_insert_with(unbounded::<PublicEvent>)
@@ -397,15 +386,29 @@ cfg_status_report!(
         }
        }
 
+
+    impl DelayTimer{
+
+        pub fn take_status_reporter(&mut self) -> Option<StatusReporter> {
+            self.status_reporter.take()
+        }
+
+        pub fn get_public_event(&self) ->anyhow::Result<PublicEvent> {
+         if let Some(status_reporter) = self.status_reporter.as_ref(){
+          return status_reporter.get_public_event();
+         }
+
+         Err(anyhow!("Have no status-reporter."))
+        }
+    }
+
 );
 
-//TODO: Translate to english.
-//usein LRU cache...
-//线程全局的lru缓存，
-
-//以后spawn，任务就只用 几百ns了。
-
-///get current OS SystemTime.
+//TODO: Since the system clock may be adjusted,
+// an internal time should be maintained
+// to get rid of system interference,
+// and this change can also be applied to snowflake-rs.
+/// get current OS SystemTime.
 pub fn get_timestamp() -> u64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs(),

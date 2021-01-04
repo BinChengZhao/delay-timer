@@ -50,8 +50,7 @@ pub mod shell_command {
                 .map(|c| c.try_wait())
                 .collect::<Vec<IoResult<Option<ExitStatus>>>>()
                 .into_iter()
-                .find(|c| matches!(c, Ok(None)))
-                .is_some()
+                .any(|c| matches!(c, Ok(None)))
         }
     }
 

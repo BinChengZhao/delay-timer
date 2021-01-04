@@ -41,7 +41,7 @@ impl TaskMark {
     }
 
     pub(crate) fn inc_parallel_runable_num(&mut self) {
-        self.parallel_runable_num = self.parallel_runable_num + 1;
+        self.parallel_runable_num += 1;
     }
 
     pub(crate) fn dec_parallel_runable_num(&mut self) {

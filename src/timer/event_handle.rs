@@ -122,7 +122,6 @@ pub(crate) struct RecyclingBinWorker {
 }
 
 impl EventHandle {
-
     fn recycling_task(&mut self) {
         async_spawn(
             self.sub_wokers
@@ -328,7 +327,7 @@ impl EventHandleBuilder {
 
 impl SubWorkers {
     fn new(timer_event_sender: TimerEventSender) -> Self {
-        let recycling_bin_woker = RecyclingBinWorker::new(timer_event_sender.clone());
+        let recycling_bin_woker = RecyclingBinWorker::new(timer_event_sender);
 
         SubWorkers {
             recycling_bin_woker,
