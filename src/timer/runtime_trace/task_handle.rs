@@ -213,6 +213,12 @@ impl DelayTaskHandler for ChildGuardList {
     }
 }
 
+impl DelayTaskHandler for () {
+    fn quit(self: Box<Self>) -> Result<()> {
+        Ok(())
+    }
+}
+
 //When SmolTask is dropped, async task is cancel.
 impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<T> {
     fn quit(self: Box<Self>) -> Result<()> {

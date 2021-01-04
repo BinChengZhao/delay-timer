@@ -9,7 +9,7 @@
 //!
 //! 1. Mission deployment.
 use super::timer::{
-    event_handle::EventHandle,
+    event_handle::{EventHandle, EventHandleBuilder},
     task::{Task, TaskMark},
     timer_core::{Slot, Timer, TimerEvent, DEFAULT_TIMER_SLOT_COUNT},
 };
@@ -81,9 +81,9 @@ pub struct DelayTimerBuilder {
 }
 
 pub struct DelayTimer {
-    timer_event_sender: TimerEventSender,
     #[allow(dead_code)]
     shared_header: SharedHeader,
+    timer_event_sender: TimerEventSender,
     #[cfg(feature = "status-report")]
     status_reporter: Option<StatusReporter>,
 }
@@ -173,16 +173,18 @@ impl DelayTimerBuilder {
     }
 
     fn lauch(&mut self) {
-        let mut event_handle = EventHandle::new(
-            self.get_timer_event_receiver(),
-            self.get_timer_event_sender(),
-            self.shared_header.clone(),
-        );
+        let mut event_handle_builder = EventHandleBuilder::default();
+        event_handle_builder
+            .timer_event_receiver(self.get_timer_event_receiver())
+            .timer_event_sender(self.get_timer_event_sender())
+            .shared_header(self.shared_header.clone());
 
         #[cfg(feature = "status-report")]
         if self.enable_status_report {
-            event_handle.set_status_report_sender(self.get_status_report_sender());
+            event_handle_builder.status_report_sender(self.get_status_report_sender());
         }
+
+        let event_handle = event_handle_builder.build();
 
         let timer = Timer::new(self.get_timer_event_sender(), self.shared_header.clone());
 
@@ -211,22 +213,32 @@ impl DelayTimerBuilder {
 
     fn run_event_handle(&self, mut event_handle: EventHandle) {
         Builder::new()
-            .name("handle_event".into())
+            .name("event_handle".into())
             .spawn(move || {
                 block_on(async {
-                    event_handle.handle_event().await;
+                    event_handle.lauch().await;
                 })
             })
-            .expect("handle_event can't start.");
+            .expect("event_handle can't start.");
     }
 
     fn init_delay_timer(&mut self) -> DelayTimer {
         let timer_event_sender = self.get_timer_event_sender();
 
         let shared_header = self.shared_header.clone();
+
+        #[cfg(feature = "status-report")]
+        let mut status_reporter = None;
+        #[cfg(feature = "status-report")]
+        if self.enable_status_report {
+            status_reporter = Some(StatusReporter::new(self.get_status_report_receiver()));
+        }
+
         DelayTimer {
-            timer_event_sender,
             shared_header,
+            timer_event_sender,
+            #[cfg(feature = "status-report")]
+            status_reporter,
         }
     }
 
@@ -250,6 +262,13 @@ cfg_status_report! {
         pub fn enable_status_report(&mut self) -> &mut Self {
             self.enable_status_report = true;
             self
+        }
+    }
+
+    impl DelayTimer{
+
+        pub fn take_status_reporter(&mut self) -> Option<StatusReporter> {
+            self.status_reporter.take()
         }
     }
 }
@@ -316,13 +335,13 @@ cfg_tokio_support!(
         if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner {
             let tokio_runtime = tokio_runtime_ref.clone();
             Builder::new()
-                .name("handle_event_tokio".into())
+                .name("event_handle_tokio".into())
                 .spawn(move || {
                     tokio_runtime.block_on(async {
-                        event_handle.handle_event().await;
+                        event_handle.lauch().await;
                     })
                 })
-                .expect("run_event_handle_by_tokio can't start.");
+                .expect("event_handle_handle_by_tokio can't start.");
         }
 
      }
@@ -364,14 +383,14 @@ cfg_tokio_support!(
 cfg_status_report!(
     impl DelayTimerBuilder{
         fn get_status_report_sender(&mut self) -> AsyncSender<PublicEvent> {
-            self.timer_event_channel
+            self.status_report_channel
                 .get_or_insert_with(unbounded::<PublicEvent>)
                 .0
                 .clone()
         }
 
         fn get_status_report_receiver(&mut self) -> AsyncReceiver<PublicEvent> {
-            self.timer_event_channel
+            self.status_report_channel
                 .get_or_insert_with(unbounded::<PublicEvent>)
                 .1
                 .clone()

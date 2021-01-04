@@ -25,24 +25,88 @@ use std::sync::{
 };
 use waitmap::WaitMap;
 
+cfg_status_report!(
+    use std::convert::TryFrom;
+    type StatusReportSender = Option<AsyncSender<PublicEvent>>;
+);
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EventHandleBuilder {
+    //Shared header information.
+    pub(crate) shared_header: Option<SharedHeader>,
+    //The core of the event recipient, dealing with the global event.
+    pub(crate) timer_event_receiver: Option<TimerEventReceiver>,
+    pub(crate) timer_event_sender: Option<TimerEventSender>,
+    #[warn(dead_code)]
+    #[cfg(feature = "status-report")]
+    pub(crate) status_report_sender: StatusReportSender,
+}
+
+impl EventHandleBuilder {
+    pub(crate) fn timer_event_receiver(
+        &mut self,
+        timer_event_receiver: TimerEventReceiver,
+    ) -> &mut Self {
+        self.timer_event_receiver = Some(timer_event_receiver);
+        self
+    }
+
+    pub(crate) fn timer_event_sender(&mut self, timer_event_sender: TimerEventSender) -> &mut Self {
+        self.timer_event_sender = Some(timer_event_sender);
+        self
+    }
+
+    pub(crate) fn shared_header(&mut self, shared_header: SharedHeader) -> &mut Self {
+        self.shared_header = Some(shared_header);
+        self
+    }
+
+    pub(crate) fn build(self) -> EventHandle {
+        let task_trace = TaskTrace::default();
+        let sub_wokers = SubWorkers::new(self.timer_event_sender.unwrap());
+
+        let timer_event_receiver = self.timer_event_receiver.unwrap();
+        let shared_header = self.shared_header.unwrap();
+        #[cfg(feature = "status-report")]
+        let status_report_sender = self.status_report_sender;
+
+        EventHandle {
+            shared_header,
+            task_trace,
+            timer_event_receiver,
+            sub_wokers,
+            #[cfg(feature = "status-report")]
+            status_report_sender,
+        }
+    }
+}
+
+/// New a instance of EventHandle.
+///
+/// The parameter `timer_event_receiver` is used by EventHandle
+/// to accept all internal events.
+///
+/// event may come from user application or sub-worker.
+///
+/// The parameter `timer_event_sender` is used by sub-workers
+/// report processed events.
+///
+/// The paramete `shared_header` is used to shared delay-timer core data.
 // TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
 // maybe cancelAll msg before last `update msg`  check the
 // flag_map slotid with biggest task-slotid in trace, if has one delay, send a msg for recycleer
 // let it to trash the last taskhandle.
 pub(crate) struct EventHandle {
+    //Shared header information.
+    pub(crate) shared_header: SharedHeader,
     //Task Handle Collector, which makes it easy to cancel a running task.
     pub(crate) task_trace: TaskTrace,
     //The core of the event recipient, dealing with the global event.
     pub(crate) timer_event_receiver: TimerEventReceiver,
-    //TODO:Reporter.
-    #[warn(dead_code)]
     #[cfg(feature = "status-report")]
     pub(crate) status_report_sender: Option<AsyncSender<PublicEvent>>,
     //The sub-workers of EventHandle.
     pub(crate) sub_wokers: SubWorkers,
-    //Shared header information.
-    pub(crate) shared_header: SharedHeader,
 }
 
 /// These sub-workers are the left and right arms of `EventHandle`
@@ -58,32 +122,6 @@ pub(crate) struct RecyclingBinWorker {
 }
 
 impl EventHandle {
-    /// New a instance of EventHandle.
-    ///
-    /// The first parameter `timer_event_receiver` is used by EventHandle
-    /// to accept all internal events.
-    ///
-    /// event may come from user application or sub-worker.
-    ///
-    /// The second parameter `timer_event_sender` is used by sub-workers
-    /// report processed events.
-    ///
-    /// The thrid parameter is used to shared delay-timer core data.
-    pub(crate) fn new(
-        timer_event_receiver: TimerEventReceiver,
-        timer_event_sender: TimerEventSender,
-        shared_header: SharedHeader,
-    ) -> Self {
-        let task_trace = TaskTrace::default();
-        let sub_wokers = SubWorkers::new(timer_event_sender);
-
-        EventHandle {
-            task_trace,
-            timer_event_receiver,
-            sub_wokers,
-            shared_header,
-        }
-    }
 
     fn recycling_task(&mut self) {
         async_spawn(
@@ -114,12 +152,9 @@ impl EventHandle {
 
     //handle all event.
     //TODO:Add TestUnit.
-    pub(crate) async fn handle_event(&mut self) {
+    pub(crate) async fn lauch(&mut self) {
         self.init_sub_workers();
-
-        while let Ok(event) = self.timer_event_receiver.recv().await {
-            self.event_dispatch(event).await;
-        }
+        self.handle_event().await;
     }
 
     fn init_sub_workers(&mut self) {
@@ -130,6 +165,26 @@ impl EventHandle {
             #[cfg(feature = "tokio-support")]
             RuntimeKind::Tokio => self.recycling_task_by_tokio(),
         };
+    }
+
+    async fn handle_event(&mut self) {
+        #[cfg(feature = "status-report")]
+        if let Some(status_report_sender) = self.status_report_sender.take() {
+            while let Ok(event) = self.timer_event_receiver.recv().await {
+                if let Ok(public_event) = PublicEvent::try_from(&event) {
+                    status_report_sender
+                        .send(public_event)
+                        .await
+                        .unwrap_or_else(|e| print!("{}", e));
+                }
+                self.event_dispatch(event).await;
+            }
+            return;
+        }
+
+        while let Ok(event) = self.timer_event_receiver.recv().await {
+            self.event_dispatch(event).await;
+        }
     }
 
     pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) {
@@ -260,14 +315,15 @@ impl EventHandle {
 }
 
 cfg_status_report!(
-   impl EventHandle{
-    pub(crate) fn set_status_report_sender(
+impl EventHandleBuilder {
+    pub(crate) fn status_report_sender(
         &mut self,
         status_report_sender: AsyncSender<PublicEvent>,
-    ) {
+    ) -> &mut Self {
         self.status_report_sender = Some(status_report_sender);
+        self
     }
-   }
+}
 );
 
 impl SubWorkers {
