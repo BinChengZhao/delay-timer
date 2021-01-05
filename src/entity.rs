@@ -60,13 +60,7 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 /// ```
 /// use delay_timer::entity::DelayTimerBuilder;
 ///
-///     // delay_timer
-///     let delay_timer = DelayTimerBuilder::default()
-///         .enable_status_report()
-///         .build()
-///         .unwrap();
 ///
-///     // use delay_timer ...
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct DelayTimerBuilder {
@@ -293,7 +287,7 @@ impl DelayTimer {
 cfg_tokio_support!(
    impl DelayTimerBuilder{
 
-    fn assign_task_by_tokio(&self, timer: Timer,event_handle: EventHandle) {
+    fn assign_task_by_tokio(&mut self, timer: Timer,event_handle: EventHandle) {
         self.run_async_schedule_by_tokio(timer);
         self.run_event_handle_by_tokio(event_handle);
     }
@@ -364,44 +358,41 @@ cfg_tokio_support!(
 );
 
 cfg_status_report!(
-    impl DelayTimerBuilder{
-
-        pub fn enable_status_report(&mut self) -> &mut Self {
+    impl DelayTimerBuilder {
+        pub fn enable_status_report(mut self) -> Self {
             self.enable_status_report = true;
             self
         }
-
+    
         fn get_status_report_sender(&mut self) -> AsyncSender<PublicEvent> {
             self.status_report_channel
                 .get_or_insert_with(unbounded::<PublicEvent>)
                 .0
                 .clone()
         }
-
+    
         fn get_status_report_receiver(&mut self) -> AsyncReceiver<PublicEvent> {
             self.status_report_channel
                 .get_or_insert_with(unbounded::<PublicEvent>)
                 .1
                 .clone()
         }
-       }
-
-
-    impl DelayTimer{
-
+    }
+    
+    impl DelayTimer {
         pub fn take_status_reporter(&mut self) -> Option<StatusReporter> {
             self.status_reporter.take()
         }
-
-        pub fn get_public_event(&self) ->anyhow::Result<PublicEvent> {
-         if let Some(status_reporter) = self.status_reporter.as_ref(){
-          return status_reporter.get_public_event();
-         }
-
-         Err(anyhow!("Have no status-reporter."))
+    
+        pub fn get_public_event(&self) -> anyhow::Result<PublicEvent> {
+            if let Some(status_reporter) = self.status_reporter.as_ref() {
+                return status_reporter.get_public_event();
+            }
+    
+            Err(anyhow!("Have no status-reporter."))
         }
     }
-
+    
 );
 
 //TODO: Since the system clock may be adjusted,

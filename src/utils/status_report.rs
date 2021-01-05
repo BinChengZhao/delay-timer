@@ -11,7 +11,7 @@ pub struct StatusReporter {
 
 impl StatusReporter {
     pub fn get_public_event(&self) -> AnyResult<PublicEvent> {
-        let event = self.inner.try_recv()?;
+        let event = dbg!(self.inner.try_recv())?;
         Ok(event)
     }
 
@@ -40,6 +40,24 @@ impl TryFrom<&TimerEvent> for PublicEvent {
                 Ok(PublicEvent::FinishTask(*task_id, *record_id))
             }
             _ => Err("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!"),
+        }
+    }
+}
+
+impl PublicEvent {
+   pub fn get_task_id(&self) -> u64 {
+        match self {
+            PublicEvent::RemoveTask(ref task_id) => *task_id,
+            PublicEvent::CancelTask(ref task_id, _) => *task_id,
+            PublicEvent::FinishTask(ref task_id, _) => *task_id,
+        }
+    }
+
+   pub fn get_record_id(&self) -> Option<i64> {
+        match self {
+            PublicEvent::RemoveTask(_) => None,
+            PublicEvent::CancelTask(_,ref record_id) => Some(*record_id),
+            PublicEvent::FinishTask(_,ref record_id) => Some(*record_id),
         }
     }
 }

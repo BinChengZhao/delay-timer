@@ -22,9 +22,9 @@ name = "delay_timer"
 [features]
 default = []
 tokio-full = ["tokio-support","status-report"]
-smol-full = ["status-report"]
 tokio-support = ["tokio"]
 status-report = []
+full = ["tokio-full"]
 
 
 [dependencies]
@@ -72,7 +72,7 @@ required-features = ["tokio-support"]
 [[example]]
 name = "demo"
 path = "examples/demo.rs"
-required-features = []
+required-features = ["full"]
 
 
 #[[bench]]

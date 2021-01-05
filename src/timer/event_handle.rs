@@ -172,7 +172,7 @@ impl EventHandle {
             while let Ok(event) = self.timer_event_receiver.recv().await {
                 if let Ok(public_event) = PublicEvent::try_from(&event) {
                     status_report_sender
-                        .send(public_event)
+                        .send(dbg!(public_event))
                         .await
                         .unwrap_or_else(|e| print!("{}", e));
                 }
