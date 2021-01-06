@@ -1,12 +1,10 @@
 use crate::prelude::*;
 
-use smol::channel::TryRecvError::*;
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse};
+use std::collections::BinaryHeap;
+use std::sync::Arc;
 
-use std::{
-    cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse},
-    collections::BinaryHeap,
-    sync::Arc,
-};
+use smol::channel::TryRecvError::*;
 
 #[derive(Default, Eq, Debug, Copy, Clone)]
 /// recycle unit.
@@ -130,14 +128,6 @@ impl RecyclingBins {
             .unwrap_or_else(|e| println!("{}", e));
     }
 
-    // cfg_tokio_support!(
-    //     pub(crate) async fn send_timer_event(&self, event: TimerEvent) {
-    //         self.timer_event_sender
-    //             .send(event)
-    //             .unwrap_or_else(|e| println!("{}", e));
-    //     }
-    // );
-    /// alternate run fn between recycle and  add_recycle_unit.
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {
         'loopLayer: loop {
             'forLayer: for _ in 0..200 {

@@ -1,12 +1,14 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
 use crate::prelude::*;
-use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
-use lru::LruCache;
+
 use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
 use std::thread::AccessError;
+
+use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
+use lru::LruCache;
 
 //TODO: Add doc.
 thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<String, ScheduleIteratorOwned<Utc>>> = RefCell::new(LruCache::new(256)));
@@ -48,7 +50,6 @@ impl TaskMark {
         self.parallel_runable_num = self.parallel_runable_num.checked_sub(1).unwrap_or_default();
     }
 }
-//TODO: Add CronCandy version.
 
 #[derive(Debug, Copy, Clone)]
 ///Enumerated values of repeating types.
@@ -120,8 +121,6 @@ pub struct TaskBuilder<'a> {
     ///Maximum parallel runable num (optional).
     maximun_parallel_runable_num: Option<u64>,
 }
-
-//TODO: 张老师建议参考 ruby 那些库，设计的很人性化.
 
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
 type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
@@ -243,7 +242,10 @@ impl<'a> TaskBuilder<'a> {
     }
 
     #[inline(always)]
-    pub fn set_maximun_parallel_runable_num(&mut self, maximun_parallel_runable_num: u64) ->&mut Self {
+    pub fn set_maximun_parallel_runable_num(
+        &mut self,
+        maximun_parallel_runable_num: u64,
+    ) -> &mut Self {
         self.maximun_parallel_runable_num = Some(maximun_parallel_runable_num);
         self
     }
@@ -399,7 +401,7 @@ mod tests {
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
         let mut task: Task = task_builder
-            .spawn(|context| create_default_delay_task_handler())
+            .spawn(|_context| create_default_delay_task_handler())
             .unwrap();
 
         assert!(task.down_count_and_set_vaild());
@@ -416,7 +418,7 @@ mod tests {
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
         let mut task: Task = task_builder
-            .spawn(|context| create_default_delay_task_handler())
+            .spawn(|_context| create_default_delay_task_handler())
             .unwrap();
 
         assert!(task.is_can_running());
@@ -438,7 +440,7 @@ mod tests {
         //The third run returns to an invalid state.
         task_builder.set_frequency_by_candy(CandyFrequency::CountDown(5, CandyCron::Minutely));
         let mut task: Task = task_builder
-            .spawn(|context| create_default_delay_task_handler())
+            .spawn(|_context| create_default_delay_task_handler())
             .unwrap();
 
         assert!(task.is_can_running());

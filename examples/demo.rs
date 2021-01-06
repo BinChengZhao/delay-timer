@@ -19,8 +19,8 @@ fn main() {
     delay_timer.add_task(build_task3(task_builder)).unwrap();
     delay_timer.add_task(build_task5(task_builder)).unwrap();
 
+    // Let's do someting about 2s.
     sleep(Duration::new(2, 1_000_000));
-
 
     let task1_record_id = filter_task_recodeid(&delay_timer, |&x| x.get_task_id() == 1).unwrap();
     delay_timer.cancel_task(1, task1_record_id);

@@ -8,25 +8,25 @@
 //! User applications can be served through the lib used by DelayTimer:
 //!
 //! 1. Mission deployment.
+
 use super::timer::{
     event_handle::{EventHandle, EventHandleBuilder},
     task::{Task, TaskMark},
-    timer_core::{Slot, Timer, TimerEvent, DEFAULT_TIMER_SLOT_COUNT},
+    timer_core::{Timer, TimerEvent, DEFAULT_TIMER_SLOT_COUNT},
+    Slot,
 };
 use crate::prelude::*;
+
+use std::fmt;
+use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::Arc;
+use std::thread::Builder;
+use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
-
 use snowflake::SnowflakeIdBucket;
-use std::fmt;
-use std::sync::{
-    atomic::{AtomicBool, AtomicU64},
-    Arc,
-};
-use std::thread::Builder;
-use std::time::SystemTime;
 use waitmap::WaitMap;
 
 cfg_tokio_support!(
@@ -39,7 +39,7 @@ cfg_status_report!(
     use anyhow::anyhow;
 );
 
-//TODO: Set it. Motivation to move forward.
+//Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
 //Global sencond hand.
 pub(crate) type SencondHand = Arc<AtomicU64>;
@@ -364,14 +364,14 @@ cfg_status_report!(
             self.enable_status_report = true;
             self
         }
-    
+
         fn get_status_report_sender(&mut self) -> AsyncSender<PublicEvent> {
             self.status_report_channel
                 .get_or_insert_with(unbounded::<PublicEvent>)
                 .0
                 .clone()
         }
-    
+
         fn get_status_report_receiver(&mut self) -> AsyncReceiver<PublicEvent> {
             self.status_report_channel
                 .get_or_insert_with(unbounded::<PublicEvent>)
@@ -379,21 +379,21 @@ cfg_status_report!(
                 .clone()
         }
     }
-    
+
     impl DelayTimer {
         pub fn take_status_reporter(&mut self) -> Option<StatusReporter> {
             self.status_reporter.take()
         }
-    
+
         pub fn get_public_event(&self) -> anyhow::Result<PublicEvent> {
             if let Some(status_reporter) = self.status_reporter.as_ref() {
                 return status_reporter.get_public_event();
             }
-    
+
             Err(anyhow!("Have no status-reporter."))
         }
     }
-    
+
 );
 
 //TODO: Since the system clock may be adjusted,

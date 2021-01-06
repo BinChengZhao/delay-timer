@@ -178,16 +178,4 @@ pub mod shell_command {
         let stdio_file = file_tmp.open(os_filename)?;
         Ok(stdio_file)
     }
-
-    //error record.
-    //sub_command = input.trim().split(">>").rev();
-    //因为 ">>" 作为一个Patten，内部关联类型Searcher会生成一个 StrSearcher<'a, 'b>
-    //StrSearcher<'a, 'b>上面没有标签trait DoubleEndedSearcher
-    //所以不满足
-    //  impl<'a, P> DoubleEndedIterator for Split<'a, P>
-    //  where
-    //     P: Pattern<'a>,
-    //     <P as Pattern<'a>>::Searcher: DoubleEndedSearcher<'a>,
-    //所以不能使用DoubleEndedIterator的，rev方法
-    //ps: 'x' is char "x" is str.
 }

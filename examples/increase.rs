@@ -51,7 +51,7 @@ fn main() {
 fn get_increase_fn(
     run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
 ) -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
-    move |context| {
+    move |_context| {
         let local_run_flag = run_flag_ref.unwrap().as_ptr();
 
         unsafe {
@@ -65,7 +65,7 @@ fn get_end_fn(
     thread: Thread,
     run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
 ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
-    move |context| {
+    move |_context| {
         let local_run_flag = run_flag_ref.unwrap().as_ptr();
         unsafe {
             println!(

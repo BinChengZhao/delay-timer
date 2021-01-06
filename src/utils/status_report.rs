@@ -1,6 +1,5 @@
-// status_report is mod  for report node heathy
-// if open feature status-report, then compile that mod .
-// mapping
+/// `StatusReporter` is to expose the necessary operational information
+/// to the outside world.
 use crate::prelude::*;
 use std::convert::TryFrom;
 

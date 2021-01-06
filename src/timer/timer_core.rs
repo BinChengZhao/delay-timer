@@ -1,19 +1,22 @@
 use super::event_handle::SharedHeader;
-pub(crate) use super::runtime_trace::task_handle::DelayTaskHandlerBox;
+use super::runtime_trace::task_handle::DelayTaskHandlerBox;
 use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
-pub(crate) use super::slot::Slot;
-pub(crate) use super::task::Task;
-pub use crate::entity::get_timestamp;
+use super::task::Task;
 use crate::prelude::*;
 
-pub(crate) use super::task::TaskMark;
-pub(crate) use crate::entity::RuntimeKind;
+use crate::entity::get_timestamp;
+use crate::entity::RuntimeKind;
+
 use std::mem::replace;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::time::Duration;
+use std::time::Instant;
+
+use smol::Timer as smolTimer;
 
 pub(crate) const DEFAULT_TIMER_SLOT_COUNT: u64 = 3600;
 
+/// The clock of timer core.
 struct Clock {
     inner: ClockInner,
 }
@@ -75,9 +78,6 @@ cfg_tokio_support!(
     }
 
 );
-
-use smol::Timer as smolTimer;
-use std::time::Instant;
 
 #[derive(Debug)]
 struct SmolClock {
@@ -191,7 +191,6 @@ impl Timer {
                 }
             }
 
-            //FIXME: dependent logic, tokio / smol.
             clock.tick().await;
         }
     }
@@ -206,18 +205,6 @@ impl Timer {
             .await
             .unwrap_or_else(|e| println!("{}", e));
     }
-
-    // cfg_tokio_support!(
-    //     pub(crate) async fn send_timer_event(
-    //         &mut self,
-    //         task_id: u64,
-    //         tmp_task_handler_box: DelayTaskHandlerBox,
-    //     ) {
-    //         self.timer_event_sender
-    //             .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
-    //             .unwrap_or_else(|e| println!("{}", e));
-    //     }
-    // );
 
     #[inline(always)]
     pub async fn maintain_task(

@@ -7,7 +7,6 @@ use std::thread::{current, park, Thread};
 //cargo run --example=cycle_tokio_task --features=tokio-support
 
 fn main() {
-    
     let delay_timer = DelayTimerBuilder::default().tokio_runtime(None).build();
     let task_builder = TaskBuilder::default();
     delay_timer.add_task(build_task(task_builder)).unwrap();
