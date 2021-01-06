@@ -242,6 +242,11 @@ impl<'a> TaskBuilder<'a> {
         self
     }
 
+    #[inline(always)]
+    pub fn set_maximun_parallel_runable_num(&mut self, maximun_parallel_runable_num: u64) ->&mut Self {
+        self.maximun_parallel_runable_num = Some(maximun_parallel_runable_num);
+        self
+    }
     ///Spawn a task.
     pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where

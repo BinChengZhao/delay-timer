@@ -104,7 +104,7 @@ pub(crate) struct EventHandle {
     //The core of the event recipient, dealing with the global event.
     pub(crate) timer_event_receiver: TimerEventReceiver,
     #[cfg(feature = "status-report")]
-    pub(crate) status_report_sender: Option<AsyncSender<PublicEvent>>,
+    pub(crate) status_report_sender: StatusReportSender,
     //The sub-workers of EventHandle.
     pub(crate) sub_wokers: SubWorkers,
 }

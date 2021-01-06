@@ -23,7 +23,7 @@ impl StatusReporter {
 #[derive(Debug, Copy, Clone)]
 pub enum PublicEvent {
     RemoveTask(u64),
-    CancelTask(u64, i64),
+    RunningTask(u64, i64),
     FinishTask(u64, i64),
 }
 
@@ -33,8 +33,8 @@ impl TryFrom<&TimerEvent> for PublicEvent {
     fn try_from(timer_event: &TimerEvent) -> Result<Self, Self::Error> {
         match timer_event {
             TimerEvent::RemoveTask(task_id) => Ok(PublicEvent::RemoveTask(*task_id)),
-            TimerEvent::CancelTask(task_id, record_id) => {
-                Ok(PublicEvent::CancelTask(*task_id, *record_id))
+            TimerEvent::AppendTaskHandle(_, delay_task_handler_box) => {
+                Ok(PublicEvent::RunningTask(delay_task_handler_box.get_task_id(), delay_task_handler_box.get_record_id()))
             }
             TimerEvent::FinishTask(task_id, record_id) => {
                 Ok(PublicEvent::FinishTask(*task_id, *record_id))
@@ -48,7 +48,7 @@ impl PublicEvent {
    pub fn get_task_id(&self) -> u64 {
         match self {
             PublicEvent::RemoveTask(ref task_id) => *task_id,
-            PublicEvent::CancelTask(ref task_id, _) => *task_id,
+            PublicEvent::RunningTask(ref task_id, _) => *task_id,
             PublicEvent::FinishTask(ref task_id, _) => *task_id,
         }
     }
@@ -56,7 +56,7 @@ impl PublicEvent {
    pub fn get_record_id(&self) -> Option<i64> {
         match self {
             PublicEvent::RemoveTask(_) => None,
-            PublicEvent::CancelTask(_,ref record_id) => Some(*record_id),
+            PublicEvent::RunningTask(_,ref record_id) => Some(*record_id),
             PublicEvent::FinishTask(_,ref record_id) => Some(*record_id),
         }
     }

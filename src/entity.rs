@@ -322,8 +322,9 @@ cfg_tokio_support!(
 
      }
 
-    pub fn tokio_runtime(&mut self, rt:Option<Arc<Runtime>>) {
+    pub fn tokio_runtime(mut self, rt:Option<Arc<Runtime>>) ->Self {
         self.shared_header.register_tokio_runtime(rt);
+        self
     }
    }
 

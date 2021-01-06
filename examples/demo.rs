@@ -15,16 +15,15 @@ fn main() {
 
     delay_timer.add_task(build_task1(task_builder)).unwrap();
 
-    // delay_timer.add_task(build_task2(task_builder)).unwrap();
-    // delay_timer.add_task(build_task3(task_builder)).unwrap();
-    // delay_timer.add_task(build_task5(task_builder)).unwrap();
+    delay_timer.add_task(build_task2(task_builder)).unwrap();
+    delay_timer.add_task(build_task3(task_builder)).unwrap();
+    delay_timer.add_task(build_task5(task_builder)).unwrap();
 
     sleep(Duration::new(2, 1_000_000));
 
-    let task1_record_id = filter_task_recodeid(&delay_timer, |&x| x.get_task_id() == 1);
 
-    // let task1_record_id = filter_task_recodeid(&delay_timer, |&x| x.get_task_id() == 1).unwrap();
-    // delay_timer.cancel_task(1, task2_record_id);
+    let task1_record_id = filter_task_recodeid(&delay_timer, |&x| x.get_task_id() == 1).unwrap();
+    delay_timer.cancel_task(1, task1_record_id);
     delay_timer.remove_task(1).unwrap();
 
     delay_timer.add_task(build_wake_task(task_builder)).unwrap();
@@ -34,7 +33,7 @@ fn main() {
 
 fn build_task1(mut task_builder: TaskBuilder) -> Task {
     let body = create_async_fn_body!({
-        println!("create_async_fn_body!--7");
+        println!("create_async_fn_body!");
 
         Timer::after(Duration::from_secs(3)).await;
 
@@ -42,7 +41,8 @@ fn build_task1(mut task_builder: TaskBuilder) -> Task {
     });
     task_builder
         .set_task_id(1)
-        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerSevenSeconds))
+        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_maximun_parallel_runable_num(2)
         .spawn(body)
         .unwrap()
 }
