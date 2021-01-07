@@ -1,28 +1,32 @@
 #![feature(ptr_internals)]
 use delay_timer::prelude::*;
 
-use std::{
-    ptr::Unique,
-    sync::{
-        atomic::{AtomicUsize, Ordering::SeqCst},
-        Arc,
-    },
-    thread::{current, park, Thread},
-};
+use std::ptr::Unique;
+use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+use std::sync::Arc;
+use std::thread::{current, park, Thread};
+
 use surf;
-//TODO:Remember close terminal can speed up because of
-//printnl! block process if stand-pipe if full.
+// Remember close terminal can speed up because of
+// printnl! block process if stand-pipe if full.
 fn main() {
     let delay_timer = DelayTimer::new();
+
+    // The Sync-Task run_flay.
     let mut run_flag = Arc::new(AtomicUsize::new(0));
+    // cross thread share raw-pointer.
     let run_flag_ref: Option<Unique<Arc<AtomicUsize>>> = Unique::new(&mut run_flag);
 
+    // Sync-Task body.
     let body = get_increase_fn(run_flag_ref);
-    let end_body = get_end_fn(current(), run_flag_ref);
+    // Waker-Task body.
+    let end_body = get_wake_fn(current(), run_flag_ref);
+    // Async-Task body.
     let async_body = get_async_fn();
 
     let mut task_builder = TaskBuilder::default();
 
+    // The common task attr.
     task_builder
         .set_frequency(Frequency::CountDown(1, "30 * * * * * *"))
         .set_maximum_running_time(90);
@@ -61,7 +65,7 @@ fn get_increase_fn(
     }
 }
 
-fn get_end_fn(
+fn get_wake_fn(
     thread: Thread,
     run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
 ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> {

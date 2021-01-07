@@ -1,4 +1,3 @@
-///TaskTrace own global task-handle.
 use crate::prelude::*;
 
 use std::collections::{HashMap, LinkedList};
@@ -8,7 +7,7 @@ use anyhow::Result;
 use smol::Task as SmolTask;
 
 #[derive(Default, Debug)]
-// TaskTrace is contanier
+///TaskTrace is contanier that own global task-handle.
 pub(crate) struct TaskTrace {
     inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
 }

@@ -53,7 +53,7 @@ pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 /// Builds DelayTimer with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
-/// DelayTimer is constructed by calling [`build`].
+/// DelayTimer is constructed by calling `build`.
 ///
 /// # Examples
 ///
@@ -285,6 +285,10 @@ impl DelayTimer {
 }
 
 cfg_tokio_support!(
+/// # Required features
+///
+/// This function requires the `tokio-support` feature of the `delay_timer`
+/// crate to be enabled.
    impl DelayTimerBuilder{
 
     fn assign_task_by_tokio(&mut self, timer: Timer,event_handle: EventHandle) {
@@ -359,6 +363,10 @@ cfg_tokio_support!(
 );
 
 cfg_status_report!(
+/// # Required features
+///
+/// This function requires the `status-report` feature of the `delay_timer`
+/// crate to be enabled.
     impl DelayTimerBuilder {
         pub fn enable_status_report(mut self) -> Self {
             self.enable_status_report = true;

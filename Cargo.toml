@@ -21,10 +21,11 @@ name = "delay_timer"
 
 [features]
 default = []
+full = ["tokio-full"]
+
 tokio-full = ["tokio-support","status-report"]
 tokio-support = ["tokio"]
 status-report = []
-full = ["tokio-full"]
 
 
 [dependencies]
@@ -54,15 +55,14 @@ features = ["attributes"]
 
 
 [package.metadata.docs.rs]
-#features = ["status-report"]
-#all-features = true
+all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 # Whether to pass `--no-default-features` to Cargo (default: false)
 no-default-features = true
 
 [package.metadata.playground]
-features = []
+features = ["full", "test-util"]
 
 [[example]]
 name = "cycle_tokio_task"
@@ -78,10 +78,4 @@ required-features = ["full"]
 #[[bench]]
 #name = "demo"
 #path = "benches/demo.rs"
-#required-features = ["full"]
-
-
-#[[test]]
-#name = "demo"
-#path = "tests/demo.rs"
 #required-features = ["full"]

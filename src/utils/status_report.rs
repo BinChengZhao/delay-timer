@@ -1,8 +1,12 @@
-/// `StatusReporter` is to expose the necessary operational information
-/// to the outside world.
+//! `StatusReporter` is to expose the necessary operational information
+//! to the outside world.
 use crate::prelude::*;
 use std::convert::TryFrom;
 
+/// # Required features
+///
+/// This function requires the `status-report` feature of the `delay_timer`
+/// crate to be enabled.
 #[derive(Debug, Clone)]
 pub struct StatusReporter {
     inner: AsyncReceiver<PublicEvent>,
