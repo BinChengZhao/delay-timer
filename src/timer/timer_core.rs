@@ -227,7 +227,7 @@ impl Timer {
             //if runable_task.parallel_runable_num >= task.maximun_parallel_runable_num doesn't run it.
 
             if parallel_runable_num >= maximun_parallel_runable_num {
-                return self.handle_task(task, timestamp, second_hand);
+                return self.handle_task(task, timestamp, second_hand, false);
             }
         }
 
@@ -254,7 +254,7 @@ impl Timer {
             return Some(());
         }
 
-        self.handle_task(task, timestamp, second_hand)
+        self.handle_task(task, timestamp, second_hand, true)
     }
 
     pub(crate) fn handle_task(
@@ -262,6 +262,7 @@ impl Timer {
         mut task: Task,
         timestamp: u64,
         second_hand: u64,
+        update_runable_num:bool
     ) -> Option<()> {
         let task_id: u64 = task.task_id;
 
@@ -287,7 +288,9 @@ impl Timer {
             let mut task_flag_map = self.shared_header.task_flag_map.get_mut(&task_id)?;
 
             task_flag_map.value_mut().set_slot_mark(slot_seed);
-            task_flag_map.value_mut().inc_parallel_runable_num();
+            if update_runable_num {
+                task_flag_map.value_mut().inc_parallel_runable_num();
+            }
         }
         Some(())
     }

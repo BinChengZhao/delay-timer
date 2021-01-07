@@ -266,7 +266,7 @@ impl EventHandle {
             .value_mut()
             .add_task(task);
 
-        TaskMark::new(task_id, slot_seed, 1)
+        TaskMark::new(task_id, slot_seed, 0)
     }
 
     //for record task-mark.
