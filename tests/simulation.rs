@@ -49,11 +49,13 @@ fn test_maximun_parallel_runable_num() {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
+    let share_num_bunshin1 = share_num.clone();
+
 
     // FIXME:Write a new macro to support the generation of a `Fn` closure
     // that requires (multiple calls and consumes a copy of the capture variable ownership)
-    // let body = create_async_fn_body!({
-    //     share_num_bunshin.fetch_add(1, Release);
+    // let body1 = create_async_fn_body!((share_num_bunshin1){
+    //     share_num_bunshin1.fetch_add(1, Release);
     //     Timer::after(Duration::from_secs(9))
     // });
 
@@ -81,7 +83,7 @@ fn test_maximun_parallel_runable_num() {
         .unwrap();
     delay_timer.add_task(task).unwrap();
 
-    for _ in 0..3{
+    for _ in 0..3 {
         park_timeout(Duration::from_micros(3_000_100));
 
         //Testing, whether the mission is performing as expected.

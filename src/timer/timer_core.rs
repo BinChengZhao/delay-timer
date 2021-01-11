@@ -262,7 +262,7 @@ impl Timer {
         mut task: Task,
         timestamp: u64,
         second_hand: u64,
-        update_runable_num:bool
+        update_runable_num: bool,
     ) -> Option<()> {
         let task_id: u64 = task.task_id;
 

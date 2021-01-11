@@ -8,7 +8,7 @@
 #[macro_export]
 macro_rules! create_async_fn_body {
     ($async_body:block) => {
-        |context: TaskContext| {
+        move |context: TaskContext| {
             let f = async move {
                 let future_inner = async move { $async_body };
                 future_inner.await;
@@ -19,6 +19,25 @@ macro_rules! create_async_fn_body {
             create_delay_task_handler(handle)
         }
     };
+
+    //FIXME: By std::concat_idents.
+    // (($($capture_variable:ident),+) $async_body:block) => {
+
+    //     move |context: TaskContext| {
+
+    //         $(
+    //             $capture_variable+"_ref" = $capture_variable.clone();
+    //         )+
+    //         let f = async move {
+    //             let future_inner = async move { $async_body };
+    //             future_inner.await;
+
+    //             context.finishe_task().await;
+    //         };
+    //         let handle = async_spawn(f);
+    //         create_delay_task_handler(handle)
+    //     }
+    // }
 }
 
 cfg_tokio_support!(
