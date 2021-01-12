@@ -5,6 +5,7 @@
 //! refer to generate_closure_template in convenience mod).
 
 /// Create a closure that return a DelayTaskHandel by macro.
+
 #[macro_export]
 macro_rules! create_async_fn_body {
     ($async_body:block) => {
@@ -20,24 +21,25 @@ macro_rules! create_async_fn_body {
         }
     };
 
-    //FIXME: By std::concat_idents.
-    // (($($capture_variable:ident),+) $async_body:block) => {
+    (($($capture_variable:ident),+)$async_body:block) => {
 
-    //     move |context: TaskContext| {
+        move |context: TaskContext| {
 
-    //         $(
-    //             $capture_variable+"_ref" = $capture_variable.clone();
-    //         )+
-    //         let f = async move {
-    //             let future_inner = async move { $async_body };
-    //             future_inner.await;
+            $(
+                concat_idents::concat_idents!(variable_ref_name = $capture_variable, "_ref" {
+                    let variable_ref_name = $capture_variable.clone();
+                });
+            )+
+            let f = async move {
+                let future_inner = async move { $async_body };
+                future_inner.await;
 
-    //             context.finishe_task().await;
-    //         };
-    //         let handle = async_spawn(f);
-    //         create_delay_task_handler(handle)
-    //     }
-    // }
+                context.finishe_task().await;
+            };
+            let handle = async_spawn(f);
+            create_delay_task_handler(handle)
+        }
+    }
 }
 
 cfg_tokio_support!(

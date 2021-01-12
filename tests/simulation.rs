@@ -49,32 +49,14 @@ fn test_maximun_parallel_runable_num() {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
-    let share_num_bunshin1 = share_num.clone();
 
+    let body = create_async_fn_body!((share_num_bunshin){
+        dbg!();
+        share_num_bunshin_ref.fetch_add(1, Release);
+        Timer::after(Duration::from_secs(9)).await;
+        share_num_bunshin_ref.fetch_sub(1, Release);
+    });
 
-    // FIXME:Write a new macro to support the generation of a `Fn` closure
-    // that requires (multiple calls and consumes a copy of the capture variable ownership)
-    // let body1 = create_async_fn_body!((share_num_bunshin1){
-    //     share_num_bunshin1.fetch_add(1, Release);
-    //     Timer::after(Duration::from_secs(9))
-    // });
-
-    let body = move |context: TaskContext| {
-        let share_num_bunshin_ref = share_num_bunshin.clone();
-        let f = async move {
-            let future_inner = async move {
-                dbg!();
-                share_num_bunshin_ref.fetch_add(1, Release);
-                Timer::after(Duration::from_secs(9)).await;
-                share_num_bunshin_ref.fetch_sub(1, Release);
-            };
-            future_inner.await;
-
-            context.finishe_task().await;
-        };
-        let handle = async_spawn(f);
-        create_delay_task_handler(handle)
-    };
     let task = TaskBuilder::default()
         .set_frequency(Frequency::CountDown(9, "* * * * * * *"))
         .set_task_id(1)
