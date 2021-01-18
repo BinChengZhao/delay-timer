@@ -25,6 +25,7 @@ https://docs.rs/delay_timer)
 
 
 ``` rust
+//TODO: Cases should be written short and beautiful .
 fn main() {
     let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
     let task_builder = TaskBuilder::default();
