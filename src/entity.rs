@@ -73,6 +73,7 @@ pub struct DelayTimerBuilder {
     status_report_channel: Option<(AsyncSender<PublicEvent>, AsyncReceiver<PublicEvent>)>,
 }
 
+///TODO: do what.
 #[derive(Clone, Debug)]
 pub struct DelayTimer {
     #[allow(dead_code)]
@@ -82,6 +83,7 @@ pub struct DelayTimer {
     status_reporter: Option<StatusReporter>,
 }
 
+///TODO: do what.
 #[derive(Clone)]
 pub struct SharedHeader {
     //The task wheel has a slot dimension.

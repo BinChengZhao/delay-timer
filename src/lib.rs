@@ -65,25 +65,25 @@
 //!         .spawn(body)
 //!         .unwrap()
 //! }
-//! 
+//!
 //! pub fn generate_closure_template(
 //!     name: String,
 //! ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
 //!     move |context| {
 //!         let future_inner = async_template(get_timestamp() as i32, name.clone());
-//! 
+//!
 //!         let future = async move {
 //!             future_inner.await;
 //!             context.finishe_task().await;
 //!         };
-//! 
+//!
 //!         create_delay_task_handler(async_spawn_by_tokio(future))
 //!     }
 //! }
-//! 
+//!
 //! pub async fn async_template(id: i32, name: String) {
 //!     let client = Client::new();
-//! 
+//!
 //!     let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
 //!     let uri: Uri = url.parse().unwrap();
 //!     let res = client.get(uri).await.unwrap();
@@ -94,8 +94,8 @@
 //! }
 //! ```
 
-
 #![feature(linked_list_cursors)]
+// Backup : https://github.com/contain-rs/linked-list/blob/master/src/lib.rs
 
 //TODO:When the version is stable in the future, we should consider using stable compile unified.
 
