@@ -23,7 +23,7 @@ fn go_works() {
     };
 
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(3, "0/6 * * * * * *"))
+        .set_frequency(Frequency::CountDown(3, "* * * * * * *"))
         .set_task_id(1)
         .spawn(body)
         .unwrap();
@@ -31,16 +31,12 @@ fn go_works() {
 
     let mut i = 0;
 
-    loop {
-        park_timeout(Duration::from_micros(6_100_000));
+    for _ in 0..3 {
+        debug_assert_eq!(i, share_num.load(Acquire));
+        park_timeout(Duration::from_micros(1_100_000));
 
         //Testing, whether the mission is performing as expected.
         i = i + 1;
-        assert_eq!(i, share_num.load(Acquire));
-
-        if i == 3 {
-            break;
-        }
     }
 }
 
@@ -58,7 +54,7 @@ fn test_maximun_parallel_runable_num() {
     });
 
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(9, "* * * * * * *"))
+        .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
         .set_task_id(1)
         .set_maximun_parallel_runable_num(3)
         .spawn(body)

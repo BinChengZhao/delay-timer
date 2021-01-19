@@ -286,7 +286,6 @@ impl Timer {
 
         {
             let mut task_flag_map = self.shared_header.task_flag_map.get_mut(&task_id)?;
-
             task_flag_map.value_mut().set_slot_mark(slot_seed);
             if update_runable_num {
                 task_flag_map.value_mut().inc_parallel_runable_num();

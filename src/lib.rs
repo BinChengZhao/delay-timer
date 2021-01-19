@@ -52,6 +52,36 @@
 //!         .unwrap()
 //! }
 //! ```
+//!
+//!
+//!
+//! Capture the specified environment information and build the closure & task:
+//! ``` rust
+//! let delay_timer = DelayTimer::new();
+//!
+//! let share_num = Arc::new(AtomicUsize::new(0));
+//! let share_num_bunshin = share_num.clone();
+//!
+//! let body = create_async_fn_body!((share_num_bunshin){
+//!     share_num_bunshin_ref.fetch_add(1, Release);
+//!     Timer::after(Duration::from_secs(9)).await;
+//!     share_num_bunshin_ref.fetch_sub(1, Release);
+//! });
+//!
+//! let task = TaskBuilder::default()
+//!     .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
+//!     .set_task_id(1)
+//!     .set_maximun_parallel_runable_num(3)
+//!     .spawn(body)
+//!     .unwrap();
+//!
+//! delay_timer.add_task(task).unwrap();
+//!
+//! debug_assert_eq!(3, share_num.load(Acquire));
+//! ```
+//!
+//!
+//!
 //! Building dynamic future tasks:
 //! ```
 //!
