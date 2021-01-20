@@ -42,7 +42,6 @@ concat-idents = "1.1.1"
 # Optional
 tokio = { version = "~1.0.0", features = ["full"] , optional = true }
 
-
 [dev-dependencies]
 surf = "2.1.0"
 tokio = { version = "~1.0.0", features = ["full"] }
@@ -75,6 +74,10 @@ name = "demo"
 path = "examples/demo.rs"
 required-features = ["full"]
 
+#[[test]]
+#name = "inspect_struct"
+#path = "tests/simulation.rs"
+#required-features = ["full"]
 
 #[[bench]]
 #name = "demo"

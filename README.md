@@ -24,101 +24,178 @@ https://docs.rs/delay_timer)
 ## Examples
 
 
-``` rust
-//TODO: Cases should be written short and beautiful .
-fn main() {
-    let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
-    let task_builder = TaskBuilder::default();
+ ``` rust
 
-    delay_timer.add_task(build_task1(task_builder)).unwrap();
-    delay_timer.add_task(build_task3(task_builder)).unwrap();
-    delay_timer.add_task(build_task5(task_builder)).unwrap();
+ #[macro_use]
+ use delay_timer::prelude::*;
 
-    let task1_record_id = filter_task_recodeid(&delay_timer, |&x| x.get_task_id() == 1).unwrap();
-    delay_timer.cancel_task(1, task1_record_id);
-    delay_timer.remove_task(1).unwrap();
+ use std::str::FromStr;
+ use std::sync::atomic::{
+     AtomicUsize,
+     Ordering::{Acquire, Release},
+ };
+ use std::sync::{atomic::AtomicI32, Arc};
+ use std::thread::{self, park_timeout};
+ use std::time::Duration;
+ use smol::Timer;
+ use hyper::{Client, Uri};
 
-    delay_timer.add_task(build_wake_task(task_builder)).unwrap();
-    park();
-    delay_timer.stop_delay_timer().unwrap();
-}
+ fn main() {
+     let delay_timer = DelayTimerBuilder::default().build();
 
-fn build_task1(mut task_builder: TaskBuilder) -> Task {
-    let body = create_async_fn_body!({
-        println!("create_async_fn_body!");
+     // Add an asynchronous task to delay_timer.
+     delay_timer.add_task(build_task(TaskBuilder::default()));
+     // Since the tasks are executed in 8-second cycles,
+     // we deal with something else.
+     // Do someting about 8s.
+     thread::sleep(Duration::new(8, 1_000_000));
+     delay_timer.remove_task(1);
+     delay_timer.stop_delay_timer();
+ }
 
-        Timer::after(Duration::from_secs(3)).await;
+ fn build_task(mut task_builder: TaskBuilder) -> Task {
+     let body = create_async_fn_body!({
+         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
+         dbg!(res.body_string().await.unwrap());
+     });
 
-        println!("create_async_fn_body:i'success");
-    });
-    task_builder
-        .set_task_id(1)
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
-        .set_maximun_parallel_runable_num(2)
-        .spawn(body)
-        .unwrap()
-}
+     task_builder
+         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerEightSeconds))
+         .set_task_id(2)
+         .set_maximum_running_time(5)
+         .spawn(body)
+         .unwrap()
+ }
+ 
+ enum AuspiciousTime {
+     PerSevenSeconds,
+     PerEightSeconds,
+     LoveTime,
+ }
+
+ impl Into<CandyCronStr> for AuspiciousTime {
+     fn into(self) -> CandyCronStr {
+         match self {
+             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
+             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
+             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+         }
+     }
+ }
+ ```
 
 
-fn build_task3(mut task_builder: TaskBuilder) -> Task {
-    let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
-    task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Minutely))
-        .set_task_id(3)
-        .set_maximum_running_time(5)
-        .spawn(body)
-        .unwrap()
-}
+ Capture the specified environment information and build the closure & task:
 
-fn build_task5(mut task_builder: TaskBuilder) -> Task {
-    let body = generate_closure_template("delay_timer is easy to use. .".into());
-    task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::LoveTime))
-        .set_task_id(5)
-        .set_maximum_running_time(5)
-        .spawn(body)
-        .unwrap()
-}
+ ``` rust
+ #[macro_use]
+ use delay_timer::prelude::*;
 
-pub fn generate_closure_template(
-    name: String,
-) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move |context| {
-        let future_inner = async_template(get_timestamp() as i32, name.clone());
+ use std::str::FromStr;
+ use std::sync::atomic::{
+     AtomicUsize,
+     Ordering::{Acquire, Release},
+ };
+ use std::sync::{atomic::AtomicI32, Arc};
+ use std::thread::{self, park_timeout};
+ use std::time::Duration;
+ use smol::Timer;
+ use hyper::{Client, Uri};
 
-        let future = async move {
-            future_inner.await.unwrap();
-            context.finishe_task().await;
-        };
-        create_delay_task_handler(async_spawn(future))
-    }
-}
 
-pub async fn async_template(id: i32, name: String) -> Result<()> {
-    let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
-    let mut res = surf::get(url).await.unwrap();
-    dbg!(res.body_string().await.unwrap());
+ let delay_timer = DelayTimer::new();
 
-    Ok(())
-}
+ let share_num = Arc::new(AtomicUsize::new(0));
+ let share_num_bunshin = share_num.clone();
 
-fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
-    let thread: Thread = current();
-    let body = move |_| {
-        println!("bye bye");
-        thread.unpark();
-        create_default_delay_task_handler()
-    };
+ let body = create_async_fn_body!((share_num_bunshin){
+     share_num_bunshin_ref.fetch_add(1, Release);
+     Timer::after(Duration::from_secs(9)).await;
+     share_num_bunshin_ref.fetch_sub(1, Release);
+ });
 
-    task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Minutely))
-        .set_task_id(700)
-        .set_maximum_running_time(50)
-        .spawn(body)
-        .unwrap()
-}
-```
+ let task = TaskBuilder::default()
+     .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
+     .set_task_id(1)
+     .set_maximun_parallel_runable_num(3)
+     .spawn(body)
+     .unwrap();
 
+ delay_timer.add_task(task).unwrap();
+
+ ```
+
+
+
+ Building dynamic future tasks:
+ ``` rust
+ #[macro_use]
+ use delay_timer::prelude::*;
+
+ use std::str::FromStr;
+ use std::sync::atomic::{
+     AtomicUsize,
+     Ordering::{Acquire, Release},
+ };
+ use std::sync::{atomic::AtomicI32, Arc};
+ use std::thread::{self, park_timeout};
+ use std::time::Duration;
+ use smol::Timer;
+ use hyper::{Client, Uri};
+
+ fn build_task(mut task_builder: TaskBuilder) -> Task {
+     let body = generate_closure_template(String::from("dynamic"));
+
+     task_builder
+         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerEightSeconds))
+         .set_task_id(2)
+         .set_maximum_running_time(5)
+         .spawn(body)
+         .unwrap()
+ }
+
+ pub fn generate_closure_template(
+     name: String,
+ ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+     move |context| {
+         let future_inner = async_template(get_timestamp() as i32, name.clone());
+
+         let future = async move {
+             future_inner.await;
+             context.finishe_task().await;
+         };
+
+         create_delay_task_handler(async_spawn_by_tokio(future))
+     }
+ }
+
+ pub async fn async_template(id: i32, name: String) {
+     let client = Client::new();
+
+     let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
+      let uri: Uri = url.parse().unwrap();
+      let res = client.get(uri).await.unwrap();
+      println!("Response: {}", res.status());
+      // Concatenate the body stream into a single buffer...
+      let buf = hyper::body::to_bytes(res).await.unwrap();
+      println!("body: {:?}", buf);
+  }
+  enum AuspiciousTime {
+      PerSevenSeconds,
+      PerEightSeconds,
+      LoveTime,
+  }
+ 
+  impl Into<CandyCronStr> for AuspiciousTime {
+      fn into(self) -> CandyCronStr {
+          match self {
+              Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
+              Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
+              Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+         }
+     }
+ }
+ ```
 There's a lot more in the [examples] directory.
 
 

@@ -127,6 +127,8 @@
 //!
 //!
 //! Building dynamic future tasks:
+//  TODO: We cannot set the `required-features` of toml-tag on a document test.
+//  Wating for `https://doc.rust-lang.org/rustdoc/documentation-tests.html` update.
 //! ```
 //! #[macro_use]
 //! use delay_timer::prelude::*;
@@ -166,7 +168,7 @@
 //!             context.finishe_task().await;
 //!         };
 //!
-//!         create_delay_task_handler(async_spawn_by_tokio(future))
+//!         create_delay_task_handler(async_spawn(future))
 //!     }
 //! }
 //!
