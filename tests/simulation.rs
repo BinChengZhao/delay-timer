@@ -1,4 +1,5 @@
 #![feature(ptr_internals)]
+use delay_timer::cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use delay_timer::prelude::*;
 
 use std::str::FromStr;
@@ -13,6 +14,15 @@ use std::time::Duration;
 use smol::Timer;
 #[test]
 fn go_works() {
+    // Coordinates the inner-Runtime with the external(test-thread) clock.
+    let expression = "0/3 * * * * * *";
+    let mut schedule_itertor: ScheduleIteratorOwned<Utc> =
+        Schedule::from_str(expression).unwrap().upcoming_owned(Utc);
+    schedule_itertor.next();
+    let mut next_exec_time;
+    let mut current_time;
+    let mut park_time = 2_000_000u64;
+
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
@@ -23,7 +33,7 @@ fn go_works() {
     };
 
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(3, "* * * * * * *"))
+        .set_frequency(Frequency::CountDown(3, expression))
         .set_task_id(1)
         .spawn(body)
         .unwrap();
@@ -33,10 +43,16 @@ fn go_works() {
 
     for _ in 0..3 {
         debug_assert_eq!(i, share_num.load(Acquire));
-        park_timeout(Duration::from_micros(1_100_000));
+        park_timeout(Duration::from_micros(park_time + 200_000));
 
         //Testing, whether the mission is performing as expected.
         i = i + 1;
+
+        next_exec_time = schedule_itertor.next().unwrap().timestamp_millis() as u128 * 1000;
+        current_time = get_timestamp_micros();
+        park_time = next_exec_time
+            .checked_sub(current_time)
+            .unwrap_or(1_000_000) as u64;
     }
 }
 

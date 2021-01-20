@@ -25,6 +25,21 @@
 //! Next:
 //!
 //! ``` rust
+//!
+//! #[macro_use]
+//! use delay_timer::prelude::*;
+//!
+//! use std::str::FromStr;
+//! use std::sync::atomic::{
+//!     AtomicUsize,
+//!     Ordering::{Acquire, Release},
+//! };
+//! use std::sync::{atomic::AtomicI32, Arc};
+//! use std::thread::{self, park_timeout};
+//! use std::time::Duration;
+//! use smol::Timer;
+//! use hyper::{Client, Uri};
+//!
 //! fn main() {
 //!     let delay_timer = DelayTimerBuilder::default().build();
 //!
@@ -33,7 +48,7 @@
 //!     // Since the tasks are executed in 8-second cycles,
 //!     // we deal with something else.
 //!     // Do someting about 8s.
-//!     sleep(Duration::new(8, 1_000_000));
+//!     thread::sleep(Duration::new(8, 1_000_000));
 //!     delay_timer.remove_task(1);
 //!     delay_timer.stop_delay_timer();
 //! }
@@ -51,12 +66,42 @@
 //!         .spawn(body)
 //!         .unwrap()
 //! }
+//! enum AuspiciousTime {
+//!     PerSevenSeconds,
+//!     PerEightSeconds,
+//!     LoveTime,
+//! }
+//!
+//! impl Into<CandyCronStr> for AuspiciousTime {
+//!     fn into(self) -> CandyCronStr {
+//!         match self {
+//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
+//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
+//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+//!         }
+//!     }
+//! }
 //! ```
 //!
 //!
 //!
 //! Capture the specified environment information and build the closure & task:
 //! ``` rust
+//! #[macro_use]
+//! use delay_timer::prelude::*;
+//!
+//! use std::str::FromStr;
+//! use std::sync::atomic::{
+//!     AtomicUsize,
+//!     Ordering::{Acquire, Release},
+//! };
+//! use std::sync::{atomic::AtomicI32, Arc};
+//! use std::thread::{self, park_timeout};
+//! use std::time::Duration;
+//! use smol::Timer;
+//! use hyper::{Client, Uri};
+//!
+//!
 //! let delay_timer = DelayTimer::new();
 //!
 //! let share_num = Arc::new(AtomicUsize::new(0));
@@ -77,13 +122,27 @@
 //!
 //! delay_timer.add_task(task).unwrap();
 //!
-//! debug_assert_eq!(3, share_num.load(Acquire));
 //! ```
 //!
 //!
 //!
 //! Building dynamic future tasks:
 //! ```
+//! #[macro_use]
+//! use delay_timer::prelude::*;
+//!
+//! use std::str::FromStr;
+//! use std::sync::atomic::{
+//!     AtomicUsize,
+//!     Ordering::{Acquire, Release},
+//! };
+//! use std::sync::{atomic::AtomicI32, Arc};
+//! use std::thread::{self, park_timeout};
+//! use std::time::Duration;
+//! use smol::Timer;
+//! use hyper::{Client, Uri};
+//!
+//!
 //!
 //! fn build_task(mut task_builder: TaskBuilder) -> Task {
 //!     let body = generate_closure_template(String::from("dynamic"));
@@ -122,16 +181,33 @@
 //!     let buf = hyper::body::to_bytes(res).await.unwrap();
 //!     println!("body: {:?}", buf);
 //! }
+//! enum AuspiciousTime {
+//!     PerSevenSeconds,
+//!     PerEightSeconds,
+//!     LoveTime,
+//! }
+//!
+//! impl Into<CandyCronStr> for AuspiciousTime {
+//!     fn into(self) -> CandyCronStr {
+//!         match self {
+//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
+//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
+//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+//!         }
+//!     }
+//! }
 //! ```
 
 #![feature(linked_list_cursors)]
 // Backup : https://github.com/contain-rs/linked-list/blob/master/src/lib.rs
 
-//TODO:When the version is stable in the future, we should consider using stable compile unified.
-
+// TODO:When the version is stable in the future, we should consider using stable compile unified.
+// FIXME: Auto fill cli-args `features = full` when exec cargo test.
 #[macro_use]
 pub mod macros;
 pub mod entity;
 pub mod prelude;
 pub mod timer;
 pub mod utils;
+
+pub use cron_clock;

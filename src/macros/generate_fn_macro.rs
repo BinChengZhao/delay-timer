@@ -57,6 +57,26 @@ cfg_tokio_support!(
                 });
                 create_delay_task_handler(handle)
             }
+
+            (($($capture_variable:ident),+)$async_body:block) => {
+
+                move |context: TaskContext| {
+
+                    $(
+                        concat_idents::concat_idents!(variable_ref_name = $capture_variable, "_ref" {
+                            let variable_ref_name = $capture_variable.clone();
+                        });
+                    )+
+                    let f = async move {
+                        let future_inner = async move { $async_body };
+                        future_inner.await;
+
+                        context.finishe_task().await;
+                    };
+                    let handle = async_spawn(f);
+                    create_delay_task_handler(handle)
+                }
+            }
         };
     }
 );

@@ -420,3 +420,15 @@ pub fn get_timestamp() -> u64 {
         Err(_) => panic!("SystemTime before UNIX EPOCH!"),
     }
 }
+
+//TODO: Since the system clock may be adjusted,
+// an internal time should be maintained
+// to get rid of system interference,
+// and this change can also be applied to snowflake-rs.
+/// get current OS SystemTime.
+pub fn get_timestamp_micros() -> u128 {
+    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(n) => n.as_micros(),
+        Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+    }
+}
