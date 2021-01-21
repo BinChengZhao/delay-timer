@@ -207,16 +207,14 @@ Licensed under either of
 
 
 ## To Do List
-- [x] Support async-local-executor API and defalut start.
-- [√] Support tokio Ecology.
-- [x] Disable unwrap related methods that will panic.
-- [x] Thread and running task quit when delayTimer drop.
-- [x] error handle need supplement.
-- [x] neaten todo in code, replenish tests and benchmark.
-- [x] batch-opration.
-- [√] report-for-server.
-- [x] TASK-TAG.
-- [x] Future upgrade of delay_timer to multi-wheel mode, different excutor handling different wheels e.g. subtract laps for one wheel, run task for one wheel.
+- [x] Support tokio Ecology.
+- [ ] Disable unwrap related methods that will panic.
+- [ ] Thread and running task quit when delayTimer drop.
+- [ ] neaten todo in code, replenish tests and benchmark.
+- [ ] batch-opration.
+- [x] report-for-server.
+- [ ] TASK-TAG.
+- [ ] Future upgrade of delay_timer to multi-wheel mode, different excutor handling different wheels e.g. subtract laps for one wheel, run task for one wheel.
 
 #### Contribution
 

@@ -1,3 +1,5 @@
+//! parse
+//! It is a module that parses and executes commands.
 pub mod shell_command {
     use anyhow::*;
     use std::collections::LinkedList;

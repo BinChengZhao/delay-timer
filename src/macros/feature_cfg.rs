@@ -1,3 +1,4 @@
+//! This macro module provides the declaration macros used for the conditional compilation of lib.
 macro_rules! cfg_tokio_support {
     ($($item:item)*) => {
         $(

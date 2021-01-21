@@ -1,3 +1,5 @@
+//! Slot
+//! It is the scale of the internal clock.
 use super::task::Task;
 use std::collections::HashMap;
 

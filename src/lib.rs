@@ -4,7 +4,7 @@
 //! and supported by the runtime provided by smol and tokio,
 //! which makes it easy to manage and dynamic add/cancel/remove is supported.
 //!
-//! - [TaskBuilder](crate::timer::task::TaskBuilder) It is a builder for Task
+//! - [TaskBuilder](crate::timer::task::TaskBuilder) It is a builder for [Task](crate::timer::task::Task)
 //!   that provides APIs for setting such as maximum number of parallel runs,
 //!   run content, run identity, run duration, etc.
 //! - [DelayTimerBuilder](crate::entity::DelayTimerBuilder) It is a builder for
@@ -66,6 +66,7 @@
 //!         .spawn(body)
 //!         .unwrap()
 //! }
+//!
 //! enum AuspiciousTime {
 //!     PerSevenSeconds,
 //!     PerEightSeconds,

@@ -1,3 +1,6 @@
+//! Internal-task-handle
+//! The internal-task-handle, which holds the execution handle of the running task,
+//! gives lib the support to exit the task at any time.
 use crate::prelude::*;
 
 use std::collections::{HashMap, LinkedList};

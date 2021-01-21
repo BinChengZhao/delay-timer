@@ -73,7 +73,7 @@ pub struct DelayTimerBuilder {
     status_report_channel: Option<(AsyncSender<PublicEvent>, AsyncReceiver<PublicEvent>)>,
 }
 
-///TODO: do what.
+/// DelayTimer is an abstraction layer that helps users solve execution cycle synchronous/asynchronous tasks.
 #[derive(Clone, Debug)]
 pub struct DelayTimer {
     #[allow(dead_code)]
@@ -83,7 +83,7 @@ pub struct DelayTimer {
     status_reporter: Option<StatusReporter>,
 }
 
-///TODO: do what.
+/// SharedHeader Store the core context of the runtime.
 #[derive(Clone)]
 pub struct SharedHeader {
     //The task wheel has a slot dimension.

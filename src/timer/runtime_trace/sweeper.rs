@@ -1,3 +1,10 @@
+//! Sweeper
+//!
+//! this is the recource guardian:
+//!
+//! 1. recycle recource get through small-heap by task setting max-running-time.
+//! 2. If the task is not set `max-running-time`, it will be automatically recycled when it finishes running.
+
 use crate::prelude::*;
 
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse};

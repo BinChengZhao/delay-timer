@@ -1,3 +1,5 @@
+//! Convenience
+//! It is a module that provides sugar-type and helper function.
 use crate::prelude::*;
 
 ///No size type, API compliant consistency.
