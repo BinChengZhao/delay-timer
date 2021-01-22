@@ -14,7 +14,7 @@ pub struct StatusReporter {
 
 impl StatusReporter {
     pub fn get_public_event(&self) -> AnyResult<PublicEvent> {
-        let event = dbg!(self.inner.try_recv())?;
+        let event = self.inner.try_recv()?;
         Ok(event)
     }
 

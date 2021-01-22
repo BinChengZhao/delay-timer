@@ -1,12 +1,10 @@
 use anyhow::Result;
 use delay_timer::prelude::*;
-use delay_timer::timer::timer_core::get_timestamp;
 use smol::Timer;
 use std::thread::{current, park, sleep, Thread};
 use std::time::Duration;
 use surf;
 
-//TODO: Optimize redeme.
 //cargo run --package delay_timer --example demo --features=full
 
 fn main() {
@@ -23,7 +21,7 @@ fn main() {
     sleep(Duration::new(2, 1_000_000));
 
     let task1_record_id = filter_task_recodeid(&delay_timer, |&x| x.get_task_id() == 1).unwrap();
-    delay_timer.cancel_task(1, task1_record_id);
+    delay_timer.cancel_task(1, task1_record_id).unwrap();
     delay_timer.remove_task(1).unwrap();
 
     delay_timer.add_task(build_wake_task(task_builder)).unwrap();

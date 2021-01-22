@@ -1,4 +1,3 @@
-#![feature(ptr_internals)]
 use delay_timer::cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use delay_timer::prelude::*;
 

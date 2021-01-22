@@ -1,6 +1,5 @@
 use delay_timer::prelude::*;
 use hyper::{Client, Uri};
-use std::ops::Deref;
 use std::thread::{current, park, Thread};
 
 //When you try to run that's example nedd add feature `tokio-support`.

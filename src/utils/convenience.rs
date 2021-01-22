@@ -208,12 +208,12 @@ mod tests {
         let mut candy_cron_str: CandyCronStr;
 
         candy_cron_str = CustomizationCandyCron(0).into();
-        assert_eq!(dbg!(*candy_cron_str), "1 1 1 1 1 1 1");
+        debug_assert_eq!(*candy_cron_str, "1 1 1 1 1 1 1");
 
         candy_cron_str = CustomizationCandyCron(1).into();
-        assert_eq!(dbg!(*candy_cron_str), "0 59 23 18 11 3 2100");
+        debug_assert_eq!(*candy_cron_str, "0 59 23 18 11 3 2100");
 
         candy_cron_str = CustomizationCandyCron(999).into();
-        assert_eq!(dbg!(*candy_cron_str), "* * * * * * *");
+        debug_assert_eq!(*candy_cron_str, "* * * * * * *");
     }
 }

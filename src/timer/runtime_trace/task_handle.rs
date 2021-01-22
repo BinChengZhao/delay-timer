@@ -240,7 +240,6 @@ cfg_tokio_support!(
     //TODO:remove debug.
     impl<T: Send + Sync + Debug + 'static> DelayTaskHandler for JoinHandle<T> {
         fn quit(self: Box<Self>) -> Result<()> {
-            dbg!(&self);
             (&*self).abort();
             Ok(())
         }

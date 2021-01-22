@@ -5,7 +5,9 @@ delay-timer is a task manager based on a time wheel algorithm, which makes it ea
 
 The underlying runtime is based on the optional smol and tokio, and you can build your application with either one.
 
-Since the library currently includes features such as #[bench], it needs to be developed in a nightly version.
+Since the library currently includes features such as `linked_list_cursors`, it needs to be developed in a nightly version.
+
+In the next release, we will be able to stabilize to the stable version.
 
 Except for the simple execution in a few seconds, you can also specify a specific date, 
 such as Sunday at 4am to execute a backup task.
@@ -180,6 +182,7 @@ https://docs.rs/delay_timer)
       let buf = hyper::body::to_bytes(res).await.unwrap();
       println!("body: {:?}", buf);
   }
+  
   enum AuspiciousTime {
       PerSevenSeconds,
       PerEightSeconds,
