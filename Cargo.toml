@@ -10,7 +10,7 @@ homepage = "https://hyper.rs"
 description = "Time-manager of delayed tasks. Like crontab, but synchronous asynchronous tasks are possible, and dynamic add/cancel/remove is supported."
 keywords = [ "cron", "schedule", "periodic", "timer", "crontab", "delay" ]
 license = "Apache-2.0 OR MIT"
-categories = ["network-programming", "web-programming::http-client", "web-programming::http-server"]
+categories = ["development-tools", "data-structures", "asynchronous", "data-structures", "accessibility"]
 
 
 
