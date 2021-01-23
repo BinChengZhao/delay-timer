@@ -5,7 +5,6 @@
 //! library's prelude you'll have to do so manually:
 //!
 //! ```
-//! #![allow(warnings)]
 //! use delay_timer::prelude::*;
 //! ```
 //!
