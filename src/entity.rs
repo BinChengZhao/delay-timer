@@ -334,7 +334,8 @@ cfg_tokio_support!(
 
      }
 
-     /// With this API, let DelayTimer internally use the custom TokioRuntime.
+     /// With this API, let DelayTimer internally use the user custom TokioRuntime.
+     /// If None is given, a custom TokioRuntime is generated internally.
     pub fn tokio_runtime(mut self, rt:Option<Arc<Runtime>>) ->Self {
         self.shared_header.register_tokio_runtime(rt);
         self
