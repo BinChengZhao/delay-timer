@@ -7,127 +7,233 @@
 //! 1. Branch of different mandated events.
 //! 2. A communication center for internal and external workers.
 
-pub(crate) use super::{
-    super::delay_timer::{SharedHeader, SharedTaskWheel},
-    runtime_trace::{
-        sweeper::{RecycleUnit, RecyclingBins},
-        task_handle::TaskTrace,
-    },
-    timer_core::{
-        AsyncSender, Slot, Task, TaskMark, TimerEvent, TimerEventReceiver, TimerEventSender,
-        DEFAULT_TIMER_SLOT_COUNT,
-    },
+pub(crate) use super::super::entity::{SharedHeader, SharedTaskWheel};
+use super::runtime_trace::{
+    sweeper::{RecycleUnit, RecyclingBins},
+    task_handle::TaskTrace,
 };
+pub(crate) use super::timer_core::{TimerEvent, DEFAULT_TIMER_SLOT_COUNT};
+use super::{Slot, Task, TaskMark};
 
+use crate::prelude::*;
 use anyhow::Result;
+use smol::channel::unbounded;
 use std::sync::{
     atomic::Ordering::{Acquire, Release},
     Arc,
 };
 use waitmap::WaitMap;
 
-use smol::{
-    channel::{unbounded, Sender},
-    future::FutureExt,
-};
+cfg_status_report!(
+    use std::convert::TryFrom;
+    type StatusReportSender = Option<AsyncSender<PublicEvent>>;
+);
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EventHandleBuilder {
+    //Shared header information.
+    pub(crate) shared_header: Option<SharedHeader>,
+    //The core of the event recipient, dealing with the global event.
+    pub(crate) timer_event_receiver: Option<TimerEventReceiver>,
+    pub(crate) timer_event_sender: Option<TimerEventSender>,
+    #[warn(dead_code)]
+    #[cfg(feature = "status-report")]
+    pub(crate) status_report_sender: StatusReportSender,
+}
 
-//TaskTrace: use event mes update.
+impl EventHandleBuilder {
+    pub(crate) fn timer_event_receiver(
+        &mut self,
+        timer_event_receiver: TimerEventReceiver,
+    ) -> &mut Self {
+        self.timer_event_receiver = Some(timer_event_receiver);
+        self
+    }
+
+    pub(crate) fn timer_event_sender(&mut self, timer_event_sender: TimerEventSender) -> &mut Self {
+        self.timer_event_sender = Some(timer_event_sender);
+        self
+    }
+
+    pub(crate) fn shared_header(&mut self, shared_header: SharedHeader) -> &mut Self {
+        self.shared_header = Some(shared_header);
+        self
+    }
+
+    pub(crate) fn build(self) -> EventHandle {
+        let task_trace = TaskTrace::default();
+        let sub_wokers = SubWorkers::new(self.timer_event_sender.unwrap());
+
+        let timer_event_receiver = self.timer_event_receiver.unwrap();
+        let shared_header = self.shared_header.unwrap();
+        #[cfg(feature = "status-report")]
+        let status_report_sender = self.status_report_sender;
+
+        EventHandle {
+            shared_header,
+            task_trace,
+            timer_event_receiver,
+            sub_wokers,
+            #[cfg(feature = "status-report")]
+            status_report_sender,
+        }
+    }
+}
+
+/// New a instance of EventHandle.
+///
+/// The parameter `timer_event_receiver` is used by EventHandle
+/// to accept all internal events.
+///
+/// event may come from user application or sub-worker.
+///
+/// The parameter `timer_event_sender` is used by sub-workers
+/// report processed events.
+///
+/// The paramete `shared_header` is used to shared delay-timer core data.
+// TaskTrace: use event mes update.
 // remove Task, can't stop runing taskHandle, just though cancel or cancelAll with taskid.
 // maybe cancelAll msg before last `update msg`  check the
 // flag_map slotid with biggest task-slotid in trace, if has one delay, send a msg for recycleer
 // let it to trash the last taskhandle.
 pub(crate) struct EventHandle {
+    //Shared header information.
+    pub(crate) shared_header: SharedHeader,
     //Task Handle Collector, which makes it easy to cancel a running task.
     pub(crate) task_trace: TaskTrace,
     //The core of the event recipient, dealing with the global event.
     pub(crate) timer_event_receiver: TimerEventReceiver,
-    //TODO:Reporter.
-    #[warn(dead_code)]
-    pub(crate) status_report_sender: Option<Sender<i32>>,
+    #[cfg(feature = "status-report")]
+    pub(crate) status_report_sender: StatusReportSender,
+    //The sub-workers of EventHandle.
+    pub(crate) sub_wokers: SubWorkers,
+}
+
+/// These sub-workers are the left and right arms of `EventHandle`
+/// and are responsible for helping it maintain global events.
+pub(crate) struct SubWorkers {
+    recycling_bin_woker: RecyclingBinWorker,
+}
+
+pub(crate) struct RecyclingBinWorker {
+    inner: Arc<RecyclingBins>,
     //Data Senders for Resource Recyclers.
-    pub(crate) recycle_unit_sources_sender: Sender<RecycleUnit>,
-    //Shared header information.
-    pub(crate) shared_header: SharedHeader,
+    sender: AsyncSender<RecycleUnit>,
 }
 
 impl EventHandle {
-    pub(crate) fn new(
-        timer_event_receiver: TimerEventReceiver,
-        timer_event_sender: TimerEventSender,
-        shared_header: SharedHeader,
-    ) -> Self {
-        let status_report_sender: Option<AsyncSender<i32>> = None;
-        let task_trace = TaskTrace::default();
-
-        let (recycle_unit_sources_sender, recycle_unit_sources_reciver) =
-            unbounded::<RecycleUnit>();
-
-        let recycling_bins = Arc::new(RecyclingBins::new(
-            recycle_unit_sources_reciver,
-            timer_event_sender,
-        ));
-
-        smol::spawn(
-            recycling_bins
+    fn recycling_task(&mut self) {
+        async_spawn(
+            self.sub_wokers
+                .recycling_bin_woker
+                .inner
                 .clone()
-                .add_recycle_unit()
-                .race(recycling_bins.recycle()),
+                .add_recycle_unit(),
         )
         .detach();
+        async_spawn(self.sub_wokers.recycling_bin_woker.inner.clone().recycle()).detach();
+    }
 
-        EventHandle {
-            task_trace,
-            timer_event_receiver,
-            status_report_sender,
-            recycle_unit_sources_sender,
-            shared_header,
+    cfg_tokio_support!(
+        // `async_spawn_by_tokio` 'must be called from the context of Tokio runtime configured
+        // with either `basic_scheduler` or `threaded_scheduler`'.
+        fn recycling_task_by_tokio(&mut self) {
+            async_spawn_by_tokio(
+                self.sub_wokers
+                    .recycling_bin_woker
+                    .inner
+                    .clone()
+                    .add_recycle_unit(),
+            );
+            async_spawn_by_tokio(self.sub_wokers.recycling_bin_woker.inner.clone().recycle());
         }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn set_status_report_sender(&mut self, status_report_sender: AsyncSender<i32>) {
-        self.status_report_sender = Some(status_report_sender);
-    }
+    );
 
     //handle all event.
     //TODO:Add TestUnit.
-    pub(crate) async fn handle_event(&mut self) {
+    pub(crate) async fn lauch(&mut self) {
+        self.init_sub_workers();
+        self.handle_event().await;
+    }
+
+    fn init_sub_workers(&mut self) {
+        let runtime_kind = self.shared_header.runtime_instance.kind;
+
+        match runtime_kind {
+            RuntimeKind::Smol => self.recycling_task(),
+            #[cfg(feature = "tokio-support")]
+            RuntimeKind::Tokio => self.recycling_task_by_tokio(),
+        };
+    }
+
+    async fn handle_event(&mut self) {
+        #[cfg(feature = "status-report")]
+        if let Some(status_report_sender) = self.status_report_sender.take() {
+            while let Ok(event) = self.timer_event_receiver.recv().await {
+                if let Ok(public_event) = PublicEvent::try_from(&event) {
+                    status_report_sender
+                        .send(public_event)
+                        .await
+                        .unwrap_or_else(|e| print!("{}", e));
+                }
+                self.event_dispatch(event).await;
+            }
+            return;
+        }
+
         while let Ok(event) = self.timer_event_receiver.recv().await {
-            match event {
-                TimerEvent::StopTimer => {
-                    self.shared_header.shared_motivation.store(false, Release);
-                    return;
-                }
-                TimerEvent::AddTask(task) => {
-                    let task_mark = self.add_task(*task);
-                    self.record_task_mark(task_mark);
-                }
-                TimerEvent::RemoveTask(task_id) => {
-                    self.remove_task(task_id).await;
-                    self.shared_header.task_flag_map.cancel(&task_id);
-                }
-                TimerEvent::CancelTask(task_id, record_id) => {
-                    self.cancel_task(task_id, record_id);
+            self.event_dispatch(event).await;
+        }
+    }
+
+    pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) {
+        //#[cfg(features="status-report")]
+        //And event isn't `AddTask`, use channel sent(event) to report_channel.
+        //defined a new outside-event support user.
+
+        match event {
+            TimerEvent::StopTimer => {
+                self.shared_header.shared_motivation.store(false, Release);
+                return;
+            }
+            TimerEvent::AddTask(task) => {
+                let task_mark = self.add_task(*task);
+                self.record_task_mark(task_mark);
+            }
+            TimerEvent::RemoveTask(task_id) => {
+                self.remove_task(task_id).await;
+                self.shared_header.task_flag_map.cancel(&task_id);
+            }
+            TimerEvent::CancelTask(task_id, record_id) => {
+                self.cancel_task(task_id, record_id);
+            }
+
+            TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
+                //if has deadline, set recycle_unit.
+                if let Some(deadline) = delay_task_handler_box.get_end_time() {
+                    let recycle_unit = RecycleUnit::new(
+                        deadline,
+                        delay_task_handler_box.get_task_id(),
+                        delay_task_handler_box.get_record_id(),
+                    );
+                    self.send_recycle_unit_sources_sender(recycle_unit).await;
                 }
 
-                TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
-                    //if has deadline, set recycle_unit.
-                    if let Some(deadline) = delay_task_handler_box.get_end_time() {
-                        let recycle_unit = RecycleUnit::new(
-                            deadline,
-                            delay_task_handler_box.get_task_id(),
-                            delay_task_handler_box.get_record_id(),
-                        );
-                        self.recycle_unit_sources_sender
-                            .send(recycle_unit)
-                            .await
-                            .unwrap_or_else(|e| println!("{}", e));
-                    }
+                self.task_trace.insert(task_id, delay_task_handler_box);
+            }
 
-                    self.task_trace.insert(task_id, delay_task_handler_box);
-                }
+            TimerEvent::FinishTask(task_id, record_id) => {
+                self.cancel_task(task_id, record_id);
             }
         }
+    }
+
+    pub(crate) async fn send_recycle_unit_sources_sender(&self, recycle_unit: RecycleUnit) {
+        self.sub_wokers
+            .recycling_bin_woker
+            .sender
+            .send(recycle_unit)
+            .await
+            .unwrap_or_else(|e| println!("{}", e));
     }
 
     //TODO:
@@ -159,7 +265,7 @@ impl EventHandle {
             .value_mut()
             .add_task(task);
 
-        TaskMark::new(task_id, slot_seed)
+        TaskMark::new(task_id, slot_seed, 0)
     }
 
     //for record task-mark.
@@ -184,6 +290,13 @@ impl EventHandle {
     }
 
     pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+        self.shared_header
+            .task_flag_map
+            .get_mut(&task_id)
+            .unwrap()
+            .value_mut()
+            .dec_parallel_runable_num();
+
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 
@@ -195,5 +308,44 @@ impl EventHandle {
         }
 
         Arc::new(task_wheel)
+    }
+}
+
+cfg_status_report!(
+impl EventHandleBuilder {
+    pub(crate) fn status_report_sender(
+        &mut self,
+        status_report_sender: AsyncSender<PublicEvent>,
+    ) -> &mut Self {
+        self.status_report_sender = Some(status_report_sender);
+        self
+    }
+}
+);
+
+impl SubWorkers {
+    fn new(timer_event_sender: TimerEventSender) -> Self {
+        let recycling_bin_woker = RecyclingBinWorker::new(timer_event_sender);
+
+        SubWorkers {
+            recycling_bin_woker,
+        }
+    }
+}
+
+impl RecyclingBinWorker {
+    fn new(timer_event_sender: TimerEventSender) -> Self {
+        let (recycle_unit_sources_sender, recycle_unit_sources_reciver) =
+            unbounded::<RecycleUnit>();
+
+        let inner = Arc::new(RecyclingBins::new(
+            recycle_unit_sources_reciver,
+            timer_event_sender,
+        ));
+
+        RecyclingBinWorker {
+            inner,
+            sender: recycle_unit_sources_sender,
+        }
     }
 }

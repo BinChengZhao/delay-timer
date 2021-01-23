@@ -1,27 +1,55 @@
+//! Task
+//! It is a basic periodic task execution unit.
 use super::runtime_trace::task_handle::DelayTaskHandler;
-use cron_clock::Utc;
-use cron_clock::{Schedule, ScheduleIteratorOwned};
+use crate::prelude::*;
+
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
+use std::thread::AccessError;
+
+use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
+use lru::LruCache;
+
+//TODO: Add doc.
+thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<String, ScheduleIteratorOwned<Utc>>> = RefCell::new(LruCache::new(256)));
+
 //TaskMark is use to remove/stop the task.
 #[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct TaskMark {
     pub(crate) task_id: u64,
     slot_mark: u64,
+    parallel_runable_num: u64,
 }
 
 impl TaskMark {
-    pub(crate) fn new(task_id: u64, slot_mark: u64) -> Self {
-        TaskMark { task_id, slot_mark }
+    pub(crate) fn new(task_id: u64, slot_mark: u64, parallel_runable_num: u64) -> Self {
+        TaskMark {
+            task_id,
+            slot_mark,
+            parallel_runable_num,
+        }
     }
 
     pub(crate) fn get_slot_mark(&self) -> u64 {
         self.slot_mark
     }
 
+    pub(crate) fn get_parallel_runable_num(&self) -> u64 {
+        self.parallel_runable_num
+    }
+
     pub(crate) fn set_slot_mark(&mut self, slot_mark: u64) {
         self.slot_mark = slot_mark;
+    }
+
+    pub(crate) fn inc_parallel_runable_num(&mut self) {
+        self.parallel_runable_num += 1;
+    }
+
+    pub(crate) fn dec_parallel_runable_num(&mut self) {
+        self.parallel_runable_num = self.parallel_runable_num.checked_sub(1).unwrap_or_default();
     }
 }
 
@@ -87,11 +115,56 @@ pub struct TaskBuilder<'a> {
     task_id: u64,
 
     ///Maximum execution time (optional).
+    ///  it can be use to deadline (excution-time + maximum_running_time).
+    /// TODO: whether auto cancel.
+    /// Zip other future to auto cancel it be poll when  first future-task finished.
     maximum_running_time: Option<u64>,
+
+    ///Maximum parallel runable num (optional).
+    maximun_parallel_runable_num: Option<u64>,
 }
 
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
-type SafeBoxFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+
+#[derive(Debug, Clone, Default)]
+pub struct TaskContext {
+    pub task_id: u64,
+    pub record_id: i64,
+    pub then_fn: Option<fn()>,
+    pub timer_event_sender: Option<TimerEventSender>,
+}
+
+impl TaskContext {
+    pub fn task_id(&mut self, task_id: u64) -> &mut Self {
+        self.task_id = task_id;
+        self
+    }
+
+    pub fn record_id(&mut self, record_id: i64) -> &mut Self {
+        self.record_id = record_id;
+        self
+    }
+
+    pub(crate) fn timer_event_sender(&mut self, timer_event_sender: TimerEventSender) -> &mut Self {
+        self.timer_event_sender = Some(timer_event_sender);
+        self
+    }
+
+    pub fn then_fn(&mut self, then_fn: fn()) -> &mut Self {
+        self.then_fn = Some(then_fn);
+        self
+    }
+
+    pub async fn finishe_task(self) {
+        if let Some(timer_event_sender) = self.timer_event_sender {
+            timer_event_sender
+                .send(TimerEvent::FinishTask(self.task_id, self.record_id))
+                .await
+                .unwrap();
+        }
+    }
+}
 
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
 impl fmt::Debug for SafeStructBoxedFn {
@@ -115,6 +188,8 @@ pub struct Task {
     cylinder_line: u64,
     ///Validity.
     valid: bool,
+    ///Maximum parallel runable num (optional).
+    pub(crate) maximun_parallel_runable_num: Option<u64>,
 }
 
 //bak type BoxFn
@@ -133,6 +208,27 @@ impl<'a> TaskBuilder<'a> {
         self
     }
 
+    #[inline(always)]
+    pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
+        &mut self,
+        frequency: CandyFrequency<T>,
+    ) -> &mut Self {
+        let frequency = match frequency {
+            CandyFrequency::Once(candy_cron_middle_str) => {
+                Frequency::Once(candy_cron_middle_str.into().0)
+            }
+            CandyFrequency::Repeated(candy_cron_middle_str) => {
+                Frequency::Repeated(candy_cron_middle_str.into().0)
+            }
+            CandyFrequency::CountDown(exec_count, candy_cron_middle_str) => {
+                Frequency::CountDown(exec_count, candy_cron_middle_str.into().0)
+            }
+        };
+
+        self.frequency = Some(frequency);
+        self
+    }
+
     ///Set task-id.
     #[inline(always)]
     pub fn set_task_id(&mut self, task_id: u64) -> &mut Self {
@@ -147,10 +243,18 @@ impl<'a> TaskBuilder<'a> {
         self
     }
 
+    #[inline(always)]
+    pub fn set_maximun_parallel_runable_num(
+        &mut self,
+        maximun_parallel_runable_num: u64,
+    ) -> &mut Self {
+        self.maximun_parallel_runable_num = Some(maximun_parallel_runable_num);
+        self
+    }
     ///Spawn a task.
-    pub fn spawn<F>(self, body: F) -> Task
+    pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where
-        F: Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
+        F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
         let frequency_inner;
 
@@ -163,9 +267,7 @@ impl<'a> TaskBuilder<'a> {
             }
         };
 
-        //From cron-expression-str build time-iter.
-        let schedule = Schedule::from_str(expression_str).unwrap();
-        let taskschedule = schedule.upcoming_owned(Utc);
+        let taskschedule = Self::analyze_cron_expression(expression_str)?;
 
         //Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
@@ -173,34 +275,40 @@ impl<'a> TaskBuilder<'a> {
             RepeatType::Num(repeat_count) => FrequencyInner::CountDown(repeat_count, taskschedule),
         };
 
-        Task::new(
-            self.task_id,
-            frequency_inner,
-            Box::new(body),
-            self.maximum_running_time,
-        )
+        let body = SafeStructBoxedFn(Box::new(body));
+
+        Ok(Task {
+            task_id: self.task_id,
+            frequency: frequency_inner,
+            body,
+            maximum_running_time: self.maximum_running_time,
+            cylinder_line: 0,
+            valid: true,
+            maximun_parallel_runable_num: self.maximun_parallel_runable_num,
+        })
+    }
+
+    // Analyze expressions, get cache.
+    fn analyze_cron_expression(
+        cron_expression: &str,
+    ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
+        let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
+
+        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
+            let mut lru_cache = expression_cache.borrow_mut();
+            if let Some(schedule_iterator) = lru_cache.get(&indiscriminate_expression) {
+                return schedule_iterator.clone();
+            }
+            let taskschedule = Schedule::from_str(&indiscriminate_expression)
+                .unwrap()
+                .upcoming_owned(Utc);
+            lru_cache.put(indiscriminate_expression, taskschedule.clone());
+            taskschedule
+        })
     }
 }
 
 impl Task {
-    #[inline(always)]
-    pub(crate) fn new(
-        task_id: u64,
-        frequency: FrequencyInner,
-        body: SafeBoxFn,
-        maximum_running_time: Option<u64>,
-    ) -> Task {
-        let body = SafeStructBoxedFn(body);
-        Task {
-            task_id,
-            frequency,
-            body,
-            maximum_running_time,
-            cylinder_line: 0,
-            valid: true,
-        }
-    }
-
     // get SafeBoxFn of Task to call.
     #[inline(always)]
     pub(crate) fn get_body(&self) -> &SafeBoxFn {
@@ -294,7 +402,9 @@ mod tests {
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+        let mut task: Task = task_builder
+            .spawn(|_context| create_default_delay_task_handler())
+            .unwrap();
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
@@ -309,7 +419,31 @@ mod tests {
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder.spawn(|| create_default_delay_task_handler());
+        let mut task: Task = task_builder
+            .spawn(|_context| create_default_delay_task_handler())
+            .unwrap();
+
+        assert!(task.is_can_running());
+
+        task.set_cylinder_line(1);
+        assert!(!task.is_can_running());
+
+        assert!(task.check_arrived());
+    }
+
+    // struct CandyCron
+
+    #[test]
+    fn test_candy_cron() {
+        use super::{CandyCron, CandyFrequency, Task, TaskBuilder};
+        use crate::utils::convenience::functions::create_default_delay_task_handler;
+        let mut task_builder = TaskBuilder::default();
+
+        //The third run returns to an invalid state.
+        task_builder.set_frequency_by_candy(CandyFrequency::CountDown(5, CandyCron::Minutely));
+        let mut task: Task = task_builder
+            .spawn(|_context| create_default_delay_task_handler())
+            .unwrap();
 
         assert!(task.is_can_running());
 

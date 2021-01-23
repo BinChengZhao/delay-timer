@@ -1,15 +1,17 @@
-use smol::{
-    channel::{Receiver, TryRecvError::*},
-    future,
-    lock::Mutex,
-};
-use std::{
-    cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse},
-    collections::BinaryHeap,
-    sync::Arc,
-};
+//! Sweeper
+//!
+//! this is the recource guardian:
+//!
+//! 1. recycle recource get through small-heap by task setting max-running-time.
+//! 2. If the task is not set `max-running-time`, it will be automatically recycled when it finishes running.
 
-use super::super::timer_core::{get_timestamp, TimerEvent, TimerEventSender};
+use crate::prelude::*;
+
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse};
+use std::collections::BinaryHeap;
+use std::sync::Arc;
+
+use smol::channel::TryRecvError::*;
 
 #[derive(Default, Eq, Debug, Copy, Clone)]
 /// recycle unit.
@@ -56,10 +58,10 @@ impl PartialEq for RecycleUnit {
 ///RecyclingBins is resource recycler, excute timeout task-handle.
 pub(crate) struct RecyclingBins {
     ///storage all task-handle in there.
-    recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>>,
+    recycle_unit_heap: AsyncMutex<BinaryHeap<Reverse<RecycleUnit>>>,
 
     /// use it to recieve source-data build recycle-unit.
-    recycle_unit_sources: Receiver<RecycleUnit>,
+    recycle_unit_sources: AsyncMutex<AsyncReceiver<RecycleUnit>>,
 
     /// notify timeout-event to event-handler for cancel that.
     timer_event_sender: TimerEventSender,
@@ -68,11 +70,12 @@ pub(crate) struct RecyclingBins {
 impl RecyclingBins {
     /// construct.
     pub(crate) fn new(
-        recycle_unit_sources: Receiver<RecycleUnit>,
+        recycle_unit_sources: AsyncReceiver<RecycleUnit>,
         timer_event_sender: TimerEventSender,
     ) -> Self {
-        let recycle_unit_heap: Mutex<BinaryHeap<Reverse<RecycleUnit>>> =
-            Mutex::new(BinaryHeap::new());
+        let recycle_unit_heap: AsyncMutex<BinaryHeap<Reverse<RecycleUnit>>> =
+            AsyncMutex::new(BinaryHeap::new());
+        let recycle_unit_sources = AsyncMutex::new(recycle_unit_sources);
 
         RecyclingBins {
             recycle_unit_heap,
@@ -107,13 +110,11 @@ impl RecyclingBins {
                     let recycle_unit = (&mut recycle_unit_heap).pop().map(|v| v.0).unwrap();
 
                     //handle send-error.
-                    self.timer_event_sender
-                        .send(TimerEvent::CancelTask(
-                            recycle_unit.task_id,
-                            recycle_unit.record_id,
-                        ))
-                        .await
-                        .unwrap_or_else(|e| println!("{}", e));
+                    self.send_timer_event(TimerEvent::CancelTask(
+                        recycle_unit.task_id,
+                        recycle_unit.record_id,
+                    ))
+                    .await;
 
                 //send msg to event_handle.
                 } else {
@@ -122,18 +123,24 @@ impl RecyclingBins {
                 }
             }
 
-            future::yield_now().await;
+            yield_now().await;
             //drop lock.
         }
     }
 
-    /// alternate run fn between recycle and  add_recycle_unit.
+    pub(crate) async fn send_timer_event(&self, event: TimerEvent) {
+        self.timer_event_sender
+            .send(event)
+            .await
+            .unwrap_or_else(|e| println!("{}", e));
+    }
+
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {
         'loopLayer: loop {
             'forLayer: for _ in 0..200 {
                 let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
 
-                match self.recycle_unit_sources.try_recv() {
+                match self.recycle_unit_sources.lock().await.try_recv() {
                     Ok(recycle_unit) => {
                         (&mut recycle_unit_heap).push(Reverse(recycle_unit));
                     }
@@ -152,7 +159,7 @@ impl RecyclingBins {
                 }
             }
 
-            future::yield_now().await;
+            yield_now().await;
             // out of scope , recycle_unit_heap is auto-drop;
         }
     }
@@ -170,7 +177,7 @@ mod tests {
         };
         use std::{
             sync::Arc,
-            thread::{park_timeout, spawn},
+            thread::{park_timeout, spawn as thread_spawn},
             time::Duration,
         };
 
@@ -181,7 +188,8 @@ mod tests {
             recycle_unit_receiver,
             timer_event_sender,
         ));
-        spawn(move || {
+        //TODO:optimize.
+        thread_spawn(move || {
             block_on(async {
                 recycling_bins
                     .clone()

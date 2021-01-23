@@ -1,11 +1,16 @@
-use crate::{ChildGuard, ChildGuardList};
-///TaskTrace own global task-handle.
-use anyhow::Result;
-use smol::Task as SmolTask;
+//! Internal-task-handle
+//! The internal-task-handle, which holds the execution handle of the running task,
+//! gives lib the support to exit the task at any time.
+use crate::prelude::*;
+
 use std::collections::{HashMap, LinkedList};
 use std::fmt::{self, Debug, Formatter, Pointer};
+
+use anyhow::Result;
+use smol::Task as SmolTask;
+
 #[derive(Default, Debug)]
-// TaskTrace is contanier
+///TaskTrace is contanier that own global task-handle.
 pub(crate) struct TaskTrace {
     inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
 }
@@ -39,26 +44,29 @@ impl TaskTrace {
     ) -> Option<Result<()>> {
         let task_handler_list = self.inner.get_mut(&task_id)?;
 
-        //TODO: Optimize.
-        let filter_collection =
-            task_handler_list.drain_filter(|handler_box| handler_box.record_id == record_id);
+        let mut list_mut_cursor = task_handler_list.cursor_back_mut();
 
-        let (filter_collection_count, _) = filter_collection.size_hint();
+        let mut task_handler_box_ref: &mut DelayTaskHandlerBox;
+        loop {
+            task_handler_box_ref = list_mut_cursor.current()?;
 
-        if filter_collection_count == 0 {
-            return None;
-        }
-
-        let mut handlers_quit_result = Some(Ok(()));
-
-        for mut task_handler_box in filter_collection {
-            let handler_quit_result = task_handler_box.quit();
-            if handler_quit_result.is_err() {
-                handlers_quit_result = Some(handler_quit_result);
+            if task_handler_box_ref.record_id > record_id {
+                return None;
             }
+
+            if task_handler_box_ref.record_id == record_id {
+                break;
+            }
+
+            list_mut_cursor.move_next();
         }
 
-        handlers_quit_result
+        //remove current task_handler_box.
+        if let Some(mut task_handler_box) = list_mut_cursor.remove_current() {
+            Some(task_handler_box.quit())
+        } else {
+            None
+        }
     }
 }
 
@@ -70,7 +78,7 @@ pub trait DelayTaskHandler: Send + Sync {
     fn quit(self: Box<Self>) -> Result<()>;
 }
 
-pub(crate) struct SafeStructBoxedDelayTaskHandler(pub(crate) Box<dyn DelayTaskHandler>);
+pub struct SafeStructBoxedDelayTaskHandler(pub(crate) Box<dyn DelayTaskHandler>);
 impl Debug for SafeStructBoxedDelayTaskHandler {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         <&Self as Pointer>::fmt(&self, f).unwrap();
@@ -90,7 +98,7 @@ impl SafeStructBoxedDelayTaskHandler {
 // generics Type will single state just store one type in TaskTrace.
 // Multi-DelayTaskHandlerBox record_id can same, because one task can spawn Multi-process.
 #[derive(Debug)]
-pub(crate) struct DelayTaskHandlerBox {
+pub struct DelayTaskHandlerBox {
     ///Task Handle is most important part of DelayTaskHandlerBox.
     pub(crate) task_handler: Option<SafeStructBoxedDelayTaskHandler>,
     ///task_id.
@@ -210,8 +218,14 @@ impl DelayTaskHandler for ChildGuardList {
     }
 }
 
+impl DelayTaskHandler for () {
+    fn quit(self: Box<Self>) -> Result<()> {
+        Ok(())
+    }
+}
+
 //When SmolTask is dropped, async task is cancel.
-impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<Result<T>> {
+impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<T> {
     fn quit(self: Box<Self>) -> Result<()> {
         smol::spawn(async {
             self.cancel().await;
@@ -220,3 +234,14 @@ impl<T: Send + Sync + 'static> DelayTaskHandler for SmolTask<Result<T>> {
         Ok(())
     }
 }
+
+cfg_tokio_support!(
+    use tokio::task::JoinHandle;
+    //TODO:remove debug.
+    impl<T: Send + Sync + Debug + 'static> DelayTaskHandler for JoinHandle<T> {
+        fn quit(self: Box<Self>) -> Result<()> {
+            (&*self).abort();
+            Ok(())
+        }
+    }
+);

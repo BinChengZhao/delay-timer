@@ -1,32 +1,85 @@
 [package]
 name = "delay_timer"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
 documentation = "https://docs.rs/delay_timer"
 readme = "README.md"
-description = "delayTimer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures."
+homepage = "https://hyper.rs"
+description = "Time-manager of delayed tasks. Like crontab, but synchronous asynchronous tasks are possible, and dynamic add/cancel/remove is supported."
 keywords = [ "cron", "schedule", "repeat", "periodic", "time" ]
 license = "Apache-2.0 OR MIT"
+categories = ["network-programming", "web-programming::http-client", "web-programming::http-server"]
+
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 name = "delay_timer"
 
+[features]
+default = []
+full = ["tokio-full"]
+
+tokio-full = ["tokio-support","status-report"]
+tokio-support = ["tokio"]
+status-report = []
+
+
 [dependencies]
-smol = "1.0.0"
 cron_clock = "0.6.6"
 anyhow = "1.0.31"
-threadpool = "1.8.1"
-rs-snowflake = "0.3.0"
+rs-snowflake = "0.4.0"
 waitmap = "1.1.0"
+lru = "0.6.1"
+futures = "0.3.8"
+smol = "1.2.4"
+concat-idents = "1.1.1"
 
+
+# Optional
+tokio = { version = "~1.0.0", features = ["full"] , optional = true }
 
 [dev-dependencies]
 surf = "2.1.0"
+tokio = { version = "~1.0.0", features = ["full"] }
+hyper= {version  = "0.14.1" , features = ["full"] }
+pretty_env_logger = "0.4"
+mockall = "0.8.2"
 
 [dev-dependencies.async-std]
 version = "1.6.3"
 features = ["attributes"]
+
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+# Whether to pass `--no-default-features` to Cargo (default: false)
+no-default-features = true
+
+[package.metadata.playground]
+features = ["full", "test-util"]
+
+[[example]]
+name = "cycle_tokio_task"
+path = "examples/cycle_tokio_task.rs"
+required-features = ["tokio-support"]
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+required-features = ["full"]
+
+#[[test]]
+#name = "inspect_struct"
+#path = "tests/simulation.rs"
+#required-features = ["full"]
+
+#[[bench]]
+#name = "demo"
+#path = "benches/demo.rs"
+#required-features = ["full"]

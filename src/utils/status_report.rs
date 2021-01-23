@@ -1,37 +1,66 @@
-// status_report is mod  for report node heathy
-// if open feature status-report, then compile that mod .
-// mapping
-// #[cfg(feature="status-report")]
-use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
+//! `StatusReporter` is to expose the necessary operational information
+//! to the outside world.
+use crate::prelude::*;
+use std::convert::TryFrom;
 
-#[cfg(feature = "status-report")]
-pub trait StatusReport: Send + Sync + 'static {
-    type Situation = Result<Self::Normal, Self::Exception>;
-    type Normal = bool;
-    type Exception = String;
+/// # Required features
+///
+/// This function requires the `status-report` feature of the `delay_timer`
+/// crate to be enabled.
+#[derive(Debug, Clone)]
+pub struct StatusReporter {
+    inner: AsyncReceiver<PublicEvent>,
+}
 
-    // type
-
-    // new a delaytimer::Task to run it....!
-
-    //
-    ///
-    /// ```
-    /// let example_task  = Task::spawn( ||{
-    ///         let result = report.report().await;
-    ///
-    ///         if result.is_err() {
-    ///            report.help().await;
-    ///         }
-    ///
-    /// } ).detach();
-    ///
-    /// ```
-    async fn report(&mut self, t: AsyncReceiver<i32>) -> Self::situation {
-
-        // t is alies of LinkedList<record> or Vec<record> or ...T<record>
+impl StatusReporter {
+    pub fn get_public_event(&self) -> AnyResult<PublicEvent> {
+        let event = self.inner.try_recv()?;
+        Ok(event)
     }
 
-    // if report error or world destory... call help ..... call user....
-    async fn help(&mut self, expression: Self::Exception) {}
+    pub(crate) fn new(inner: AsyncReceiver<PublicEvent>) -> Self {
+        Self { inner }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum PublicEvent {
+    RemoveTask(u64),
+    RunningTask(u64, i64),
+    FinishTask(u64, i64),
+}
+
+impl TryFrom<&TimerEvent> for PublicEvent {
+    type Error = &'static str;
+
+    fn try_from(timer_event: &TimerEvent) -> Result<Self, Self::Error> {
+        match timer_event {
+            TimerEvent::RemoveTask(task_id) => Ok(PublicEvent::RemoveTask(*task_id)),
+            TimerEvent::AppendTaskHandle(_, delay_task_handler_box) => {
+                Ok(PublicEvent::RunningTask(delay_task_handler_box.get_task_id(), delay_task_handler_box.get_record_id()))
+            }
+            TimerEvent::FinishTask(task_id, record_id) => {
+                Ok(PublicEvent::FinishTask(*task_id, *record_id))
+            }
+            _ => Err("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!"),
+        }
+    }
+}
+
+impl PublicEvent {
+   pub fn get_task_id(&self) -> u64 {
+        match self {
+            PublicEvent::RemoveTask(ref task_id) => *task_id,
+            PublicEvent::RunningTask(ref task_id, _) => *task_id,
+            PublicEvent::FinishTask(ref task_id, _) => *task_id,
+        }
+    }
+
+   pub fn get_record_id(&self) -> Option<i64> {
+        match self {
+            PublicEvent::RemoveTask(_) => None,
+            PublicEvent::RunningTask(_,ref record_id) => Some(*record_id),
+            PublicEvent::FinishTask(_,ref record_id) => Some(*record_id),
+        }
+    }
 }

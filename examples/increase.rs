@@ -1,54 +1,52 @@
 #![feature(ptr_internals)]
-use delay_timer::timer::timer_core::get_timestamp;
-use delay_timer::{
-    create_async_fn_body,
-    delay_timer::DelayTimer,
-    timer::runtime_trace::task_handle::DelayTaskHandler,
-    timer::task::{Frequency, TaskBuilder},
-    utils::functions::{create_default_delay_task_handler, create_delay_task_handler},
-};
+use delay_timer::prelude::*;
 
-use std::{
-    ptr::Unique,
-    sync::{
-        atomic::{AtomicUsize, Ordering::SeqCst},
-        Arc,
-    },
-    thread::{current, park, Thread},
-};
+use std::ptr::Unique;
+use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+use std::sync::Arc;
+use std::thread::{current, park, Thread};
+
 use surf;
-//TODO:Remember close terminal can speed up because of
-//printnl! block process if stand-pipe if full.
+// Remember close terminal can speed up because of
+// printnl! block process if stand-pipe if full.
 fn main() {
-    let mut delay_timer = DelayTimer::new();
+    let delay_timer = DelayTimer::new();
+
+    // The Sync-Task run_flay.
     let mut run_flag = Arc::new(AtomicUsize::new(0));
+    // cross thread share raw-pointer.
     let run_flag_ref: Option<Unique<Arc<AtomicUsize>>> = Unique::new(&mut run_flag);
 
+    // Sync-Task body.
     let body = get_increase_fn(run_flag_ref);
-    let end_body = get_end_fn(current(), run_flag_ref);
+    // Waker-Task body.
+    let end_body = get_wake_fn(current(), run_flag_ref);
+    // Async-Task body.
     let async_body = get_async_fn();
 
     let mut task_builder = TaskBuilder::default();
 
+    // The common task attr.
     task_builder
         .set_frequency(Frequency::CountDown(1, "30 * * * * * *"))
         .set_maximum_running_time(90);
 
     for i in 0..1000 {
-        let task = task_builder.set_task_id(i).spawn(body);
+        let task = task_builder.set_task_id(i).spawn(body).unwrap();
         delay_timer.add_task(task).unwrap();
     }
 
     task_builder.set_frequency(Frequency::CountDown(1, "58 * * * * * *"));
-    for i in 1000..1100 {
-        let task = task_builder.set_task_id(i).spawn(async_body);
+    for i in 1000..1300 {
+        let task = task_builder.set_task_id(i).spawn(async_body).unwrap();
         delay_timer.add_task(task).unwrap();
     }
 
     let task = task_builder
         .set_task_id(8888)
         .set_frequency(Frequency::CountDown(1, "@minutely"))
-        .spawn(end_body);
+        .spawn(end_body)
+        .unwrap();
     delay_timer.add_task(task).unwrap();
 
     park();
@@ -56,8 +54,8 @@ fn main() {
 
 fn get_increase_fn(
     run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
-) -> impl Copy + Fn() -> Box<dyn DelayTaskHandler> {
-    move || {
+) -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
+    move |_context| {
         let local_run_flag = run_flag_ref.unwrap().as_ptr();
 
         unsafe {
@@ -67,11 +65,11 @@ fn get_increase_fn(
     }
 }
 
-fn get_end_fn(
+fn get_wake_fn(
     thread: Thread,
     run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
-) -> impl Fn() -> Box<dyn DelayTaskHandler> {
-    move || {
+) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
+    move |_context| {
         let local_run_flag = run_flag_ref.unwrap().as_ptr();
         unsafe {
             println!(
@@ -85,11 +83,10 @@ fn get_end_fn(
     }
 }
 
-fn get_async_fn() -> impl Copy + Fn() -> Box<dyn DelayTaskHandler> {
+fn get_async_fn() -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
     create_async_fn_body!({
         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
         let body_str = res.body_string().await.unwrap();
         println!("{}", body_str);
-        Ok(())
     })
 }
