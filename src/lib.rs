@@ -203,6 +203,7 @@
 //! ```
 
 #![feature(linked_list_cursors)]
+#![feature(doc_cfg)]
 // Backup : https://github.com/contain-rs/linked-list/blob/master/src/lib.rs
 
 // TODO:When the version is stable in the future, we should consider using stable compile unified.
