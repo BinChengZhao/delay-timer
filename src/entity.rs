@@ -163,11 +163,13 @@ impl Default for DelayTimer {
 }
 
 impl DelayTimerBuilder {
+    /// Build DelayTimer.
     pub fn build(mut self) -> DelayTimer {
         self.lauch();
         self.init_delay_timer()
     }
 
+    // Start the DelayTimer.
     fn lauch(&mut self) {
         let mut event_handle_builder = EventHandleBuilder::default();
         event_handle_builder
@@ -277,6 +279,7 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 
+    /// Stop DelayTimer, running tasks are not affected.
     pub fn stop_delay_timer(&self) -> Result<()> {
         self.seed_timer_event(TimerEvent::StopTimer)
     }
@@ -331,6 +334,7 @@ cfg_tokio_support!(
 
      }
 
+     /// With this API, let DelayTimer internally use the custom TokioRuntime.
     pub fn tokio_runtime(mut self, rt:Option<Arc<Runtime>>) ->Self {
         self.shared_header.register_tokio_runtime(rt);
         self
@@ -373,6 +377,8 @@ cfg_status_report!(
 /// This function requires the `status-report` feature of the `delay_timer`
 /// crate to be enabled.
     impl DelayTimerBuilder {
+
+        /// Whether to expose public events.
         pub fn enable_status_report(mut self) -> Self {
             self.enable_status_report = true;
             self
@@ -394,10 +400,13 @@ cfg_status_report!(
     }
 
     impl DelayTimer {
+
+        /// Take StatusReporter from DelayTimer, through which you can get public events.
         pub fn take_status_reporter(&mut self) -> Option<StatusReporter> {
             self.status_reporter.take()
         }
 
+        /// Access to public events through DelayTimer.
         pub fn get_public_event(&self) -> anyhow::Result<PublicEvent> {
             if let Some(status_reporter) = self.status_reporter.as_ref() {
                 return status_reporter.get_public_event();

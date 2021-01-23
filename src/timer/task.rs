@@ -176,19 +176,19 @@ impl fmt::Debug for SafeStructBoxedFn {
 
 #[derive(Debug)]
 pub struct Task {
-    ///Unique task-id.
+    /// Unique task-id.
     pub task_id: u64,
-    ///Iter of frequencies and executive clocks.
+    /// Iter of frequencies and executive clocks.
     frequency: FrequencyInner,
     /// A Fn in box it can be run and return delayTaskHandler.
     pub(crate) body: SafeStructBoxedFn,
-    ///Maximum execution time (optional).
+    /// Maximum execution time (optional).
     maximum_running_time: Option<u64>,
-    ///Loop the line and check how many more clock cycles it will take to execute it.
+    /// Loop the line and check how many more clock cycles it will take to execute it.
     cylinder_line: u64,
-    ///Validity.
+    /// Validity.
     valid: bool,
-    ///Maximum parallel runable num (optional).
+    /// Maximum parallel runable num (optional).
     pub(crate) maximun_parallel_runable_num: Option<u64>,
 }
 
@@ -201,13 +201,14 @@ enum RepeatType {
 }
 
 impl<'a> TaskBuilder<'a> {
-    ///Set task Frequency.
+    /// Set task Frequency.
     #[inline(always)]
     pub fn set_frequency(&mut self, frequency: Frequency<'a>) -> &mut Self {
         self.frequency = Some(frequency);
         self
     }
 
+    /// Set task Frequency by customized CandyCronStr.
     #[inline(always)]
     pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
         &mut self,
@@ -229,20 +230,21 @@ impl<'a> TaskBuilder<'a> {
         self
     }
 
-    ///Set task-id.
+    /// Set task-id.
     #[inline(always)]
     pub fn set_task_id(&mut self, task_id: u64) -> &mut Self {
         self.task_id = task_id;
         self
     }
 
-    ///Set maximum execution time (optional).
+    /// Set maximum execution time (optional).
     #[inline(always)]
     pub fn set_maximum_running_time(&mut self, maximum_running_time: u64) -> &mut Self {
         self.maximum_running_time = Some(maximum_running_time);
         self
     }
 
+    /// Set a task with the maximum number of parallel runs (optional).
     #[inline(always)]
     pub fn set_maximun_parallel_runable_num(
         &mut self,
@@ -251,14 +253,14 @@ impl<'a> TaskBuilder<'a> {
         self.maximun_parallel_runable_num = Some(maximun_parallel_runable_num);
         self
     }
-    ///Spawn a task.
+    /// Spawn a task.
     pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where
         F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
         let frequency_inner;
 
-        //The user inputs are pattern matched for different repetition types.
+        // The user inputs are pattern matched for different repetition types.
         let (expression_str, repeat_type) = match self.frequency.unwrap() {
             Frequency::Once(expression_str) => (expression_str, RepeatType::Num(1)),
             Frequency::Repeated(expression_str) => (expression_str, RepeatType::Always),
@@ -269,7 +271,7 @@ impl<'a> TaskBuilder<'a> {
 
         let taskschedule = Self::analyze_cron_expression(expression_str)?;
 
-        //Building TaskFrequencyInner patterns based on repetition types.
+        // Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
             RepeatType::Always => FrequencyInner::Repeated(taskschedule),
             RepeatType::Num(repeat_count) => FrequencyInner::CountDown(repeat_count, taskschedule),
@@ -315,8 +317,8 @@ impl Task {
         &(self.body).0
     }
 
-    //swap slot loction ,do this
-    //down_count_and_set_vaild,will return new vaild status.
+    // swap slot loction ,do this
+    // down_count_and_set_vaild,will return new vaild status.
     #[inline(always)]
     pub(crate) fn down_count_and_set_vaild(&mut self) -> bool {
         self.down_count();
