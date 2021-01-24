@@ -221,7 +221,8 @@ impl EventHandle {
                 self.task_trace.insert(task_id, delay_task_handler_box);
             }
 
-            TimerEvent::FinishTask(task_id, record_id) => {
+            TimerEvent::FinishTask(task_id, record_id, _finish_time) => {
+                //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
                 self.cancel_task(task_id, record_id);
             }
         }

@@ -53,3 +53,8 @@ fn bench_try_wait(b: &mut Bencher) {
 
     b.iter(|| child.try_wait());
 }
+
+#[bench]
+fn bench_get_timestamp(b: &mut Bencher) {
+    b.iter(|| get_timestamp());
+}

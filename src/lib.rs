@@ -19,7 +19,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! delay_timer = "0.2.0"
+//! delay_timer = "*"
 //! ```
 //!
 //! Next:

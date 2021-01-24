@@ -114,14 +114,14 @@ pub struct TaskBuilder<'a> {
     ///Task_id should unique.
     task_id: u64,
 
-    ///Maximum execution time (optional).
-    ///  it can be use to deadline (excution-time + maximum_running_time).
-    /// TODO: whether auto cancel.
-    /// Zip other future to auto cancel it be poll when  first future-task finished.
+    /// Maximum execution time (optional).
+    /// it can be use to deadline (excution-time + maximum_running_time).
     maximum_running_time: Option<u64>,
 
     ///Maximum parallel runable num (optional).
     maximun_parallel_runable_num: Option<u64>,
+    // TODO: whether auto cancel.
+    // Zip other future to auto cancel it be poll when  first future-task finished.
 }
 
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
@@ -159,7 +159,11 @@ impl TaskContext {
     pub async fn finishe_task(self) {
         if let Some(timer_event_sender) = self.timer_event_sender {
             timer_event_sender
-                .send(TimerEvent::FinishTask(self.task_id, self.record_id))
+                .send(TimerEvent::FinishTask(
+                    self.task_id,
+                    self.record_id,
+                    get_timestamp(),
+                ))
                 .await
                 .unwrap();
         }

@@ -106,7 +106,7 @@ pub enum TimerEvent {
     AddTask(Box<Task>),
     RemoveTask(u64),
     CancelTask(u64, i64),
-    FinishTask(u64, i64),
+    FinishTask(u64, i64, u64),
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
 #[derive(Clone)]
