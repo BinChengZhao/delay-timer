@@ -83,7 +83,11 @@ impl TaskTrace {
         let index = task_handler_list
             .iter()
             .position(|d| d.record_id == record_id)?;
-        Some(task_handler_list.remove(index).quit())
+
+        let mut has_remove_element_list = task_handler_list.split_off(index);
+        let mut remove_element = has_remove_element_list.pop_front()?;
+        task_handler_list.append(&mut has_remove_element_list);
+        Some(remove_element.quit())
     }
 }
 

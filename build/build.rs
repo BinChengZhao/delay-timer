@@ -22,7 +22,7 @@ fn main() {
     }
 
     // Check for a minimum version
-    if version().unwrap() < Version::parse("1.5.1").unwrap() {
+    if version().unwrap() >= Version::parse("1.51.0").unwrap() {
         println!("cargo:rustc-cfg=SPLIT_INCLUSIVE_COMPATIBLE");
     }
 
