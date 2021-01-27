@@ -135,6 +135,7 @@ pub mod shell_command {
     // I should give Option<Result<File>>
     //By Option(Some(Result<T>)), determine if there is an output stdio..
     //By Result<T>(OK(t)), determine if there is success open file.
+    #[cfg(not(SPLIT_INCLUSIVE_COMPATIBLE))]
     fn _has_redirect_file(command: &str) -> Option<Result<File>> {
         let angle_bracket;
 
@@ -146,6 +147,30 @@ pub mod shell_command {
             return None;
         }
 
+        // FIXME:In order to be stable-rustc compiled , it needs to be compatible here.
+        // Waiting for rustc-1.51.0;
+        let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
+        if let Some(filename) = sub_command_inner.next() {
+            Some(create_stdio_file(angle_bracket, filename))
+        } else {
+            None
+        }
+    }
+
+    #[cfg(SPLIT_INCLUSIVE_COMPATIBLE)]
+    fn _has_redirect_file(command: &str) -> Option<Result<File>> {
+        let angle_bracket;
+
+        if command.contains(">>") {
+            angle_bracket = ">>";
+        } else if command.contains('>') {
+            angle_bracket = ">";
+        } else {
+            return None;
+        }
+
+        // FIXME:In order to be stable-rustc compiled , it needs to be compatible here.
+        // Waiting for rustc-1.51.0;
         let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
         if let Some(filename) = sub_command_inner.next() {
             Some(create_stdio_file(angle_bracket, filename))

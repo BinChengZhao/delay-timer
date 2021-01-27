@@ -107,6 +107,8 @@ pub mod functions {
 pub mod cron_expression_grammatical_candy {
     use std::ops::Deref;
 
+    // FIXME: https://github.com/BinChengZhao/delay-timer/issues/4
+    // `&'static str` TO `String`
     #[derive(Debug, Copy, Clone)]
     pub struct CandyCronStr(pub &'static str);
 

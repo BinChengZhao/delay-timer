@@ -14,6 +14,8 @@ such as Sunday at 4am to execute a backup task.
 
 Supports configuration of the maximum number of parallelism of tasks.
 
+### TODO The minimum-supported version fo rustc is `1.*.*` .
+
 [![Build](https://github.com/BinChengZhao/delay-timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay-timer/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](

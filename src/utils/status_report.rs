@@ -39,7 +39,7 @@ impl TryFrom<&TimerEvent> for PublicEvent {
             TimerEvent::AppendTaskHandle(_, delay_task_handler_box) => {
                 Ok(PublicEvent::RunningTask(delay_task_handler_box.get_task_id(), delay_task_handler_box.get_record_id()))
             }
-            TimerEvent::FinishTask(task_id, record_id) => {
+            TimerEvent::FinishTask(task_id, record_id, _) => {
                 Ok(PublicEvent::FinishTask(*task_id, *record_id))
             }
             _ => Err("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!"),
