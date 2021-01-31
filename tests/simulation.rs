@@ -42,7 +42,7 @@ fn go_works() {
 
     for _ in 0..3 {
         debug_assert_eq!(i, share_num.load(Acquire));
-        park_timeout(Duration::from_micros(park_time + 300_000));
+        park_timeout(Duration::from_micros(park_time + 280_000));
 
         //Testing, whether the mission is performing as expected.
         i = i + 1;

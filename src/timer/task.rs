@@ -120,7 +120,9 @@ pub struct TaskBuilder<'a> {
 
     ///Maximum parallel runable num (optional).
     maximun_parallel_runable_num: Option<u64>,
-    // TODO: whether auto cancel.
+
+    build_by_candy_str: bool, 
+
     // Zip other future to auto cancel it be poll when  first future-task finished.
 }
 
@@ -213,21 +215,29 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Set task Frequency by customized CandyCronStr.
+    /// In order to build a high-performance,
+    /// highly reusable `TaskBuilder` that maintains the Copy feature .
+    /// when supporting building from CandyCronStr ,
+    /// here actively leaks memory for create a str-slice (because str-slice support Copy, String does not)
+    /// String's memory will be recycle at TaskBuilder drop time.
     #[inline(always)]
     pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
         &mut self,
         frequency: CandyFrequency<T>,
     ) -> &mut Self {
+        self.build_by_candy_str = true;
+
         let frequency = match frequency {
             CandyFrequency::Once(candy_cron_middle_str) => {
-                Frequency::Once(candy_cron_middle_str.into().0)
+                Frequency::Once(Box::leak(candy_cron_middle_str.into().0.into_boxed_str()))
             }
             CandyFrequency::Repeated(candy_cron_middle_str) => {
-                Frequency::Repeated(candy_cron_middle_str.into().0)
+                Frequency::Repeated(Box::leak(candy_cron_middle_str.into().0.into_boxed_str()))
             }
-            CandyFrequency::CountDown(exec_count, candy_cron_middle_str) => {
-                Frequency::CountDown(exec_count, candy_cron_middle_str.into().0)
-            }
+            CandyFrequency::CountDown(exec_count, candy_cron_middle_str) => Frequency::CountDown(
+                exec_count,
+                Box::leak(candy_cron_middle_str.into().0.into_boxed_str()),
+            ),
         };
 
         self.frequency = Some(frequency);
@@ -311,6 +321,31 @@ impl<'a> TaskBuilder<'a> {
             lru_cache.put(indiscriminate_expression, taskschedule.clone());
             taskschedule
         })
+    }
+
+    /// If we call set_frequency_by_candy explicitly and generate TaskBuilder,
+    /// We need to call `free` manually before `TaskBuilder` drop or before we leave the scope.
+    ///
+    /// Explain:
+    /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
+    /// disallowed. This feature can make some sense in theory, but the current
+    /// implementation is incorrect and can lead to memory unsafety (see
+    /// [issue #20126][iss20126]), so it has been disabled for now.
+
+    /// So I can't go through Drop and handle these automatically.
+    pub fn free(self) {
+        if self.build_by_candy_str {
+            if let Some(frequency) = self.frequency {
+                let s = match frequency {
+                    Frequency::Once(s) => s,
+                    Frequency::Repeated(s) => s,
+                    Frequency::CountDown(_, s) => s,
+                };
+
+                let box_str: Box<str> = <Box<str> as From<&'_ str>>::from(s);
+                drop(box_str);
+            }
+        }
     }
 }
 

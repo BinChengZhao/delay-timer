@@ -76,9 +76,9 @@
 //! impl Into<CandyCronStr> for AuspiciousTime {
 //!     fn into(self) -> CandyCronStr {
 //!         match self {
-//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
-//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
-//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
 //!         }
 //!     }
 //! }
@@ -194,9 +194,9 @@
 //! impl Into<CandyCronStr> for AuspiciousTime {
 //!     fn into(self) -> CandyCronStr {
 //!         match self {
-//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
-//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
-//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
 //!         }
 //!     }
 //! }
