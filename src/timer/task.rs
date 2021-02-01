@@ -15,7 +15,10 @@ use lru::LruCache;
 //TODO: Add doc.
 thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<String, ScheduleIteratorOwned<Utc>>> = RefCell::new(LruCache::new(256)));
 
-//TaskMark is use to remove/stop the task.
+//TODO: Add doc.
+thread_local!(static CRON_EXPRESSION_CACHE1: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
+
+// TaskMark is use to remove/stop the task.
 #[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct TaskMark {
     pub(crate) task_id: u64,
@@ -54,22 +57,107 @@ impl TaskMark {
 }
 
 #[derive(Debug, Copy, Clone)]
-///Enumerated values of repeating types.
+/// Enumerated values of repeating types.
 pub enum Frequency<'a> {
-    ///Repeat once.
+    /// Repeat once.
     Once(&'a str),
-    ///Repeat ad infinitum.
+    /// Repeat ad infinitum.
     Repeated(&'a str),
-    ///Type of countdown.
+    /// Type of countdown.
     CountDown(u32, &'a str),
 }
-///Iterator for task internal control of execution time.
-#[derive(Debug, Clone)]
+/// Iterator for task internal control of execution time.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FrequencyInner {
     ///Unlimited repetition types.
     Repeated(ScheduleIteratorOwned<Utc>),
     ///Type of countdown.
     CountDown(u32, ScheduleIteratorOwned<Utc>),
+}
+
+/// Set the time zone for the time of the expression iteration.
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum ScheduleIteratorTimeZone {
+    /// Utc specifies the UTC time zone. It is most efficient.
+    Utc,
+    /// Local specifies the system local time zone.
+    Local,
+    /// FixedOffset specifies an arbitrary, fixed time zone such as UTC+09:00 or UTC-10:30. This often results from the parsed textual date and time. Since it stores the most information and does not depend on the system environment, you would want to normalize other TimeZones into this type.
+    FixedOffset(FixedOffset),
+}
+
+#[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
+struct ScheduleIteratorTimeZoneQuery {
+    time_zone: ScheduleIteratorTimeZone,
+    cron_expression: String,
+}
+
+impl Default for ScheduleIteratorTimeZone {
+    fn default() -> Self {
+        ScheduleIteratorTimeZone::Local
+    }
+}
+
+/// The Cron-expression scheduling iterator enum.
+/// There are three variants.
+/// The declaration `enum` is to avoid the problems caused by generalized contagion and monomorphism.
+///
+//
+// Frequency<T> -> FrequencyInner<T> -> Task<T> -> Slot<T> -> Wheel<T> ....
+// Frequency<Utc> or Frequency<Local> caused Task<Utc> Task<Local>
+// The Wheel<T> must only exist one for delay-timer run ,
+// can't store two kind of task-type .
+//
+///
+/// The intention is to provide an api to the user to set the time zone of `ScheduleIteratorOwned` conveniently,
+/// if you use a generic that wraps its type need to add this generic parameter,
+/// and after the type will be inconsistent and can not be stored in the same container,
+/// so use enum to avoid these problems.
+
+#[derive(Debug, Clone)]
+enum DelayTimerScheduleIteratorOwned {
+    InnerUtcScheduleIteratorOwned(ScheduleIteratorOwned<Utc>),
+    InnerLocalScheduleIteratorOwned(ScheduleIteratorOwned<Local>),
+    InnerFixedOffsetScheduleIteratorOwned(ScheduleIteratorOwned<FixedOffset>),
+}
+
+impl DelayTimerScheduleIteratorOwned {
+    pub(crate) fn new(
+        schedule_iterator_time_zone: ScheduleIteratorTimeZone,
+        cron_expression_str: &str,
+    ) {
+        // let a = match schedule_iterator_time_zone {
+        //     ScheduleIteratorTimeZone::Utc =>
+        //     //DelayTimerScheduleIteratorOwned::InnerUtcScheduleIteratorOwned(),
+        //     {
+        //         Utc
+        //     },
+        //     ScheduleIteratorTimeZone::Local => {Local},
+        //     // DelayTimerScheduleIteratorOwned::InnerLocalScheduleIteratorOwned(),
+        //     ,
+        //     ScheduleIteratorTimeZone::FixedOffset(fixed_offset) => {fixed_offset}, // DelayTimerScheduleIteratorOwned::InnerFixedOffsetScheduleIteratorOwned()            ,
+        // };
+    }
+
+    // Analyze expressions, get cache.
+    fn analyze_cron_expression(
+        schedule_iterator_time_zone: ScheduleIteratorTimeZone,
+        cron_expression: &str,
+    ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
+        let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
+
+        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
+            let mut lru_cache = expression_cache.borrow_mut();
+            if let Some(schedule_iterator) = lru_cache.get(&indiscriminate_expression) {
+                return schedule_iterator.clone();
+            }
+            let taskschedule = Schedule::from_str(&indiscriminate_expression)
+                .unwrap()
+                .upcoming_owned(Utc);
+            lru_cache.put(indiscriminate_expression, taskschedule.clone());
+            taskschedule
+        })
+    }
 }
 
 impl FrequencyInner {
@@ -105,25 +193,28 @@ impl FrequencyInner {
     }
 }
 
+//TODO: Support customer time-zore.
 #[derive(Debug, Default, Copy, Clone)]
-///Cycle plan task builder.
+/// Cycle plan task builder.
 pub struct TaskBuilder<'a> {
-    ///Repeat type.
+    /// Repeat type.
     frequency: Option<Frequency<'a>>,
 
-    ///Task_id should unique.
+    /// Task_id should unique.
     task_id: u64,
 
     /// Maximum execution time (optional).
     /// it can be use to deadline (excution-time + maximum_running_time).
     maximum_running_time: Option<u64>,
 
-    ///Maximum parallel runable num (optional).
+    /// Maximum parallel runable num (optional).
     maximun_parallel_runable_num: Option<u64>,
 
-    build_by_candy_str: bool, 
+    /// If it is built by set_frequency_by_candy, set the tag separately.
+    build_by_candy_str: bool,
 
-    // Zip other future to auto cancel it be poll when  first future-task finished.
+    /// Time zone for cron-expression iteration time.
+    schedule_iterator_time_zone: ScheduleIteratorTimeZone,
 }
 
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
@@ -219,7 +310,14 @@ impl<'a> TaskBuilder<'a> {
     /// highly reusable `TaskBuilder` that maintains the Copy feature .
     /// when supporting building from CandyCronStr ,
     /// here actively leaks memory for create a str-slice (because str-slice support Copy, String does not)
-    /// String's memory will be recycle at TaskBuilder drop time.
+    /// We need to call `free` manually before `TaskBuilder` drop or before we leave the scope.
+    ///
+    /// Explain:
+    /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
+    /// disallowed. This feature can make some sense in theory, but the current
+    /// implementation is incorrect and can lead to memory unsafety (see
+    /// [issue #20126][iss20126]), so it has been disabled for now.
+
     #[inline(always)]
     pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
         &mut self,
@@ -267,6 +365,17 @@ impl<'a> TaskBuilder<'a> {
         self.maximun_parallel_runable_num = Some(maximun_parallel_runable_num);
         self
     }
+
+    /// Set time zone for cron-expression iteration time.
+    #[inline(always)]
+    pub fn set_schedule_iterator_time_zone(
+        &mut self,
+        schedule_iterator_time_zone: ScheduleIteratorTimeZone,
+    ) -> &mut Self {
+        self.schedule_iterator_time_zone = schedule_iterator_time_zone;
+        self
+    }
+
     /// Spawn a task.
     pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where
@@ -283,7 +392,7 @@ impl<'a> TaskBuilder<'a> {
             }
         };
 
-        let taskschedule = Self::analyze_cron_expression(expression_str)?;
+        let taskschedule = self.analyze_cron_expression(expression_str)?;
 
         // Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
@@ -306,6 +415,7 @@ impl<'a> TaskBuilder<'a> {
 
     // Analyze expressions, get cache.
     fn analyze_cron_expression(
+        &self,
         cron_expression: &str,
     ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();

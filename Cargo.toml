@@ -29,7 +29,9 @@ status-report = []
 
 
 [dependencies]
-cron_clock = "0.6.6"
+# next_version 
+# cron_clock = "0.6.7"
+cron_clock = { path = "../cron_clock" }
 anyhow = "1.0.31"
 rs-snowflake = "0.5.0"
 waitmap = "1.1.0"

@@ -48,7 +48,7 @@ fn go_works() {
         i = i + 1;
 
         // Coordinates the inner-Runtime with the external(test-thread) clock.(200_000 is a buffer.)
-        next_exec_time = schedule_itertor.next().unwrap().timestamp_millis() as u128 * 1000;
+        next_exec_time = dbg!(schedule_itertor.next()).unwrap().timestamp_millis() as u128 * 1000;
         current_time = get_timestamp_micros();
         park_time = next_exec_time
             .checked_sub(current_time)
