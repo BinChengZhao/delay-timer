@@ -457,7 +457,7 @@ impl<'a> TaskBuilder<'a> {
     /// [issue #20126][iss20126]), so it has been disabled for now.
 
     /// So I can't go through Drop and handle these automatically.
-    pub fn free(self) {
+    pub fn free(&mut self) {
         if self.build_by_candy_str {
             if let Some(frequency) = self.frequency {
                 let s = match frequency {
@@ -466,8 +466,7 @@ impl<'a> TaskBuilder<'a> {
                     Frequency::CountDown(_, s) => s,
                 };
 
-                let box_str: Box<str> = <Box<str> as From<&'_ str>>::from(s);
-                drop(box_str);
+                <Box<str> as From<&'_ str>>::from(s);
             }
         }
     }

@@ -14,7 +14,7 @@ pub use crate::entity::{get_timestamp, get_timestamp_micros, DelayTimer, DelayTi
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use crate::timer::task::TaskContext;
-pub use crate::timer::task::{Frequency, Task, TaskBuilder, ScheduleIteratorTimeZone};
+pub use crate::timer::task::{Frequency, ScheduleIteratorTimeZone, Task, TaskBuilder};
 pub use crate::timer::timer_core::TimerEvent;
 pub use crate::utils::convenience::cron_expression_grammatical_candy::{
     CandyCron, CandyCronStr, CandyFrequency,
