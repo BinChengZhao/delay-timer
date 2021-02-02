@@ -85,16 +85,23 @@ cfg_tokio_support!(
 struct SmolClock {
     inner: smolTimer,
     period: Duration,
+    offset: Instant,
 }
 
 impl SmolClock {
     pub fn new(start: Instant, period: Duration) -> Self {
-        let inner = smolTimer::at(start + period);
-        SmolClock { inner, period }
+        let offset = start + period;
+        let inner = smolTimer::at(offset);
+        SmolClock {
+            inner,
+            period,
+            offset,
+        }
     }
 
     pub async fn tick(&mut self) {
-        let new_inner = smolTimer::after(self.period);
+        self.offset += self.period;
+        let new_inner = smolTimer::at(self.offset);
         replace(&mut self.inner, new_inner).await;
     }
 }
