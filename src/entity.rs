@@ -275,6 +275,7 @@ impl DelayTimer {
     }
 
     /// Cancel a task in timer_core by event-channel.
+    /// `Cancel` is for instances derived from the task running up.
     pub fn cancel_task(&self, task_id: u64, record_id: i64) -> Result<()> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }

@@ -13,10 +13,7 @@ use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
 
 //TODO: Add doc.
-thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<String, ScheduleIteratorOwned<Utc>>> = RefCell::new(LruCache::new(256)));
-
-//TODO: Add doc.
-thread_local!(static CRON_EXPRESSION_CACHE1: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
+thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
 
 // TaskMark is use to remove/stop the task.
 #[derive(Default, Debug, Clone, Copy)]
@@ -67,12 +64,12 @@ pub enum Frequency<'a> {
     CountDown(u32, &'a str),
 }
 /// Iterator for task internal control of execution time.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) enum FrequencyInner {
     ///Unlimited repetition types.
-    Repeated(ScheduleIteratorOwned<Utc>),
+    Repeated(DelayTimerScheduleIteratorOwned),
     ///Type of countdown.
-    CountDown(u32, ScheduleIteratorOwned<Utc>),
+    CountDown(u32, DelayTimerScheduleIteratorOwned),
 }
 
 /// Set the time zone for the time of the expression iteration.
@@ -87,7 +84,7 @@ pub enum ScheduleIteratorTimeZone {
 }
 
 #[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
-struct ScheduleIteratorTimeZoneQuery {
+pub(crate) struct ScheduleIteratorTimeZoneQuery {
     time_zone: ScheduleIteratorTimeZone,
     cron_expression: String,
 }
@@ -115,7 +112,7 @@ impl Default for ScheduleIteratorTimeZone {
 /// so use enum to avoid these problems.
 
 #[derive(Debug, Clone)]
-enum DelayTimerScheduleIteratorOwned {
+pub(crate) enum DelayTimerScheduleIteratorOwned {
     InnerUtcScheduleIteratorOwned(ScheduleIteratorOwned<Utc>),
     InnerLocalScheduleIteratorOwned(ScheduleIteratorOwned<Local>),
     InnerFixedOffsetScheduleIteratorOwned(ScheduleIteratorOwned<FixedOffset>),
@@ -123,39 +120,72 @@ enum DelayTimerScheduleIteratorOwned {
 
 impl DelayTimerScheduleIteratorOwned {
     pub(crate) fn new(
-        schedule_iterator_time_zone: ScheduleIteratorTimeZone,
-        cron_expression_str: &str,
-    ) {
-        // let a = match schedule_iterator_time_zone {
-        //     ScheduleIteratorTimeZone::Utc =>
-        //     //DelayTimerScheduleIteratorOwned::InnerUtcScheduleIteratorOwned(),
-        //     {
-        //         Utc
-        //     },
-        //     ScheduleIteratorTimeZone::Local => {Local},
-        //     // DelayTimerScheduleIteratorOwned::InnerLocalScheduleIteratorOwned(),
-        //     ,
-        //     ScheduleIteratorTimeZone::FixedOffset(fixed_offset) => {fixed_offset}, // DelayTimerScheduleIteratorOwned::InnerFixedOffsetScheduleIteratorOwned()            ,
-        // };
+        ScheduleIteratorTimeZoneQuery {
+            time_zone,
+            ref cron_expression,
+        }: ScheduleIteratorTimeZoneQuery,
+    ) -> DelayTimerScheduleIteratorOwned {
+        match time_zone {
+            ScheduleIteratorTimeZone::Utc => {
+                DelayTimerScheduleIteratorOwned::InnerUtcScheduleIteratorOwned(
+                    Schedule::from_str(cron_expression)
+                        .unwrap()
+                        .upcoming_owned(Utc),
+                )
+            }
+            ScheduleIteratorTimeZone::Local => {
+                DelayTimerScheduleIteratorOwned::InnerLocalScheduleIteratorOwned(
+                    Schedule::from_str(cron_expression)
+                        .unwrap()
+                        .upcoming_owned(Local),
+                )
+            }
+            ScheduleIteratorTimeZone::FixedOffset(fixed_offset) => {
+                DelayTimerScheduleIteratorOwned::InnerFixedOffsetScheduleIteratorOwned(
+                    Schedule::from_str(cron_expression)
+                        .unwrap()
+                        .upcoming_owned(fixed_offset),
+                )
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn next(&mut self) -> i64 {
+        match self {
+            Self::InnerUtcScheduleIteratorOwned(ref mut iterator) => {
+                iterator.next().unwrap().timestamp()
+            }
+            Self::InnerLocalScheduleIteratorOwned(ref mut iterator) => {
+                iterator.next().unwrap().timestamp()
+            }
+            Self::InnerFixedOffsetScheduleIteratorOwned(ref mut iterator) => {
+                iterator.next().unwrap().timestamp()
+            }
+        }
     }
 
     // Analyze expressions, get cache.
     fn analyze_cron_expression(
-        schedule_iterator_time_zone: ScheduleIteratorTimeZone,
+        time_zone: ScheduleIteratorTimeZone,
         cron_expression: &str,
-    ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
+    ) -> Result<DelayTimerScheduleIteratorOwned, AccessError> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
+        let schedule_iterator_time_zone_query: ScheduleIteratorTimeZoneQuery =
+            ScheduleIteratorTimeZoneQuery {
+                cron_expression: indiscriminate_expression,
+                time_zone,
+            };
 
         CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
             let mut lru_cache = expression_cache.borrow_mut();
-            if let Some(schedule_iterator) = lru_cache.get(&indiscriminate_expression) {
+            if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
                 return schedule_iterator.clone();
             }
-            let taskschedule = Schedule::from_str(&indiscriminate_expression)
-                .unwrap()
-                .upcoming_owned(Utc);
-            lru_cache.put(indiscriminate_expression, taskschedule.clone());
-            taskschedule
+            let task_schedule =
+                DelayTimerScheduleIteratorOwned::new(schedule_iterator_time_zone_query.clone());
+            lru_cache.put(schedule_iterator_time_zone_query, task_schedule.clone());
+            task_schedule
         })
     }
 }
@@ -173,8 +203,8 @@ impl FrequencyInner {
     fn next_alarm_timestamp(&mut self) -> i64 {
         //TODO:handle error
         match self {
-            FrequencyInner::CountDown(_, ref mut clock) => clock.next().unwrap().timestamp(),
-            FrequencyInner::Repeated(ref mut clock) => clock.next().unwrap().timestamp(),
+            FrequencyInner::CountDown(_, ref mut clock) => clock.next(),
+            FrequencyInner::Repeated(ref mut clock) => clock.next(),
         }
     }
 
@@ -284,6 +314,7 @@ pub struct Task {
     /// Loop the line and check how many more clock cycles it will take to execute it.
     cylinder_line: u64,
     /// Validity.
+    /// Any `Task` can set `valid` for that stop.
     valid: bool,
     /// Maximum parallel runable num (optional).
     pub(crate) maximun_parallel_runable_num: Option<u64>,
@@ -392,7 +423,10 @@ impl<'a> TaskBuilder<'a> {
             }
         };
 
-        let taskschedule = self.analyze_cron_expression(expression_str)?;
+        let taskschedule = DelayTimerScheduleIteratorOwned::analyze_cron_expression(
+            self.schedule_iterator_time_zone,
+            expression_str,
+        )?;
 
         // Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
@@ -410,26 +444,6 @@ impl<'a> TaskBuilder<'a> {
             cylinder_line: 0,
             valid: true,
             maximun_parallel_runable_num: self.maximun_parallel_runable_num,
-        })
-    }
-
-    // Analyze expressions, get cache.
-    fn analyze_cron_expression(
-        &self,
-        cron_expression: &str,
-    ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
-        let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
-
-        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
-            let mut lru_cache = expression_cache.borrow_mut();
-            if let Some(schedule_iterator) = lru_cache.get(&indiscriminate_expression) {
-                return schedule_iterator.clone();
-            }
-            let taskschedule = Schedule::from_str(&indiscriminate_expression)
-                .unwrap()
-                .upcoming_owned(Utc);
-            lru_cache.put(indiscriminate_expression, taskschedule.clone());
-            taskschedule
         })
     }
 

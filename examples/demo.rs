@@ -160,7 +160,7 @@ impl Into<CandyCronStr> for AuspiciousTime {
             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
-            Self::PerDayFiveAclock => CandyCronStr("01 15 8 * * * *".to_string()),
+            Self::PerDayFiveAclock => CandyCronStr("01 00 1 * * * *".to_string()),
         }
     }
 }

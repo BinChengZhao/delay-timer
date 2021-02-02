@@ -239,12 +239,6 @@ impl EventHandle {
             .unwrap_or_else(|e| println!("{}", e));
     }
 
-    //TODO:
-    //cancel for exit running task.
-    //stop is suspension of execution(set vaild).
-    //user delete task , node should remove.
-    //any `Task` can set `valid` for that stop.
-
     //add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Task) -> TaskMark {
         let second_hand = self.shared_header.second_hand.load(Acquire);
