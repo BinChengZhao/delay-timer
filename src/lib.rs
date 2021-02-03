@@ -203,6 +203,7 @@
 //! ```
 #![cfg_attr(RUSTC_IS_NIGHTLY, feature(linked_list_cursors))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![feature(renamed_spin_loop)]
 // TODO:When the version is stable in the future, we should consider using stable compile unified.
 // FIXME: Auto fill cli-args `features = full` when exec cargo test.
 #[macro_use]
