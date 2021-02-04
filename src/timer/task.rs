@@ -466,7 +466,9 @@ impl<'a> TaskBuilder<'a> {
                     Frequency::CountDown(_, s) => s,
                 };
 
-                <Box<str> as From<&'_ str>>::from(s);
+                unsafe {
+                    Box::from_raw(std::mem::transmute::<&str, *mut str>(s));
+                }
             }
         }
     }

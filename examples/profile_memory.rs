@@ -1,4 +1,6 @@
 use delay_timer::prelude::*;
+use std::thread::sleep;
+use std::time::Duration;
 
 #[derive(Default)]
 struct RequstBody {
@@ -27,10 +29,10 @@ impl Into<CandyCronStr> for RequstBody {
 // LD_PRELOAD=../../tools-bin/libmemory_profiler.so ./target/debug/examples/profile_memory
 // ../../tools-bin/memory-profiler-cli server memory-profiling_*.dat
 fn main() {
-    // let mut task_builder_vec: Vec<RequstBody> = Vec::with_capacity(100_000);
-    let mut task_builder_vec: Vec<TaskBuilder> = Vec::with_capacity(100_000);
+    let capacity: usize = 256_00;
+    let mut task_builder_vec: Vec<TaskBuilder> = Vec::with_capacity(capacity);
 
-    for _ in 0..256_00 {
+    for _ in 0..capacity {
         task_builder_vec.push({
             let mut task_builder = TaskBuilder::default();
             task_builder
@@ -38,15 +40,15 @@ fn main() {
 
             task_builder
         });
-
-        // task_builder_vec.push(RequstBody::fake_request_body());
     }
 
-    for _ in 0..256_00 {
-        // FIXME: It can't free memory.
+    sleep(Duration::from_secs(25));
+
+    for _ in 0..capacity {
         task_builder_vec.pop().unwrap().free();
-        // task_builder_vec.pop().unwrap();
     }
 
     drop(task_builder_vec);
+
+    dbg!("after drop");
 }
