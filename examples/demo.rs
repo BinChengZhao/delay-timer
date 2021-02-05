@@ -5,7 +5,7 @@ use std::thread::{current, park, sleep, Thread};
 use std::time::Duration;
 use surf;
 
-//cargo run --package delay_timer --example demo --features=full
+// cargo run --package delay_timer --example demo --features=full
 
 fn main() {
     let delay_timer = DelayTimerBuilder::default().enable_status_report().build();

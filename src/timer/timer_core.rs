@@ -269,8 +269,8 @@ impl Timer {
         self.handle_task(task, timestamp, next_second_hand, true)
     }
 
-    // Use `next_second_hand` to solve a problem 
-    // (when exec_timestamp - timestamp = 0, a task that needs to be executed immediately 
+    // Use `next_second_hand` to solve a problem
+    // (when exec_timestamp - timestamp = 0, a task that needs to be executed immediately
     // is instead put on the next turn)
     pub(crate) fn handle_task(
         &mut self,
