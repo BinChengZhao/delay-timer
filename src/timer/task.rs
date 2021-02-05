@@ -113,9 +113,9 @@ impl Default for ScheduleIteratorTimeZone {
 
 #[derive(Debug, Clone)]
 pub(crate) enum DelayTimerScheduleIteratorOwned {
-    InnerUtcScheduleIteratorOwned(ScheduleIteratorOwned<Utc>),
-    InnerLocalScheduleIteratorOwned(ScheduleIteratorOwned<Local>),
-    InnerFixedOffsetScheduleIteratorOwned(ScheduleIteratorOwned<FixedOffset>),
+    Utc(ScheduleIteratorOwned<Utc>),
+    Local(ScheduleIteratorOwned<Local>),
+    FixedOffset(ScheduleIteratorOwned<FixedOffset>),
 }
 
 impl DelayTimerScheduleIteratorOwned {
@@ -126,22 +126,18 @@ impl DelayTimerScheduleIteratorOwned {
         }: ScheduleIteratorTimeZoneQuery,
     ) -> DelayTimerScheduleIteratorOwned {
         match time_zone {
-            ScheduleIteratorTimeZone::Utc => {
-                DelayTimerScheduleIteratorOwned::InnerUtcScheduleIteratorOwned(
-                    Schedule::from_str(cron_expression)
-                        .unwrap()
-                        .upcoming_owned(Utc),
-                )
-            }
-            ScheduleIteratorTimeZone::Local => {
-                DelayTimerScheduleIteratorOwned::InnerLocalScheduleIteratorOwned(
-                    Schedule::from_str(cron_expression)
-                        .unwrap()
-                        .upcoming_owned(Local),
-                )
-            }
+            ScheduleIteratorTimeZone::Utc => DelayTimerScheduleIteratorOwned::Utc(
+                Schedule::from_str(cron_expression)
+                    .unwrap()
+                    .upcoming_owned(Utc),
+            ),
+            ScheduleIteratorTimeZone::Local => DelayTimerScheduleIteratorOwned::Local(
+                Schedule::from_str(cron_expression)
+                    .unwrap()
+                    .upcoming_owned(Local),
+            ),
             ScheduleIteratorTimeZone::FixedOffset(fixed_offset) => {
-                DelayTimerScheduleIteratorOwned::InnerFixedOffsetScheduleIteratorOwned(
+                DelayTimerScheduleIteratorOwned::FixedOffset(
                     Schedule::from_str(cron_expression)
                         .unwrap()
                         .upcoming_owned(fixed_offset),
@@ -153,15 +149,9 @@ impl DelayTimerScheduleIteratorOwned {
     #[inline(always)]
     pub(crate) fn next(&mut self) -> i64 {
         match self {
-            Self::InnerUtcScheduleIteratorOwned(ref mut iterator) => {
-                iterator.next().unwrap().timestamp()
-            }
-            Self::InnerLocalScheduleIteratorOwned(ref mut iterator) => {
-                iterator.next().unwrap().timestamp()
-            }
-            Self::InnerFixedOffsetScheduleIteratorOwned(ref mut iterator) => {
-                iterator.next().unwrap().timestamp()
-            }
+            Self::Utc(ref mut iterator) => iterator.next().unwrap().timestamp(),
+            Self::Local(ref mut iterator) => iterator.next().unwrap().timestamp(),
+            Self::FixedOffset(ref mut iterator) => iterator.next().unwrap().timestamp(),
         }
     }
 

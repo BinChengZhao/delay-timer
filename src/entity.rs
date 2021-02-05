@@ -265,6 +265,21 @@ impl DelayTimer {
     /// TODO: In the future, adding a task may return a `Handle` to the implementation of Future,
     /// through which the running information associated with the task can be queried.
 
+    // Here is an expected implementation, which is not yet determined.
+    ///```
+    // let delay_timer = DelayTimer::default();
+    //
+    // let join_handle = delay_timer.add_task(_).unwrap();
+    //
+    // let peek : Option<Peek<&Instance>> = join_handle.peek().await;
+    // let peek : Result<Option<Peek<&Instance>>> join_handle.try_peek();
+    //
+    // let instance : Option<Intance> =  join_handle.next().await.unwrap();
+    // let instance : Result<Option<Intance>> =  join_handle.try_next().unwrap();
+    //
+    // instance.cancel();
+    //
+    ///```
     pub fn add_task(&self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }

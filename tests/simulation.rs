@@ -1,4 +1,4 @@
-use delay_timer::cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
+use delay_timer::cron_clock::{Schedule, ScheduleIteratorOwned};
 use delay_timer::prelude::*;
 
 use std::str::FromStr;
@@ -6,7 +6,10 @@ use std::sync::atomic::{
     AtomicUsize,
     Ordering::{Acquire, Release},
 };
-use std::sync::{atomic::AtomicI32, Arc};
+use std::sync::{
+    atomic::{AtomicI32, AtomicU64},
+    Arc,
+};
 use std::thread::{self, park_timeout};
 use std::time::Duration;
 
@@ -14,10 +17,12 @@ use smol::Timer;
 #[test]
 fn go_works() {
     // Coordinates the inner-Runtime with the external(test-thread) clock.
-    let expression = "0/3 * * * * * *";
-    let mut schedule_itertor: ScheduleIteratorOwned<Utc> =
-        Schedule::from_str(expression).unwrap().upcoming_owned(Utc);
-    schedule_itertor.next();
+    let expression = "0/2 * * * * * *";
+    let mut schedule_itertor: ScheduleIteratorOwned<Local> = Schedule::from_str(expression)
+        .unwrap()
+        .upcoming_owned(Local);
+    // schedule_itertor.next();
+
     let mut next_exec_time;
     let mut current_time;
     let mut park_time = 2_000_000u64;
@@ -42,13 +47,13 @@ fn go_works() {
 
     for _ in 0..3 {
         debug_assert_eq!(i, share_num.load(Acquire));
-        park_timeout(Duration::from_micros(park_time + 280_000));
+        park_timeout(Duration::from_micros(park_time + 1_000_000));
 
         //Testing, whether the mission is performing as expected.
         i = i + 1;
 
         // Coordinates the inner-Runtime with the external(test-thread) clock.(200_000 is a buffer.)
-        next_exec_time = dbg!(schedule_itertor.next()).unwrap().timestamp_millis() as u128 * 1000;
+        next_exec_time = dbg!(schedule_itertor.next().unwrap().timestamp_millis()) as u128 * 1000;
         current_time = get_timestamp_micros();
         park_time = next_exec_time
             .checked_sub(current_time)
@@ -59,7 +64,7 @@ fn go_works() {
 #[test]
 fn test_maximun_parallel_runable_num() {
     let delay_timer = DelayTimer::new();
-    let share_num = Arc::new(AtomicUsize::new(0));
+    let share_num = Arc::new(AtomicU64::new(0));
     let share_num_bunshin = share_num.clone();
 
     let body = create_async_fn_body!((share_num_bunshin){
@@ -70,18 +75,18 @@ fn test_maximun_parallel_runable_num() {
     });
 
     let task = TaskBuilder::default()
-        .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
+        .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
         .set_task_id(1)
         .set_maximun_parallel_runable_num(3)
         .spawn(body)
         .unwrap();
     delay_timer.add_task(task).unwrap();
 
-    for _ in 0..3 {
-        park_timeout(Duration::from_micros(3_000_100));
+    for i in 1..=6 {
+        park_timeout(Duration::from_micros(1_000_000 * i));
 
         //Testing, whether the mission is performing as expected.
-        debug_assert_eq!(3, share_num.load(Acquire));
+        debug_assert!(dbg!(share_num.load(Acquire)) <= i);
     }
 }
 

@@ -244,7 +244,6 @@ impl EventHandle {
         let second_hand = self.shared_header.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();
         let timestamp = self.shared_header.global_time.load(Acquire);
-
         let time_seed: u64 = exec_time
             .checked_sub(timestamp)
             .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
