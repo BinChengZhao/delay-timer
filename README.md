@@ -1,21 +1,4 @@
-# delay-timer
-Time-manager of delayed tasks. Like crontab, but synchronous asynchronous tasks are possible, and dynamic add/cancel/remove is supported.
-
-delay-timer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures.
-
-The underlying runtime is based on the optional smol and tokio, and you can build your application with either one.
-
-Since the library currently includes features such as `linked_list_cursors`, it needs to be developed in a nightly version.
-
-In the next release, we will be able to stabilize to the stable version.
-
-Except for the simple execution in a few seconds, you can also specify a specific date, 
-such as Sunday at 4am to execute a backup task.
-
-Supports configuration of the maximum number of parallelism of tasks.
-
-### TODO The minimum-supported version fo rustc is `1.*.*` .
-
+# delay-timer  
 [![Build](https://github.com/BinChengZhao/delay-timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay-timer/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](
@@ -24,7 +7,23 @@ https://github.com/BinChengZhao/delay-timer)
 https://crates.io/crates/delay_timer)
 [![Documentation](https://docs.rs/delay_timer/badge.svg)](
 https://docs.rs/delay_timer)
+
+Time-manager of delayed tasks. Like crontab, but synchronous asynchronous tasks are possible, and dynamic add/cancel/remove is supported.
+
+delay-timer is a task manager based on a time wheel algorithm, which makes it easy to manage timed tasks, or to periodically execute arbitrary tasks such as closures.
+
+The underlying runtime is based on the optional smol and tokio, and you can build your application with either one.
+
+The minimum-supported version of `rustc` is **1.49**.
+
+Except for the simple execution in a few seconds, you can also specify a specific date, 
+such as Sunday at 4am to execute a backup task.
+
+Supports configuration of the maximum number of parallelism of tasks.
+
 ![image](https://github.com/BinChengZhao/delay-timer/blob/master/structural_drawing/DelayTImer.png)
+
+
 ## Examples
 
 
