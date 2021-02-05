@@ -223,8 +223,8 @@ impl EventHandle {
 
             TimerEvent::FinishTask(task_id, record_id, _finish_time) => {
                 //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
-                //给外部单独提供开始时间， record_id 的时间有延迟
-                //或者是用snowflake.real_time 生成record_id ，就不用单独加字段了。。。
+                // Provide a separate start time for the external, record_id time with a delay.
+                // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.
                 self.cancel_task(task_id, record_id);
             }
         }

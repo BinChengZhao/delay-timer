@@ -38,7 +38,7 @@ impl TaskTrace {
     // that is no task_handler can cancel  or record_id bigger than last record_id.
     // one record_id may be used for many handler.
 
-    //TODO: 一个stable 的cfg， 一个nightly 的cfg .
+    //TODO: One stable cfg-flag， One nightly cfg-flag .
 
     #[cfg(RUSTC_IS_NIGHTLY)]
     pub(crate) fn quit_one_task_handler(
