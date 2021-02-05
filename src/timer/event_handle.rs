@@ -221,7 +221,10 @@ impl EventHandle {
                 self.task_trace.insert(task_id, delay_task_handler_box);
             }
 
-            TimerEvent::FinishTask(task_id, record_id) => {
+            TimerEvent::FinishTask(task_id, record_id, _finish_time) => {
+                //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
+                // Provide a separate start time for the external, record_id time with a delay.
+                // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.
                 self.cancel_task(task_id, record_id);
             }
         }
@@ -236,18 +239,11 @@ impl EventHandle {
             .unwrap_or_else(|e| println!("{}", e));
     }
 
-    //TODO:
-    //cancel for exit running task.
-    //stop is suspension of execution(set vaild).
-    //user delete task , node should remove.
-    //any `Task` can set `valid` for that stop.
-
     //add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Task) -> TaskMark {
         let second_hand = self.shared_header.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();
         let timestamp = self.shared_header.global_time.load(Acquire);
-
         let time_seed: u64 = exec_time
             .checked_sub(timestamp)
             .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)

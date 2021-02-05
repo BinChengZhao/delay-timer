@@ -13,9 +13,9 @@ use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
 
 //TODO: Add doc.
-thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<String, ScheduleIteratorOwned<Utc>>> = RefCell::new(LruCache::new(256)));
+thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
 
-//TaskMark is use to remove/stop the task.
+// TaskMark is use to remove/stop the task.
 #[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct TaskMark {
     pub(crate) task_id: u64,
@@ -54,22 +54,130 @@ impl TaskMark {
 }
 
 #[derive(Debug, Copy, Clone)]
-///Enumerated values of repeating types.
+/// Enumerated values of repeating types.
 pub enum Frequency<'a> {
-    ///Repeat once.
+    /// Repeat once.
     Once(&'a str),
-    ///Repeat ad infinitum.
+    /// Repeat ad infinitum.
     Repeated(&'a str),
-    ///Type of countdown.
+    /// Type of countdown.
     CountDown(u32, &'a str),
 }
-///Iterator for task internal control of execution time.
+/// Iterator for task internal control of execution time.
 #[derive(Debug, Clone)]
 pub(crate) enum FrequencyInner {
     ///Unlimited repetition types.
-    Repeated(ScheduleIteratorOwned<Utc>),
+    Repeated(DelayTimerScheduleIteratorOwned),
     ///Type of countdown.
-    CountDown(u32, ScheduleIteratorOwned<Utc>),
+    CountDown(u32, DelayTimerScheduleIteratorOwned),
+}
+
+/// Set the time zone for the time of the expression iteration.
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum ScheduleIteratorTimeZone {
+    /// Utc specifies the UTC time zone. It is most efficient.
+    Utc,
+    /// Local specifies the system local time zone.
+    Local,
+    /// FixedOffset specifies an arbitrary, fixed time zone such as UTC+09:00 or UTC-10:30. This often results from the parsed textual date and time. Since it stores the most information and does not depend on the system environment, you would want to normalize other TimeZones into this type.
+    FixedOffset(FixedOffset),
+}
+
+#[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
+pub(crate) struct ScheduleIteratorTimeZoneQuery {
+    time_zone: ScheduleIteratorTimeZone,
+    cron_expression: String,
+}
+
+impl Default for ScheduleIteratorTimeZone {
+    fn default() -> Self {
+        ScheduleIteratorTimeZone::Local
+    }
+}
+
+/// The Cron-expression scheduling iterator enum.
+/// There are three variants.
+/// The declaration `enum` is to avoid the problems caused by generalized contagion and monomorphism.
+///
+//
+// Frequency<T> -> FrequencyInner<T> -> Task<T> -> Slot<T> -> Wheel<T> ....
+// Frequency<Utc> or Frequency<Local> caused Task<Utc> Task<Local>
+// The Wheel<T> must only exist one for delay-timer run ,
+// can't store two kind of task-type .
+//
+///
+/// The intention is to provide an api to the user to set the time zone of `ScheduleIteratorOwned` conveniently,
+/// if you use a generic that wraps its type need to add this generic parameter,
+/// and after the type will be inconsistent and can not be stored in the same container,
+/// so use enum to avoid these problems.
+
+#[derive(Debug, Clone)]
+pub(crate) enum DelayTimerScheduleIteratorOwned {
+    Utc(ScheduleIteratorOwned<Utc>),
+    Local(ScheduleIteratorOwned<Local>),
+    FixedOffset(ScheduleIteratorOwned<FixedOffset>),
+}
+
+impl DelayTimerScheduleIteratorOwned {
+    pub(crate) fn new(
+        ScheduleIteratorTimeZoneQuery {
+            time_zone,
+            ref cron_expression,
+        }: ScheduleIteratorTimeZoneQuery,
+    ) -> DelayTimerScheduleIteratorOwned {
+        match time_zone {
+            ScheduleIteratorTimeZone::Utc => DelayTimerScheduleIteratorOwned::Utc(
+                Schedule::from_str(cron_expression)
+                    .unwrap()
+                    .upcoming_owned(Utc),
+            ),
+            ScheduleIteratorTimeZone::Local => DelayTimerScheduleIteratorOwned::Local(
+                Schedule::from_str(cron_expression)
+                    .unwrap()
+                    .upcoming_owned(Local),
+            ),
+            ScheduleIteratorTimeZone::FixedOffset(fixed_offset) => {
+                DelayTimerScheduleIteratorOwned::FixedOffset(
+                    Schedule::from_str(cron_expression)
+                        .unwrap()
+                        .upcoming_owned(fixed_offset),
+                )
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn next(&mut self) -> i64 {
+        match self {
+            Self::Utc(ref mut iterator) => iterator.next().unwrap().timestamp(),
+            Self::Local(ref mut iterator) => iterator.next().unwrap().timestamp(),
+            Self::FixedOffset(ref mut iterator) => iterator.next().unwrap().timestamp(),
+        }
+    }
+
+    // Analyze expressions, get cache.
+    fn analyze_cron_expression(
+        time_zone: ScheduleIteratorTimeZone,
+        cron_expression: &str,
+    ) -> Result<DelayTimerScheduleIteratorOwned, AccessError> {
+        let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
+        let schedule_iterator_time_zone_query: ScheduleIteratorTimeZoneQuery =
+            ScheduleIteratorTimeZoneQuery {
+                cron_expression: indiscriminate_expression,
+                time_zone,
+            };
+
+        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
+            let mut lru_cache = expression_cache.borrow_mut();
+            if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
+                return schedule_iterator.clone();
+            }
+            let task_schedule =
+                DelayTimerScheduleIteratorOwned::new(schedule_iterator_time_zone_query.clone());
+            lru_cache.put(schedule_iterator_time_zone_query, task_schedule.clone());
+            task_schedule
+        })
+    }
 }
 
 impl FrequencyInner {
@@ -85,8 +193,8 @@ impl FrequencyInner {
     fn next_alarm_timestamp(&mut self) -> i64 {
         //TODO:handle error
         match self {
-            FrequencyInner::CountDown(_, ref mut clock) => clock.next().unwrap().timestamp(),
-            FrequencyInner::Repeated(ref mut clock) => clock.next().unwrap().timestamp(),
+            FrequencyInner::CountDown(_, ref mut clock) => clock.next(),
+            FrequencyInner::Repeated(ref mut clock) => clock.next(),
         }
     }
 
@@ -105,23 +213,28 @@ impl FrequencyInner {
     }
 }
 
+//TODO: Support customer time-zore.
 #[derive(Debug, Default, Copy, Clone)]
-///Cycle plan task builder.
+/// Cycle plan task builder.
 pub struct TaskBuilder<'a> {
-    ///Repeat type.
+    /// Repeat type.
     frequency: Option<Frequency<'a>>,
 
-    ///Task_id should unique.
+    /// Task_id should unique.
     task_id: u64,
 
-    ///Maximum execution time (optional).
-    ///  it can be use to deadline (excution-time + maximum_running_time).
-    /// TODO: whether auto cancel.
-    /// Zip other future to auto cancel it be poll when  first future-task finished.
+    /// Maximum execution time (optional).
+    /// it can be use to deadline (excution-time + maximum_running_time).
     maximum_running_time: Option<u64>,
 
-    ///Maximum parallel runable num (optional).
+    /// Maximum parallel runable num (optional).
     maximun_parallel_runable_num: Option<u64>,
+
+    /// If it is built by set_frequency_by_candy, set the tag separately.
+    build_by_candy_str: bool,
+
+    /// Time zone for cron-expression iteration time.
+    schedule_iterator_time_zone: ScheduleIteratorTimeZone,
 }
 
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
@@ -159,7 +272,11 @@ impl TaskContext {
     pub async fn finishe_task(self) {
         if let Some(timer_event_sender) = self.timer_event_sender {
             timer_event_sender
-                .send(TimerEvent::FinishTask(self.task_id, self.record_id))
+                .send(TimerEvent::FinishTask(
+                    self.task_id,
+                    self.record_id,
+                    get_timestamp(),
+                ))
                 .await
                 .unwrap();
         }
@@ -187,6 +304,7 @@ pub struct Task {
     /// Loop the line and check how many more clock cycles it will take to execute it.
     cylinder_line: u64,
     /// Validity.
+    /// Any `Task` can set `valid` for that stop.
     valid: bool,
     /// Maximum parallel runable num (optional).
     pub(crate) maximun_parallel_runable_num: Option<u64>,
@@ -209,21 +327,36 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Set task Frequency by customized CandyCronStr.
+    /// In order to build a high-performance,
+    /// highly reusable `TaskBuilder` that maintains the Copy feature .
+    /// when supporting building from CandyCronStr ,
+    /// here actively leaks memory for create a str-slice (because str-slice support Copy, String does not)
+    /// We need to call `free` manually before `TaskBuilder` drop or before we leave the scope.
+    ///
+    /// Explain:
+    /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
+    /// disallowed. This feature can make some sense in theory, but the current
+    /// implementation is incorrect and can lead to memory unsafety (see
+    /// [issue #20126][iss20126]), so it has been disabled for now.
+
     #[inline(always)]
     pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
         &mut self,
         frequency: CandyFrequency<T>,
     ) -> &mut Self {
+        self.build_by_candy_str = true;
+
         let frequency = match frequency {
             CandyFrequency::Once(candy_cron_middle_str) => {
-                Frequency::Once(candy_cron_middle_str.into().0)
+                Frequency::Once(Box::leak(candy_cron_middle_str.into().0.into_boxed_str()))
             }
             CandyFrequency::Repeated(candy_cron_middle_str) => {
-                Frequency::Repeated(candy_cron_middle_str.into().0)
+                Frequency::Repeated(Box::leak(candy_cron_middle_str.into().0.into_boxed_str()))
             }
-            CandyFrequency::CountDown(exec_count, candy_cron_middle_str) => {
-                Frequency::CountDown(exec_count, candy_cron_middle_str.into().0)
-            }
+            CandyFrequency::CountDown(exec_count, candy_cron_middle_str) => Frequency::CountDown(
+                exec_count,
+                Box::leak(candy_cron_middle_str.into().0.into_boxed_str()),
+            ),
         };
 
         self.frequency = Some(frequency);
@@ -253,6 +386,17 @@ impl<'a> TaskBuilder<'a> {
         self.maximun_parallel_runable_num = Some(maximun_parallel_runable_num);
         self
     }
+
+    /// Set time zone for cron-expression iteration time.
+    #[inline(always)]
+    pub fn set_schedule_iterator_time_zone(
+        &mut self,
+        schedule_iterator_time_zone: ScheduleIteratorTimeZone,
+    ) -> &mut Self {
+        self.schedule_iterator_time_zone = schedule_iterator_time_zone;
+        self
+    }
+
     /// Spawn a task.
     pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where
@@ -269,7 +413,10 @@ impl<'a> TaskBuilder<'a> {
             }
         };
 
-        let taskschedule = Self::analyze_cron_expression(expression_str)?;
+        let taskschedule = DelayTimerScheduleIteratorOwned::analyze_cron_expression(
+            self.schedule_iterator_time_zone,
+            expression_str,
+        )?;
 
         // Building TaskFrequencyInner patterns based on repetition types.
         frequency_inner = match repeat_type {
@@ -290,23 +437,30 @@ impl<'a> TaskBuilder<'a> {
         })
     }
 
-    // Analyze expressions, get cache.
-    fn analyze_cron_expression(
-        cron_expression: &str,
-    ) -> Result<ScheduleIteratorOwned<Utc>, AccessError> {
-        let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
+    /// If we call set_frequency_by_candy explicitly and generate TaskBuilder,
+    /// We need to call `free` manually before `TaskBuilder` drop or before we leave the scope.
+    ///
+    /// Explain:
+    /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
+    /// disallowed. This feature can make some sense in theory, but the current
+    /// implementation is incorrect and can lead to memory unsafety (see
+    /// [issue #20126][iss20126]), so it has been disabled for now.
 
-        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
-            let mut lru_cache = expression_cache.borrow_mut();
-            if let Some(schedule_iterator) = lru_cache.get(&indiscriminate_expression) {
-                return schedule_iterator.clone();
+    /// So I can't go through Drop and handle these automatically.
+    pub fn free(&mut self) {
+        if self.build_by_candy_str {
+            if let Some(frequency) = self.frequency {
+                let s = match frequency {
+                    Frequency::Once(s) => s,
+                    Frequency::Repeated(s) => s,
+                    Frequency::CountDown(_, s) => s,
+                };
+
+                unsafe {
+                    Box::from_raw(std::mem::transmute::<&str, *mut str>(s));
+                }
             }
-            let taskschedule = Schedule::from_str(&indiscriminate_expression)
-                .unwrap()
-                .upcoming_owned(Utc);
-            lru_cache.put(indiscriminate_expression, taskschedule.clone());
-            taskschedule
-        })
+        }
     }
 }
 

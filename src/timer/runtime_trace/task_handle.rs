@@ -10,12 +10,12 @@ use anyhow::Result;
 use smol::Task as SmolTask;
 
 #[derive(Default, Debug)]
-///TaskTrace is contanier that own global task-handle.
+/// TaskTrace is contanier that own global task-handle.
 pub(crate) struct TaskTrace {
     inner: HashMap<u64, LinkedList<DelayTaskHandlerBox>>,
 }
 
-//TaskTrace can cancel a task via a Task Handle.
+// TaskTrace can cancel a task via a Task Handle.
 impl TaskTrace {
     pub(crate) fn insert(&mut self, task_id: u64, task_handler_box: DelayTaskHandlerBox) {
         //entry is amazing!
@@ -34,9 +34,13 @@ impl TaskTrace {
         }
     }
 
-    //linkedlist is ordered by record_id, if input record_id is small than linkedlist first record_id
-    //that is no task_handler can cancel  or record_id bigger than last record_id.
-    //one record_id may be used for many handler.
+    // linkedlist is ordered by record_id, if input record_id is small than linkedlist first record_id
+    // that is no task_handler can cancel  or record_id bigger than last record_id.
+    // one record_id may be used for many handler.
+
+    //TODO: One stable cfg-flag， One nightly cfg-flag .
+
+    #[cfg(RUSTC_IS_NIGHTLY)]
     pub(crate) fn quit_one_task_handler(
         &mut self,
         task_id: u64,
@@ -67,6 +71,23 @@ impl TaskTrace {
         } else {
             None
         }
+    }
+
+    #[cfg(not(RUSTC_IS_NIGHTLY))]
+    pub(crate) fn quit_one_task_handler(
+        &mut self,
+        task_id: u64,
+        record_id: i64,
+    ) -> Option<Result<()>> {
+        let task_handler_list = self.inner.get_mut(&task_id)?;
+        let index = task_handler_list
+            .iter()
+            .position(|d| d.record_id == record_id)?;
+
+        let mut has_remove_element_list = task_handler_list.split_off(index);
+        let mut remove_element = has_remove_element_list.pop_front()?;
+        task_handler_list.append(&mut has_remove_element_list);
+        Some(remove_element.quit())
     }
 }
 

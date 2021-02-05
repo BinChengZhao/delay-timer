@@ -2,8 +2,8 @@ use delay_timer::prelude::*;
 use hyper::{Client, Uri};
 use std::thread::{current, park, Thread};
 
-//When you try to run that's example nedd add feature `tokio-support`.
-//cargo run --example=cycle_tokio_task --features=tokio-support
+// When you try to run that's example nedd add feature `tokio-support`.
+// cargo run --example=cycle_tokio_task --features=tokio-support
 
 fn main() {
     let delay_timer = DelayTimerBuilder::default().tokio_runtime(None).build();
@@ -81,8 +81,8 @@ enum AuspiciousDay {
 impl Into<CandyCronStr> for AuspiciousDay {
     fn into(self) -> CandyCronStr {
         match self {
-            Self::Work => CandyCronStr("10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
-            Self::Wake => CandyCronStr("0 * * * Jan-Dec * 2020-2100"),
+            Self::Work => CandyCronStr("10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
+            Self::Wake => CandyCronStr("0 * * * Jan-Dec * 2020-2100".to_string()),
         }
     }
 }

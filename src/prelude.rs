@@ -14,7 +14,7 @@ pub use crate::entity::{get_timestamp, get_timestamp_micros, DelayTimer, DelayTi
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use crate::timer::task::TaskContext;
-pub use crate::timer::task::{Frequency, Task, TaskBuilder};
+pub use crate::timer::task::{Frequency, ScheduleIteratorTimeZone, Task, TaskBuilder};
 pub use crate::timer::timer_core::TimerEvent;
 pub use crate::utils::convenience::cron_expression_grammatical_candy::{
     CandyCron, CandyCronStr, CandyFrequency,
@@ -24,7 +24,7 @@ pub use crate::utils::convenience::functions::{
 };
 
 pub use anyhow::Result as AnyResult;
-pub use cron_clock;
+pub use cron_clock::{self, FixedOffset, Local, TimeZone, Utc};
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;

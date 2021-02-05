@@ -5,7 +5,7 @@ use std::thread::{current, park, sleep, Thread};
 use std::time::Duration;
 use surf;
 
-//cargo run --package delay_timer --example demo --features=full
+// cargo run --package delay_timer --example demo --features=full
 
 fn main() {
     let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
@@ -16,6 +16,7 @@ fn main() {
     delay_timer.add_task(build_task2(task_builder)).unwrap();
     delay_timer.add_task(build_task3(task_builder)).unwrap();
     delay_timer.add_task(build_task5(task_builder)).unwrap();
+    delay_timer.add_task(build_task7(task_builder)).unwrap();
 
     // Let's do someting about 2s.
     sleep(Duration::new(2, 1_000_000));
@@ -80,6 +81,20 @@ fn build_task5(mut task_builder: TaskBuilder) -> Task {
         .unwrap()
 }
 
+fn build_task7(mut task_builder: TaskBuilder) -> Task {
+    let body = create_async_fn_body!({
+        dbg!(get_timestamp());
+
+        Timer::after(Duration::from_secs(3)).await;
+    });
+    task_builder
+        .set_task_id(7)
+        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerDayFiveAclock))
+        .set_maximun_parallel_runable_num(2)
+        .spawn(body)
+        .unwrap()
+}
+
 pub fn generate_closure_template(
     name: String,
 ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
@@ -136,14 +151,16 @@ enum AuspiciousTime {
     PerSevenSeconds,
     PerEightSeconds,
     LoveTime,
+    PerDayFiveAclock,
 }
 
 impl Into<CandyCronStr> for AuspiciousTime {
     fn into(self) -> CandyCronStr {
         match self {
-            Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
-            Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
-            Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+            Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+            Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+            Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
+            Self::PerDayFiveAclock => CandyCronStr("01 00 1 * * * *".to_string()),
         }
     }
 }

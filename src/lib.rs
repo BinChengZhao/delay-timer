@@ -19,7 +19,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! delay_timer = "0.2.0"
+//! delay_timer = "*"
 //! ```
 //!
 //! Next:
@@ -76,9 +76,9 @@
 //! impl Into<CandyCronStr> for AuspiciousTime {
 //!     fn into(self) -> CandyCronStr {
 //!         match self {
-//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
-//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
-//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
 //!         }
 //!     }
 //! }
@@ -194,20 +194,16 @@
 //! impl Into<CandyCronStr> for AuspiciousTime {
 //!     fn into(self) -> CandyCronStr {
 //!         match self {
-//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
-//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
-//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
 //!         }
 //!     }
 //! }
 //! ```
-
-#![feature(linked_list_cursors)]
-#![feature(doc_cfg)]
-// Backup : https://github.com/contain-rs/linked-list/blob/master/src/lib.rs
-
+#![cfg_attr(RUSTC_IS_NIGHTLY, feature(linked_list_cursors))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 // TODO:When the version is stable in the future, we should consider using stable compile unified.
-// FIXME: Auto fill cli-args `features = full` when exec cargo test.
 #[macro_use]
 pub mod macros;
 pub mod entity;

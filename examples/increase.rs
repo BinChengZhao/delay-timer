@@ -1,12 +1,25 @@
-#![feature(ptr_internals)]
 use delay_timer::prelude::*;
 
-use std::ptr::Unique;
+use std::ops::Deref;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::sync::Arc;
 use std::thread::{current, park, Thread};
 
 use surf;
+
+#[derive(Debug, Clone, Copy)]
+struct SafePointer(NonNull<Arc<AtomicUsize>>);
+
+unsafe impl Send for SafePointer {}
+unsafe impl Sync for SafePointer {}
+impl Deref for SafePointer {
+    type Target = NonNull<Arc<AtomicUsize>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 // Remember close terminal can speed up because of
 // printnl! block process if stand-pipe if full.
 fn main() {
@@ -15,7 +28,8 @@ fn main() {
     // The Sync-Task run_flay.
     let mut run_flag = Arc::new(AtomicUsize::new(0));
     // cross thread share raw-pointer.
-    let run_flag_ref: Option<Unique<Arc<AtomicUsize>>> = Unique::new(&mut run_flag);
+    let run_flag_ref: SafePointer =
+        SafePointer(NonNull::new(&mut run_flag as *mut Arc<AtomicUsize>).unwrap());
 
     // Sync-Task body.
     let body = get_increase_fn(run_flag_ref);
@@ -53,10 +67,10 @@ fn main() {
 }
 
 fn get_increase_fn(
-    run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
+    run_flag_ref: SafePointer,
 ) -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
     move |_context| {
-        let local_run_flag = run_flag_ref.unwrap().as_ptr();
+        let local_run_flag = run_flag_ref.as_ptr();
 
         unsafe {
             (*local_run_flag).fetch_add(1, SeqCst);
@@ -67,10 +81,10 @@ fn get_increase_fn(
 
 fn get_wake_fn(
     thread: Thread,
-    run_flag_ref: Option<Unique<Arc<AtomicUsize>>>,
+    run_flag_ref: SafePointer,
 ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
     move |_context| {
-        let local_run_flag = run_flag_ref.unwrap().as_ptr();
+        let local_run_flag = run_flag_ref.as_ptr();
         unsafe {
             println!(
                 "end time {}, result {}",

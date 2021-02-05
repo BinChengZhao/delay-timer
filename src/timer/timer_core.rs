@@ -85,16 +85,23 @@ cfg_tokio_support!(
 struct SmolClock {
     inner: smolTimer,
     period: Duration,
+    offset: Instant,
 }
 
 impl SmolClock {
     pub fn new(start: Instant, period: Duration) -> Self {
-        let inner = smolTimer::at(start + period);
-        SmolClock { inner, period }
+        let offset = start + period;
+        let inner = smolTimer::at(offset);
+        SmolClock {
+            inner,
+            period,
+            offset,
+        }
     }
 
     pub async fn tick(&mut self) {
-        let new_inner = smolTimer::after(self.period);
+        self.offset += self.period;
+        let new_inner = smolTimer::at(self.offset);
         replace(&mut self.inner, new_inner).await;
     }
 }
@@ -106,7 +113,8 @@ pub enum TimerEvent {
     AddTask(Box<Task>),
     RemoveTask(u64),
     CancelTask(u64, i64),
-    FinishTask(u64, i64),
+    //TODO: Here it should be structured and no longer use tuples.
+    FinishTask(u64, i64, u64),
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
 #[derive(Clone)]
@@ -149,6 +157,7 @@ impl Timer {
     pub(crate) async fn async_schedule(&mut self) {
         //if that overtime , i run it not block
         let mut second_hand;
+        let mut next_second_hand;
         let mut timestamp;
 
         let runtime_kind = self.shared_header.runtime_instance.kind;
@@ -189,7 +198,8 @@ impl Timer {
                 }
 
                 if let Some(task) = task_option {
-                    self.maintain_task(task, timestamp, second_hand).await;
+                    next_second_hand = (second_hand + 1) % DEFAULT_TIMER_SLOT_COUNT;
+                    self.maintain_task(task, timestamp, next_second_hand).await;
                 }
             }
 
@@ -213,7 +223,7 @@ impl Timer {
         &mut self,
         mut task: Task,
         timestamp: u64,
-        second_hand: u64,
+        next_second_hand: u64,
     ) -> Option<()> {
         let record_id: i64 = self.shared_header.snowflakeid_bucket.get_id();
         let task_id: u64 = task.task_id;
@@ -229,7 +239,7 @@ impl Timer {
             //if runable_task.parallel_runable_num >= task.maximun_parallel_runable_num doesn't run it.
 
             if parallel_runable_num >= maximun_parallel_runable_num {
-                return self.handle_task(task, timestamp, second_hand, false);
+                return self.handle_task(task, timestamp, next_second_hand, false);
             }
         }
 
@@ -256,26 +266,26 @@ impl Timer {
             return Some(());
         }
 
-        self.handle_task(task, timestamp, second_hand, true)
+        self.handle_task(task, timestamp, next_second_hand, true)
     }
 
+    // Use `next_second_hand` to solve a problem
+    // (when exec_timestamp - timestamp = 0, a task that needs to be executed immediately
+    // is instead put on the next turn)
     pub(crate) fn handle_task(
         &mut self,
         mut task: Task,
         timestamp: u64,
-        second_hand: u64,
+        next_second_hand: u64,
         update_runable_num: bool,
     ) -> Option<()> {
         let task_id: u64 = task.task_id;
 
-        //Next execute timestamp.
+        // Next execute timestamp.
         let task_excute_timestamp = task.get_next_exec_timestamp();
 
-        //Time difference + current second hand % DEFAULT_TIMER_SLOT_COUNT
-        let step = task_excute_timestamp
-            .checked_sub(timestamp)
-            .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
-            + second_hand;
+        // Time difference + next second hand % DEFAULT_TIMER_SLOT_COUNT
+        let step = task_excute_timestamp.checked_sub(timestamp).unwrap_or(1) + next_second_hand;
         let quan = step / DEFAULT_TIMER_SLOT_COUNT;
         task.set_cylinder_line(quan);
         let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;

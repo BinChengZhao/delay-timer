@@ -135,16 +135,32 @@ pub mod shell_command {
     // I should give Option<Result<File>>
     //By Option(Some(Result<T>)), determine if there is an output stdio..
     //By Result<T>(OK(t)), determine if there is success open file.
+    #[cfg(not(SPLIT_INCLUSIVE_COMPATIBLE))]
     fn _has_redirect_file(command: &str) -> Option<Result<File>> {
-        let angle_bracket;
-
-        if command.contains(">>") {
-            angle_bracket = ">>";
+        let angle_bracket = if command.contains(">>") {
+            ">>"
         } else if command.contains('>') {
-            angle_bracket = ">";
+            ">"
         } else {
             return None;
+        };
+
+        if let Some(filename) = command.trim().rsplit(angle_bracket).next() {
+            Some(create_stdio_file(angle_bracket, filename))
+        } else {
+            None
         }
+    }
+
+    #[cfg(SPLIT_INCLUSIVE_COMPATIBLE)]
+    fn _has_redirect_file(command: &str) -> Option<Result<File>> {
+        let angle_bracket = if command.contains(">>") {
+            ">>"
+        } else if command.contains('>') {
+            ">"
+        } else {
+            return None;
+        };
 
         let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
         if let Some(filename) = sub_command_inner.next() {

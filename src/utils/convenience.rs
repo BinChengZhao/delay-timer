@@ -107,11 +107,15 @@ pub mod functions {
 pub mod cron_expression_grammatical_candy {
     use std::ops::Deref;
 
-    #[derive(Debug, Copy, Clone)]
-    pub struct CandyCronStr(pub &'static str);
+    #[derive(Debug, Clone)]
+    // Here, for the convenience of the user to create CandyCronStr,
+    // it is the internal type of CandyCronStr that from &'static str is changed to String,
+    // so that the user can construct CandyCronStr according to the indefinite conditions of the runtime.
+    // For: https://github.com/BinChengZhao/delay-timer/issues/4
+    pub struct CandyCronStr(pub String);
 
     impl Deref for CandyCronStr {
-        type Target = &'static str;
+        type Target = str;
 
         fn deref(&self) -> &Self::Target {
             &self.0
@@ -133,13 +137,13 @@ pub mod cron_expression_grammatical_candy {
     impl Into<CandyCronStr> for CandyCron {
         fn into(self) -> CandyCronStr {
             match self {
-                Secondly => CandyCronStr("@secondly"),
-                Minutely => CandyCronStr("@minutely"),
-                Hourly => CandyCronStr("@hourly"),
-                Daily => CandyCronStr("@daily"),
-                Weekly => CandyCronStr("@weekly"),
-                Monthly => CandyCronStr("@monthly"),
-                Yearly => CandyCronStr("@yearly"),
+                Secondly => CandyCronStr(String::from("@secondly")),
+                Minutely => CandyCronStr(String::from("@minutely")),
+                Hourly => CandyCronStr(String::from("@hourly")),
+                Daily => CandyCronStr(String::from("@daily")),
+                Weekly => CandyCronStr(String::from("@weekly")),
+                Monthly => CandyCronStr(String::from("@monthly")),
+                Yearly => CandyCronStr(String::from("@yearly")),
             }
         }
     }
@@ -174,15 +178,15 @@ mod tests {
     fn test_cron_candy() {
         use super::cron_expression_grammatical_candy::{CandyCron, CandyCronStr};
 
-        let mut s: &'static str;
+        let mut s: String;
 
         s = <CandyCron as Into<CandyCronStr>>::into(CandyCron::Daily).0;
         assert_eq!(s, "@daily");
 
-        s = *<CandyCron as Into<CandyCronStr>>::into(CandyCron::Yearly);
+        s = <CandyCron as Into<CandyCronStr>>::into(CandyCron::Yearly).0;
         assert_eq!(s, "@yearly");
 
-        s = *<CandyCron as Into<CandyCronStr>>::into(CandyCron::Secondly);
+        s = <CandyCron as Into<CandyCronStr>>::into(CandyCron::Secondly).0;
 
         assert_eq!(s, "@secondly");
     }
@@ -191,6 +195,7 @@ mod tests {
     fn test_customization_cron_candy() {
         use super::cron_expression_grammatical_candy::CandyCronStr;
         use std::convert::Into;
+        use std::ops::Deref;
 
         struct CustomizationCandyCron(i32);
 
@@ -201,19 +206,22 @@ mod tests {
                     1 => "0 59 23 18 11 3 2100",
                     _ => "* * * * * * *",
                 };
-                CandyCronStr(s)
+                CandyCronStr(s.to_owned())
             }
         }
 
         let mut candy_cron_str: CandyCronStr;
 
         candy_cron_str = CustomizationCandyCron(0).into();
-        debug_assert_eq!(*candy_cron_str, "1 1 1 1 1 1 1");
+        debug_assert_eq!(
+            <CandyCronStr as Deref>::deref(&candy_cron_str),
+            "1 1 1 1 1 1 1"
+        );
 
         candy_cron_str = CustomizationCandyCron(1).into();
-        debug_assert_eq!(*candy_cron_str, "0 59 23 18 11 3 2100");
+        debug_assert_eq!(candy_cron_str.deref(), "0 59 23 18 11 3 2100");
 
         candy_cron_str = CustomizationCandyCron(999).into();
-        debug_assert_eq!(*candy_cron_str, "* * * * * * *");
+        debug_assert_eq!(&*candy_cron_str, "* * * * * * *");
     }
 }

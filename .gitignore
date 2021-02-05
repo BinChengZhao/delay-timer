@@ -18,4 +18,5 @@ Cargo.lock
 /target
 *.log
 /*.txt
+*.dat
 .idea
