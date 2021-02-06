@@ -40,11 +40,11 @@ concat-idents = "1.1.1"
 
 
 # Optional
-tokio = { version = "~1.0.0", features = ["full"] , optional = true }
+tokio = { version = "1.2.*", features = ["full"] , optional = true }
 
 [dev-dependencies]
 surf = "2.1.0"
-tokio = { version = "~1.0.0", features = ["full"] }
+tokio = { version = "1.2.*", features = ["full"] }
 hyper= {version  = "0.14.2" , features = ["full"] }
 pretty_env_logger = "0.4"
 mockall = "0.8.2"
