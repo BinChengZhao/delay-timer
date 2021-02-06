@@ -19,3 +19,4 @@ Cargo.lock
 *.log
 /*.txt
 *.dat
+.idea
