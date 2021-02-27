@@ -48,6 +48,7 @@ Supports configuration of the maximum number of parallelism of tasks.
 
      // Add an asynchronous task to delay_timer.
      delay_timer.add_task(build_task(TaskBuilder::default()));
+
      // Since the tasks are executed in 8-second cycles,
      // we deal with something else.
      // Do someting about 8s.
@@ -79,9 +80,9 @@ Supports configuration of the maximum number of parallelism of tasks.
  impl Into<CandyCronStr> for AuspiciousTime {
      fn into(self) -> CandyCronStr {
          match self {
-             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
-             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
-             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
          }
      }
  }
@@ -193,9 +194,9 @@ Supports configuration of the maximum number of parallelism of tasks.
   impl Into<CandyCronStr> for AuspiciousTime {
       fn into(self) -> CandyCronStr {
           match self {
-              Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *"),
-              Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *"),
-              Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100"),
+              Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+              Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+              Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
          }
      }
  }
