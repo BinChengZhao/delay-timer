@@ -203,7 +203,6 @@
 //! ```
 #![cfg_attr(RUSTC_IS_NIGHTLY, feature(linked_list_cursors))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-// TODO:When the version is stable in the future, we should consider using stable compile unified.
 #[macro_use]
 pub mod macros;
 pub mod entity;

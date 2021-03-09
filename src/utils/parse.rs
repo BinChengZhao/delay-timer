@@ -14,6 +14,10 @@ pub mod shell_command {
     pub type ChildGuardList = LinkedList<ChildGuard>;
     #[derive(Debug)]
     pub struct ChildGuard {
+        //TODO: 包装tokio/smol 的 Child 
+        // 从第一个spawn的进程开始wait_output（因为第一个进程没有 stdin, 所以默认被drop也没事）
+
+        //`wait_with_output` The stdin handle to the child process, if any, will be closed before waiting. This helps avoid deadlock: it ensures that the child does not block waiting for input from the parent, while the parent waits for the child to exit.。
         pub(crate) child: Child,
     }
 
@@ -185,10 +189,6 @@ pub mod shell_command {
         if angle_bracket == ">>" {
             file_tmp.append(true);
         }
-
-        // Where you need to return a Result, use Result<T, anyhow::Error> or the equivalent anyhow::Result<T>.
-        //You can use it? Throws any type of error that implements std::error::Error.
-        //anyhow::Error is compatible with std::error::Error.
 
         //TODO:I need record that open file error because filename has a whitespace i don't trim.
         let os_filename = Path::new(filename.trim()).as_os_str();
