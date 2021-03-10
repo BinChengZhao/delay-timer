@@ -12,6 +12,8 @@ pub mod shell_command {
     use std::process::{Child, Command, ExitStatus, Stdio};
 
     pub type ChildGuardList = LinkedList<ChildGuard>;
+    pub type ChildGuardListX<T> = LinkedList<ChildGuardX<T>>;
+
     #[derive(Debug)]
     pub struct ChildGuard {
         //TODO: 包装tokio/smol 的 Child
@@ -19,6 +21,10 @@ pub mod shell_command {
 
         //`wait_with_output` The stdin handle to the child process, if any, will be closed before waiting. This helps avoid deadlock: it ensures that the child does not block waiting for input from the parent, while the parent waits for the child to exit.。
         pub(crate) child: Child,
+    }
+    #[derive(Debug)]
+    pub struct ChildGuardX<T> {
+        pub(crate) child: T,
     }
 
     impl ChildGuard {
