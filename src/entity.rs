@@ -262,8 +262,10 @@ impl DelayTimer {
     }
 
     /// Add a task in timer_core by event-channel.
+
     /// TODO: In the future, adding a task may return a `Handle` to the implementation of Future,
     /// through which the running information associated with the task can be queried.
+    /// TODO: The above logic will be put into `insert_task`-api later .
 
     // Here is an expected implementation, which is not yet determined.
     ///```
@@ -282,6 +284,11 @@ impl DelayTimer {
     ///```
     pub fn add_task(&self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
+    }
+
+    /// Update a task in timer_core by event-channel.
+    pub fn update_task(&self, task: Task) -> Result<()> {
+        self.seed_timer_event(TimerEvent::UpdateTask(Box::new(task)))
     }
 
     /// Remove a task in timer_core by event-channel.

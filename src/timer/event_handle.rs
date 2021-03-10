@@ -196,11 +196,20 @@ impl EventHandle {
                 return;
             }
             TimerEvent::AddTask(task) => {
-                let task_mark = self.add_task(*task);
+                let task_mark = self.add_task(task);
                 self.record_task_mark(task_mark);
             }
 
-            //TODO: UpdateTask
+            //TODO: The api associated with this variant will be exposed in the future.
+            TimerEvent::InsertTask(task) => {
+                let task_mark = self.add_task(task);
+                self.record_task_mark(task_mark);
+            }
+
+            TimerEvent::UpdateTask(task) => {
+                self.update_task(task).await;
+            }
+
             TimerEvent::RemoveTask(task_id) => {
                 self.remove_task(task_id).await;
                 self.shared_header.task_flag_map.cancel(&task_id);
@@ -242,7 +251,7 @@ impl EventHandle {
     }
 
     //add task to wheel_queue  slot
-    fn add_task(&mut self, mut task: Task) -> TaskMark {
+    fn add_task(&mut self, mut task: Box<Task>) -> TaskMark {
         let second_hand = self.shared_header.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();
         let timestamp = self.shared_header.global_time.load(Acquire);
@@ -261,19 +270,33 @@ impl EventHandle {
             .get_mut(&slot_seed)
             .unwrap()
             .value_mut()
-            .add_task(task);
+            .add_task(*task);
 
         TaskMark::new(task_id, slot_seed, 0)
     }
 
-    //for record task-mark.
+    // for record task-mark.
     pub(crate) fn record_task_mark(&mut self, task_mark: TaskMark) {
         self.shared_header
             .task_flag_map
             .insert(task_mark.task_id, task_mark);
     }
 
-    //for remove task.
+    // for update task.
+    pub(crate) async fn update_task(&mut self, task: Box<Task>) -> Option<Task> {
+        let task_mark = self.shared_header.task_flag_map.get(&task.task_id)?;
+
+        let slot_mark = task_mark.value().get_slot_mark();
+
+        self.shared_header
+            .wheel_queue
+            .get_mut(&slot_mark)
+            .unwrap()
+            .value_mut()
+            .update_task(*task)
+    }
+
+    // for remove task.
     pub(crate) async fn remove_task(&mut self, task_id: u64) -> Option<Task> {
         let task_mark = self.shared_header.task_flag_map.get(&task_id)?;
 

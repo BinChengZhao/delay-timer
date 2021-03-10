@@ -14,7 +14,7 @@ pub mod shell_command {
     pub type ChildGuardList = LinkedList<ChildGuard>;
     #[derive(Debug)]
     pub struct ChildGuard {
-        //TODO: 包装tokio/smol 的 Child 
+        //TODO: 包装tokio/smol 的 Child
         // 从第一个spawn的进程开始wait_output（因为第一个进程没有 stdin, 所以默认被drop也没事）
 
         //`wait_with_output` The stdin handle to the child process, if any, will be closed before waiting. This helps avoid deadlock: it ensures that the child does not block waiting for input from the parent, while the parent waits for the child to exit.。

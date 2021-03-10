@@ -111,6 +111,8 @@ impl SmolClock {
 pub enum TimerEvent {
     StopTimer,
     AddTask(Box<Task>),
+    InsertTask(Box<Task>),
+    UpdateTask(Box<Task>),
     RemoveTask(u64),
     CancelTask(u64, i64),
     //TODO: Here it should be structured and no longer use tuples.

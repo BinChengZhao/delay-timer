@@ -2,6 +2,7 @@
 //! It is the scale of the internal clock.
 use super::task::Task;
 use std::collections::HashMap;
+use std::mem::swap;
 
 //Slot is based on HashMap, It easy to add it and find it.
 pub(crate) struct Slot {
@@ -20,6 +21,17 @@ impl Slot {
 
     pub(crate) fn add_task(&mut self, task: Task) -> Option<Task> {
         self.task_map.insert(task.task_id, task)
+    }
+
+    pub(crate) fn update_task(&mut self, mut task: Task) -> Option<Task> {
+        match self.task_map.get_mut(&task.task_id) {
+            Some(t) => {
+                swap(t, &mut task);
+                Some(task)
+            }
+
+            None => self.task_map.insert(task.task_id, task),
+        }
     }
 
     pub(crate) fn remove_task(&mut self, task_id: u64) -> Option<Task> {
