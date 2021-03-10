@@ -37,14 +37,15 @@ lru = "0.6.1"
 futures = "0.3.8"
 smol = "1.2.5"
 concat-idents = "1.1.1"
+async-trait = "0.1.48"
 
 
 # Optional
-tokio = { version = "1.2.*", features = ["full"] , optional = true }
+tokio = { version = "1.3.*", features = ["full"] , optional = true }
 
 [dev-dependencies]
 surf = "2.1.0"
-tokio = { version = "1.2.*", features = ["full"] }
+tokio = { version = "1.3.*", features = ["full"] }
 hyper= {version  = "0.14.2" , features = ["full"] }
 pretty_env_logger = "0.4"
 mockall = "0.8.2"
