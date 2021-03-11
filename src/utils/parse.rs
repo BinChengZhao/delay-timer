@@ -47,15 +47,9 @@ pub mod shell_command {
         fn spawn(&mut self) -> IoResult<Child> {
             self.spawn()
         }
-
-        // fn stdout_mut(&mut self) ->&mut Stdio ;
     }
 
-    impl CommandUnify<StdChild> for Command {
-        // fn stdout_mut(&mut self) ->&mut Stdio {
-        //    &mut self.stdout
-        // }
-    }
+    impl CommandUnify<StdChild> for Command {}
     impl CommandUnify<SmolChild> for SmolCommand {}
     cfg_tokio_support!(
         use tokio::process::Command as TokioCommand;
@@ -66,12 +60,16 @@ pub mod shell_command {
     #[async_trait]
     pub trait ChildUnify {
         async fn wait_with_output(self) -> IoResult<Output>;
+        fn stdout_to_stdio(&mut self) -> Option<Stdio>;
     }
 
     #[async_trait]
     impl ChildUnify for StdChild {
         async fn wait_with_output(self) -> IoResult<Output> {
             self.wait_with_output()
+        }
+        fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+            self.stdout.take().map(|s| Stdio::from(s))
         }
     }
 
@@ -80,6 +78,11 @@ pub mod shell_command {
         async fn wait_with_output(self) -> IoResult<Output> {
             self.output().await
         }
+
+        fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+            todo!()
+            // self.stdout.unwrap().into()
+        }
     }
 
     cfg_tokio_support!(
@@ -87,6 +90,10 @@ pub mod shell_command {
         impl ChildUnify for TokioChild {
             async fn wait_with_output(self) -> IoResult<Output> {
                 self.wait_with_output().await
+            }
+
+            fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+                self.stdout.take().map(|s| s.try_into().ok())
             }
         }
     );
@@ -269,22 +276,13 @@ pub mod shell_command {
             let mut stdin = Stdio::inherit();
 
             if let Some(previous_command_ref) = previous_command {
-                // FIXME: DODODOD.
+                let mut t = None;
 
-                // let mut t = None;
-                // FIXME: DODODOD.
+                mem::swap(&mut previous_command_ref.child.stdout_to_stdio(), &mut t);
 
-                // When Child is SmolChild;
-                // https://docs.rs/smol/1.2.5/smol/process/struct.Stdio.html#impl-From%3CChildStdout%3E
-
-                // mem::swap(&mut previous_command_ref.child.stdout, &mut t);
-
-                // When Child is TokioChild;
-                // https://docs.rs/tokio/1.3.0/tokio/process/struct.ChildStdout.html#impl-TryInto%3CStdio%3E
-
-                // if let Some(child_stdio) = t {
-                //     stdin = Stdio::from(child_stdio);
-                // }
+                if let Some(child_stdio) = t {
+                    stdin = Stdio::from(child_stdio);
+                }
             }
 
             let mut output = Command::new(command);
@@ -318,8 +316,7 @@ pub mod shell_command {
                 break;
             }
         }
-        // Ok(process_linked_list)
-        todo!()
+        Ok(process_linked_list)
     }
 
     // I should give Option<Result<File>>
