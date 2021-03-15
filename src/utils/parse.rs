@@ -13,6 +13,7 @@ pub mod shell_command {
     use std::fs::{File, OpenOptions};
     use std::io::Result as IoResult;
     use std::iter::Iterator;
+    // use std::iter::Iterator;
     use std::mem;
     use std::ops::{Deref, DerefMut};
     use std::path::Path;
@@ -21,6 +22,38 @@ pub mod shell_command {
     pub type ChildGuardList = LinkedList<ChildGuard>;
     pub type ChildGuardListX<T> = LinkedList<ChildGuardX<T>>;
 
+    macro_rules! impl_command_unify{
+        ($($command:ty => $child:ty),+) => {
+            $(impl CommandUnify<$child> for $command {
+                fn new<S: AsRef<OsStr>>(program: S) -> Self {
+                    Self::new(program.as_ref())
+                }
+                fn args<I, S>(&mut self, args: I) -> &mut Self
+                where
+                    I: IntoIterator<Item = S>,
+                    S: AsRef<OsStr>,
+                {
+                    self.args(args);
+                    self
+                }
+
+                fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self {
+                    self.stdin(cfg);
+                    self
+                }
+
+                fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self {
+                    self.stdout(cfg);
+                    self
+                }
+
+                fn spawn(&mut self) -> IoResult<$child> {
+                    self.spawn()
+                }
+            })+
+        }
+    }
+
     pub trait CommandUnify<Child: ChildUnify>: Sized {
         fn new<S: AsRef<OsStr>>(program: S) -> Self {
             Self::new(program.as_ref())
@@ -28,33 +61,20 @@ pub mod shell_command {
         fn args<I, S>(&mut self, args: I) -> &mut Self
         where
             I: IntoIterator<Item = S>,
-            S: AsRef<OsStr>,
-        {
-            self.args(args);
-            self
-        }
+            S: AsRef<OsStr>;
 
-        fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self {
-            self.stdin(cfg);
-            self
-        }
+        fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
 
-        fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self {
-            self.stdout(cfg);
-            self
-        }
+        fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
 
-        fn spawn(&mut self) -> IoResult<Child> {
-            self.spawn()
-        }
+        fn spawn(&mut self) -> IoResult<Child>;
     }
 
-    impl CommandUnify<StdChild> for Command {}
-    impl CommandUnify<SmolChild> for SmolCommand {}
+    impl_command_unify!(Command => StdChild,SmolCommand => SmolChild);
     cfg_tokio_support!(
         use tokio::process::Command as TokioCommand;
         use tokio::process::Child as TokioChild;
-        impl CommandUnify<TokioChild> for TokioCommand {}
+        impl_command_unify!(TokioCommand => TokioChild);
     );
 
     #[async_trait]
@@ -69,7 +89,7 @@ pub mod shell_command {
             self.wait_with_output()
         }
         fn stdout_to_stdio(&mut self) -> Option<Stdio> {
-            self.stdout.take().map(|s| Stdio::from(s))
+            self.stdout.take().map(Stdio::from)
         }
     }
 
@@ -81,7 +101,6 @@ pub mod shell_command {
 
         fn stdout_to_stdio(&mut self) -> Option<Stdio> {
             todo!()
-            // self.stdout.unwrap().into()
         }
     }
 
@@ -281,7 +300,7 @@ pub mod shell_command {
                 mem::swap(&mut previous_command_ref.child.stdout_to_stdio(), &mut t);
 
                 if let Some(child_stdio) = t {
-                    stdin = Stdio::from(child_stdio);
+                    stdin = child_stdio;
                 }
             }
 
