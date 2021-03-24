@@ -74,6 +74,7 @@ pub mod shell_command {
     cfg_tokio_support!(
         use tokio::process::Command as TokioCommand;
         use tokio::process::Child as TokioChild;
+        use std::convert::TryInto;
         impl_command_unify!(TokioCommand => TokioChild);
     );
 
@@ -112,7 +113,7 @@ pub mod shell_command {
             }
 
             fn stdout_to_stdio(&mut self) -> Option<Stdio> {
-                self.stdout.take().map(|s| s.try_into().ok())
+                self.stdout.take().map(|s| s.try_into().ok()).flatten()
             }
         }
     );

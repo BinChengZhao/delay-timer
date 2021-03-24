@@ -135,7 +135,7 @@ pub mod cron_expression_grammatical_candy {
     use CandyCron::*;
 
     impl From<CandyCron> for CandyCronStr {
-        fn from(value:CandyCron) -> CandyCronStr {
+        fn from(value: CandyCron) -> CandyCronStr {
             match value {
                 Secondly => CandyCronStr(String::from("@secondly")),
                 Minutely => CandyCronStr(String::from("@minutely")),
