@@ -282,9 +282,34 @@ impl DelayTimer {
     // instance.cancel();
     //
     ///```
+
     pub fn add_task(&self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
+
+    // `Instance` is a hub for internal and external.
+    // struct Instance{
+    //     task_id: u64,
+    //     record_id: i64,
+    //     state: AtomicBool,
+    //     event_listener: listener
+    // }
+
+    // impl Instance{
+    //     pub async fn cancel(&self){
+    //         if self.state.load(Acquire){
+    //             self.event_listener.await;
+    //         }
+
+    // update or through delay_timer.cancel_task(self.task_id, self.record_id);
+    // }
+    // }
+
+    // pub fn insert_task(&self, task: Task) -> Result<()> {
+    //     set common-state.
+    //     update state when inner run-task.
+    //     self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
+    // }
 
     /// Update a task in timer_core by event-channel.
     pub fn update_task(&self, task: Task) -> Result<()> {
