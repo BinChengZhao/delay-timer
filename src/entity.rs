@@ -271,7 +271,7 @@ impl DelayTimer {
     ///```
     // let delay_timer = DelayTimer::default();
     //
-    // let join_handle = delay_timer.add_task(_).unwrap();
+    // let join_handle = delay_timer.insert_task(_).unwrap();
     //
     // let peek : Option<Peek<&Instance>> = join_handle.peek().await;
     // let peek : Result<Option<Peek<&Instance>>> join_handle.try_peek();
