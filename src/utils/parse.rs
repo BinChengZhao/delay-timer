@@ -1,5 +1,7 @@
 //! parse
 //! It is a module that parses and executes commands.
+
+/// Collection of functions related to shell commands and processes.
 pub mod shell_command {
     use anyhow::*;
 
@@ -19,7 +21,9 @@ pub mod shell_command {
     use std::path::Path;
     use std::process::{Child as StdChild, Command, ExitStatus, Output, Stdio};
 
+    /// The linkedlist of ChildGuard.
     pub type ChildGuardList = LinkedList<ChildGuard>;
+    /// The linkedlist of ChildGuard.
     pub type ChildGuardListX<T> = LinkedList<ChildGuardX<T>>;
 
     macro_rules! impl_command_unify{
@@ -54,19 +58,26 @@ pub mod shell_command {
         }
     }
 
+    /// Abstraction of command methods in multiple libraries.
     pub trait CommandUnify<Child: ChildUnify>: Sized {
+        /// Constructs a new Command for launching the program at path program.
         fn new<S: AsRef<OsStr>>(program: S) -> Self {
             Self::new(program.as_ref())
         }
+
+        /// Adds multiple arguments to pass to the program.
         fn args<I, S>(&mut self, args: I) -> &mut Self
         where
             I: IntoIterator<Item = S>,
             S: AsRef<OsStr>;
 
+        /// Configuration for the child process's standard input (stdin) handle.
         fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
 
+        /// Configuration for the child process's standard output (stdout) handle.
         fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
 
+        /// Executes the command as a child process, returning a handle to it.
         fn spawn(&mut self) -> IoResult<Child>;
     }
 
@@ -79,8 +90,11 @@ pub mod shell_command {
     );
 
     #[async_trait]
+    /// Trait abstraction of multiple library process handles.
     pub trait ChildUnify {
+        /// Executes the command as a child process, waiting for it to finish and collecting all of its output.
         async fn wait_with_output(self) -> IoResult<Output>;
+        /// Convert stdout to stdio.
         fn stdout_to_stdio(&mut self) -> Option<Stdio>;
     }
 
@@ -118,6 +132,7 @@ pub mod shell_command {
         }
     );
     #[derive(Debug)]
+    /// Guarding of process handles.
     pub struct ChildGuard {
         //TODO: 包装tokio/smol 的 Child
         // 从第一个spawn的进程开始wait_output（因为第一个进程没有 stdin, 所以默认被drop也没事）
@@ -126,6 +141,7 @@ pub mod shell_command {
         pub(crate) child: StdChild,
     }
     #[derive(Debug)]
+    /// Guarding of process handles.
     pub struct ChildGuardX<Child> {
         pub(crate) child: Child,
     }

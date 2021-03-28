@@ -18,8 +18,11 @@ thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTim
 // TaskMark is use to remove/stop the task.
 #[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct TaskMark {
+    // The id of task.
     pub(crate) task_id: u64,
+    // The wheel slot where the task is located.
     slot_mark: u64,
+    // Number of tasks running in parallel.
     parallel_runable_num: u64,
 }
 

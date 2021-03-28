@@ -92,10 +92,11 @@ impl TaskTrace {
 }
 
 //I export that trait for that crate user.
-//| You can implement this trait for your type `T`,
-//|and then you can define the function that returns the `Box<T> as Box<dyn DelayTaskHandler>` closure,
-//|  which can be wrapped by the TaskBuilder and then thrown into the time wheel for constant rotation.
+/// You can implement this trait for your type `T`,
+/// and then you can define the function that returns the `Box<T> as Box<dyn DelayTaskHandler>` closure,
+/// which can be wrapped by the TaskBuilder and then thrown into the time wheel for constant rotation.
 pub trait DelayTaskHandler: Send + Sync {
+    /// Stopping a running task instance.
     fn quit(self: Box<Self>) -> Result<()>;
 }
 

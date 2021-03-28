@@ -86,19 +86,19 @@ pub struct DelayTimer {
 /// SharedHeader Store the core context of the runtime.
 #[derive(Clone)]
 pub struct SharedHeader {
-    //The task wheel has a slot dimension.
+    // The task wheel has a slot dimension.
     pub(crate) wheel_queue: SharedTaskWheel,
-    //Task distribution map to track where tasks are in a slot for easy removal.
+    // Task distribution map to track where tasks are in a slot for easy removal.
     pub(crate) task_flag_map: SharedTaskFlagMap,
-    //The hands of the clock.
+    // The hands of the clock.
     pub(crate) second_hand: SencondHand,
-    //Global Timestamp.
+    // Global Timestamp.
     pub(crate) global_time: GlobalTime,
-    //Delay_timer flag for running
+    // Delay_timer flag for running
     pub(crate) shared_motivation: SharedMotivation,
-    //RuntimeInstance
+    // RuntimeInstance
     pub(crate) runtime_instance: RuntimeInstance,
-    //Unique id generator.
+    // Unique id generator.
     pub(crate) snowflakeid_bucket: SnowflakeIdBucket,
 }
 
@@ -287,21 +287,31 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
+    // TODO: LinkedList<Weak<Instance>>
+
     // `Instance` is a hub for internal and external.
     // struct Instance{
     //     task_id: u64,
     //     record_id: i64,
     //     state: AtomicBool,
-    //     event_listener: listener
+    //     event_listener: listener OR Event
     // }
 
     // impl Instance{
-    //     pub async fn cancel(&self){
+    //     pub async fn async_cancel(&self){
     //         if self.state.load(Acquire){
     //             self.event_listener.await;
     //         }
 
-    // update or through delay_timer.cancel_task(self.task_id, self.record_id);
+    // update or through seed_timer_event(TimerEvent::CancelTask(task_id, record_id));
+    // }
+    //
+    //     pub fn cancel(&self){
+    //         if self.state.load(Acquire){
+    //             self.event_listener.wait();
+    //         }
+
+    // update or through seed_timer_event(TimerEvent::CancelTask(task_id, record_id));
     // }
     // }
 

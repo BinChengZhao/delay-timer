@@ -2,7 +2,8 @@
 //! It is a module that provides sugar-type and helper function.
 use crate::prelude::*;
 
-///No size type, API compliant consistency.
+/// No size type, API compliant consistency.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MyUnit;
 
 impl DelayTaskHandler for MyUnit {
@@ -11,6 +12,7 @@ impl DelayTaskHandler for MyUnit {
     }
 }
 
+/// The convenient functions to combine.
 pub mod functions {
 
     use smol::Timer;
@@ -22,6 +24,7 @@ pub mod functions {
     use crate::prelude::*;
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
+    /// UnBlock execution of a command line task in delay-timer.
     pub fn unblock_process_task_fn(
         shell_command: String,
     ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
@@ -104,6 +107,7 @@ pub mod functions {
     }
 }
 
+/// cron expression syntax sugar related.
 pub mod cron_expression_grammatical_candy {
     use std::ops::Deref;
 
@@ -112,6 +116,7 @@ pub mod cron_expression_grammatical_candy {
     // it is the internal type of CandyCronStr that from &'static str is changed to String,
     // so that the user can construct CandyCronStr according to the indefinite conditions of the runtime.
     // For: https://github.com/BinChengZhao/delay-timer/issues/4
+    /// Syntactic sugar enumeration of the corresponding structure instance.
     pub struct CandyCronStr(pub String);
 
     impl Deref for CandyCronStr {
@@ -123,13 +128,21 @@ pub mod cron_expression_grammatical_candy {
     }
 
     #[derive(Debug, Copy, Clone)]
+    /// Syntactic sugar for cron expressions.
     pub enum CandyCron {
+        /// This variant for Secondly.
         Secondly,
+        /// This variant for Minutely.
         Minutely,
+        /// This variant for Hourly.
         Hourly,
+        /// This variant for Daily.
         Daily,
+        /// This variant for Weekly.
         Weekly,
+        /// This variant for Monthly.
         Monthly,
+        /// This variant for Yearly.
         Yearly,
     }
     use CandyCron::*;
@@ -168,6 +181,7 @@ pub fn generate_closure_template(
     move || self::functions::create_delay_task_handler(async_spawn(async_template(a, b.clone())))
 }
 
+/// This is a demo case to demonstrate a custom asynchronous task.
 pub async fn async_template(_: i32, _: String) -> AnyResult<()> {
     Ok(())
 }
