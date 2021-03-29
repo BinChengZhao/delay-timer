@@ -16,3 +16,4 @@
 //! gives lib the support to exit the task at any time.
 pub(crate) mod sweeper;
 pub mod task_handle;
+pub mod task_instance;

@@ -16,18 +16,13 @@ use super::timer::{
     Slot,
 };
 use crate::prelude::*;
-
-use std::collections::LinkedList;
-use std::convert::From;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc};
 use std::thread::Builder;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
-use arc_swap::ArcSwap;
-use event_listener::Event;
 use futures::executor::block_on;
 use smol::channel::unbounded;
 use snowflake::SnowflakeIdBucket;
@@ -54,50 +49,6 @@ pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
 //The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
 
-/// Chain of task run instances.
-/// For User access to Running-Task's instance.
-#[derive(Debug, Clone)]
-pub struct TaskInstancesChain {
-    pub(crate) inner: Arc<ArcSwap<LinkedList<Weak<Instance>>>>,
-}
-
-/// Chain of task run instances.
-/// For inner maintain to Running-Task's instance.
-#[derive(Debug, Clone)]
-pub(crate) struct TaskInstancesChainMaintainer {
-    pub(crate) inner: Weak<ArcSwap<LinkedList<Weak<Instance>>>>,
-}
-
-impl TaskInstancesChain {}
-
-impl Default for TaskInstancesChain {
-    fn default() -> Self {
-        let shared_list: Arc<LinkedList<Weak<Instance>>> = Arc::new(LinkedList::new());
-        let inner: Arc<ArcSwap<LinkedList<Weak<Instance>>>> = Arc::new(ArcSwap::new(shared_list));
-
-        TaskInstancesChain { inner }
-    }
-}
-
-impl From<&TaskInstancesChain> for TaskInstancesChainMaintainer {
-    fn from(value: &TaskInstancesChain) -> TaskInstancesChainMaintainer {
-        let inner = Arc::downgrade(&value.inner);
-        TaskInstancesChainMaintainer { inner }
-    }
-}
-
-impl TaskInstancesChainMaintainer {}
-
-/// instance of task running.
-#[derive(Debug)]
-pub struct Instance {
-    /// The id of task.
-    task_id: u64,
-    /// The id of task running record.
-    record_id: i64,
-    /// The event view of inner task.
-    event_listener: Event,
-}
 
 /// Builds DelayTimer with custom configuration values.
 ///
@@ -376,12 +327,6 @@ impl DelayTimer {
 
     // update or through seed_timer_event(TimerEvent::CancelTask(task_id, record_id));
     // }
-    // }
-
-    // pub fn insert_task(&self, task: Task) -> Result<()> {
-    //     set common-state.
-    //     update state when inner run-task.
-    //     self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     // }
 
     pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
