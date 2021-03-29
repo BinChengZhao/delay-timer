@@ -287,7 +287,11 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
-    // TODO: LinkedList<Weak<Instance>>
+    // TODO: ArcSwap<LinkedList<Weak<Instance>>> The type may be adjusted.
+    // Create a shared data type wrapped in ArcSwap, a copy is left to the outside as a handle,
+    // a copy is passed to the inside via `insert_task`,
+    // the internal maintenance of the state is mainly through EventHandle's sub-workers,
+    // mainly note the `UpdateTask` event and `CancelTask` events and `FinishTask` events.
 
     // `Instance` is a hub for internal and external.
     // struct Instance{
