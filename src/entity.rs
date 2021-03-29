@@ -17,13 +17,17 @@ use super::timer::{
 };
 use crate::prelude::*;
 
+use std::collections::LinkedList;
+use std::convert::From;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::thread::Builder;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
+use arc_swap::ArcSwap;
+use event_listener::Event;
 use futures::executor::block_on;
 use smol::channel::unbounded;
 use snowflake::SnowflakeIdBucket;
@@ -49,6 +53,51 @@ pub(crate) type GlobalTime = Arc<AtomicU64>;
 pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
 //The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
+
+/// Chain of task run instances.
+/// For User access to Running-Task's instance.
+#[derive(Debug, Clone)]
+pub struct TaskInstancesChain {
+    pub(crate) inner: Arc<ArcSwap<LinkedList<Weak<Instance>>>>,
+}
+
+/// Chain of task run instances.
+/// For inner maintain to Running-Task's instance.
+#[derive(Debug, Clone)]
+pub(crate) struct TaskInstancesChainMaintainer {
+    pub(crate) inner: Weak<ArcSwap<LinkedList<Weak<Instance>>>>,
+}
+
+impl TaskInstancesChain {}
+
+impl Default for TaskInstancesChain {
+    fn default() -> Self {
+        let shared_list: Arc<LinkedList<Weak<Instance>>> = Arc::new(LinkedList::new());
+        let inner: Arc<ArcSwap<LinkedList<Weak<Instance>>>> = Arc::new(ArcSwap::new(shared_list));
+
+        TaskInstancesChain { inner }
+    }
+}
+
+impl From<&TaskInstancesChain> for TaskInstancesChainMaintainer {
+    fn from(value: &TaskInstancesChain) -> TaskInstancesChainMaintainer {
+        let inner = Arc::downgrade(&value.inner);
+        TaskInstancesChainMaintainer { inner }
+    }
+}
+
+impl TaskInstancesChainMaintainer {}
+
+/// instance of task running.
+#[derive(Debug)]
+pub struct Instance {
+    /// The id of task.
+    task_id: u64,
+    /// The id of task running record.
+    record_id: i64,
+    /// The event view of inner task.
+    event_listener: Event,
+}
 
 /// Builds DelayTimer with custom configuration values.
 ///
@@ -287,7 +336,17 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
-    // TODO: ArcSwap<LinkedList<Weak<Instance>>> The type may be adjusted.
+    /// The container used to provide a shared/cross-threaded data structure base is Arc, to support concurrent reads (potentially more read and write less).
+
+    /// Since the external environment that relies on `delay-timer` is indeterminate and potentially synchronous context, the asynchronous synchronous primitive AsyncRwlock<Arc<T>> is not sufficient for the user.
+
+    /// Providing synchronous primitives such as Arc<std::sync::RwLock<T>> will block Executor in asynchronous runtime.
+
+    /// The most balanced data structure is ArcSwap<Arc<T>>
+
+    // Translated with www.DeepL.com/Translator (free version)
+
+    // TODO: ArcSwap<Arc<LinkedList<Weak<Instance>>>> The type may be adjusted.
     // Create a shared data type wrapped in ArcSwap, a copy is left to the outside as a handle,
     // a copy is passed to the inside via `insert_task`,
     // the internal maintenance of the state is mainly through EventHandle's sub-workers,
@@ -324,6 +383,15 @@ impl DelayTimer {
     //     update state when inner run-task.
     //     self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     // }
+
+    pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
+        let task_instances_chain: TaskInstancesChain = TaskInstancesChain::default();
+        let _task_instances_chain_maintainer: TaskInstancesChainMaintainer =
+            (&task_instances_chain).into();
+
+        self.seed_timer_event(TimerEvent::InsertTask(Box::new(task)))?;
+        Ok(task_instances_chain)
+    }
 
     /// Update a task in timer_core by event-channel.
     pub fn update_task(&self, task: Task) -> Result<()> {

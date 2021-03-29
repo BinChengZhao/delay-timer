@@ -107,29 +107,42 @@ impl SmolClock {
 }
 
 //warning: large size difference between variants
+/// Event for Timer Wheel Core.
 #[derive(Debug)]
 pub enum TimerEvent {
+    /// Stop the Timer.
     StopTimer,
+    /// Add a new `Task`.
     AddTask(Box<Task>),
+    /// Insert a new `Task`.
+    /// Maintain a state that is transparent to the user, such as the end of a task running instance.
     InsertTask(Box<Task>),
+    /// Update a Task in Timer .
     UpdateTask(Box<Task>),
+    /// Remove a Task in Timer .
     RemoveTask(u64),
+    /// Cancel a Task running instance in Timer .
     CancelTask(u64, i64),
     //TODO: Here it should be structured and no longer use tuples.
+    /// Finished a Task running instance in Timer .
     FinishTask(u64, i64, u64),
+    /// Append a new instance of a running task .
     AppendTaskHandle(u64, DelayTaskHandlerBox),
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+/// delay-timer internal timer wheel core.
 pub struct Timer {
+    /// Event Sender for Timer Wheel Core.
     pub(crate) timer_event_sender: TimerEventSender,
     status_report_sender: Option<AsyncSender<i32>>,
     pub(crate) shared_header: SharedHeader,
 }
 
-//In any case, the task is not executed in the Scheduler,
-//and task-Fn determines which runtime to put the internal task in when it is generated.
-//just provice api and struct ,less is more.
+// In any case, the task is not executed in the Scheduler,
+// and task-Fn determines which runtime to put the internal task in when it is generated.
+// just provice api and struct ,less is more.
 impl Timer {
+    /// Initialize a timer wheel core.
     pub fn new(timer_event_sender: TimerEventSender, shared_header: SharedHeader) -> Self {
         Timer {
             timer_event_sender,
@@ -221,6 +234,7 @@ impl Timer {
     }
 
     #[inline(always)]
+    /// Maintain the running status of task.
     pub async fn maintain_task(
         &mut self,
         mut task: Task,

@@ -244,19 +244,26 @@ pub struct TaskBuilder<'a> {
 type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 
 #[derive(Debug, Clone, Default)]
+/// Task runtime context.
 pub struct TaskContext {
+    /// The id of Task.
     pub task_id: u64,
+    /// The id of the task running instance.
     pub record_id: i64,
+    /// Hook functions that may be used in the future.
     pub then_fn: Option<fn()>,
+    /// Event Sender for Timer Wheel Core.
     pub timer_event_sender: Option<TimerEventSender>,
 }
 
 impl TaskContext {
+    /// Get the id of task.
     pub fn task_id(&mut self, task_id: u64) -> &mut Self {
         self.task_id = task_id;
         self
     }
 
+    /// Get the id of the task running instance.
     pub fn record_id(&mut self, record_id: i64) -> &mut Self {
         self.record_id = record_id;
         self
@@ -267,11 +274,13 @@ impl TaskContext {
         self
     }
 
+    /// Get hook functions that may be used in the future.
     pub fn then_fn(&mut self, then_fn: fn()) -> &mut Self {
         self.then_fn = Some(then_fn);
         self
     }
 
+    /// Send a task-Finish signal to EventHandle.
     pub async fn finishe_task(self) {
         if let Some(timer_event_sender) = self.timer_event_sender {
             timer_event_sender
@@ -295,6 +304,7 @@ impl fmt::Debug for SafeStructBoxedFn {
 }
 
 #[derive(Debug)]
+/// Periodic Task Structures.
 pub struct Task {
     /// Unique task-id.
     pub task_id: u64,
@@ -501,6 +511,7 @@ impl Task {
     }
 
     #[inline(always)]
+    /// Get the maximum running time of the task.
     pub fn get_maximum_running_time(&self, start_time: u64) -> Option<u64> {
         self.maximum_running_time.map(|t| t + start_time)
     }
