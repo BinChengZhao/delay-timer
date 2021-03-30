@@ -186,10 +186,6 @@ impl EventHandle {
     }
 
     pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) {
-        //#[cfg(features="status-report")]
-        //And event isn't `AddTask`, use channel sent(event) to report_channel.
-        //defined a new outside-event support user.
-
         match event {
             TimerEvent::StopTimer => {
                 self.shared_header.shared_motivation.store(false, Release);
@@ -201,7 +197,7 @@ impl EventHandle {
             }
 
             //TODO: The api associated with this variant will be exposed in the future.
-            TimerEvent::InsertTask(task) => {
+            TimerEvent::InsertTask(task, task_instances_chain_maintainer) => {
                 let task_mark = self.add_task(task);
                 self.record_task_mark(task_mark);
             }
@@ -272,7 +268,13 @@ impl EventHandle {
             .value_mut()
             .add_task(*task);
 
-        TaskMark::new(task_id, slot_seed, 0)
+        let mut task_mart = TaskMark::default();
+        task_mart
+            .set_task_id(task_id)
+            .set_slot_mark(slot_seed)
+            .set_parallel_runable_num(0);
+
+        task_mart
     }
 
     // for record task-mark.

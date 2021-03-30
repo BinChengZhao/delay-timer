@@ -10,13 +10,14 @@ use std::str::FromStr;
 use std::thread::AccessError;
 
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
+use event_listener::Event;
 use lru::LruCache;
 
 //TODO: Add doc.
 thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
 
-// TaskMark is use to remove/stop the task.
-#[derive(Default, Debug, Clone, Copy)]
+// TaskMark is used to maintain the status of running tasks.
+#[derive(Default, Debug, Clone)]
 pub(crate) struct TaskMark {
     // The id of task.
     pub(crate) task_id: u64,
@@ -24,35 +25,57 @@ pub(crate) struct TaskMark {
     slot_mark: u64,
     // Number of tasks running in parallel.
     parallel_runable_num: u64,
+    /// Chain of task run instances.
+    /// For inner maintain to Running-Task's instance.
+    task_instances_chain_maintainer: Option<TaskInstancesChainMaintainer>,
 }
 
 impl TaskMark {
-    pub(crate) fn new(task_id: u64, slot_mark: u64, parallel_runable_num: u64) -> Self {
-        TaskMark {
-            task_id,
-            slot_mark,
-            parallel_runable_num,
-        }
+    #[inline(always)]
+    pub(crate) fn set_task_id(&mut self, task_id: u64) -> &mut Self {
+        self.task_id = task_id;
+        self
     }
 
+    #[inline(always)]
     pub(crate) fn get_slot_mark(&self) -> u64 {
         self.slot_mark
     }
 
+    #[inline(always)]
+    pub(crate) fn set_slot_mark(&mut self, slot_mark: u64) -> &mut Self {
+        self.slot_mark = slot_mark;
+        self
+    }
+
+    #[inline(always)]
     pub(crate) fn get_parallel_runable_num(&self) -> u64 {
         self.parallel_runable_num
     }
 
-    pub(crate) fn set_slot_mark(&mut self, slot_mark: u64) {
-        self.slot_mark = slot_mark;
+    #[inline(always)]
+    pub(crate) fn set_parallel_runable_num(&mut self, parallel_runable_num: u64) -> &mut Self {
+        self.parallel_runable_num = parallel_runable_num;
+        self
     }
 
+    #[inline(always)]
     pub(crate) fn inc_parallel_runable_num(&mut self) {
         self.parallel_runable_num += 1;
     }
 
+    #[inline(always)]
     pub(crate) fn dec_parallel_runable_num(&mut self) {
         self.parallel_runable_num = self.parallel_runable_num.checked_sub(1).unwrap_or_default();
+    }
+
+    #[inline(always)]
+    pub(crate) fn set_task_instances_chain_maintainer(
+        &mut self,
+        task_instances_chain_maintainer: TaskInstancesChainMaintainer,
+    ) -> &mut Self {
+        self.task_instances_chain_maintainer = Some(task_instances_chain_maintainer);
+        self
     }
 }
 
@@ -253,7 +276,7 @@ pub struct TaskContext {
     /// Hook functions that may be used in the future.
     pub then_fn: Option<fn()>,
     /// Event Sender for Timer Wheel Core.
-    pub timer_event_sender: Option<TimerEventSender>,
+    pub(crate) timer_event_sender: Option<TimerEventSender>,
 }
 
 impl TaskContext {

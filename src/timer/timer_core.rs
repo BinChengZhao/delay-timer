@@ -116,7 +116,7 @@ pub enum TimerEvent {
     AddTask(Box<Task>),
     /// Insert a new `Task`.
     /// Maintain a state that is transparent to the user, such as the end of a task running instance.
-    InsertTask(Box<Task>),
+    InsertTask(Box<Task>, TaskInstancesChainMaintainer),
     /// Update a Task in Timer .
     UpdateTask(Box<Task>),
     /// Remove a Task in Timer .
@@ -132,7 +132,7 @@ pub enum TimerEvent {
 #[derive(Clone, Debug)]
 /// delay-timer internal timer wheel core.
 pub struct Timer {
-    /// Event Sender for Timer Wheel Core.
+    /// Event sender that provides events to `EventHandle` processing.
     pub(crate) timer_event_sender: TimerEventSender,
     status_report_sender: Option<AsyncSender<i32>>,
     pub(crate) shared_header: SharedHeader,
@@ -157,8 +157,8 @@ impl Timer {
         self.status_report_sender = Some(sender);
     }
 
-    ///Offset the current slot by one when reading it,
-    ///so event_handle can be easily inserted into subsequent slots.
+    /// Offset the current slot by one when reading it,
+    /// so event_handle can be easily inserted into subsequent slots.
     pub(crate) fn next_position(&mut self) -> u64 {
         self.shared_header
             .second_hand
@@ -168,9 +168,9 @@ impl Timer {
             .unwrap_or_else(|e| e)
     }
 
-    ///Return a future can pool it for Schedule all cycles task.
+    /// Return a future can pool it for Schedule all cycles task.
     pub(crate) async fn async_schedule(&mut self) {
-        //if that overtime , i run it not block
+        // if that overtime , i run it not block
         let mut second_hand;
         let mut next_second_hand;
         let mut timestamp;

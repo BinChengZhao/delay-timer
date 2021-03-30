@@ -18,7 +18,7 @@ use super::timer::{
 use crate::prelude::*;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::thread::Builder;
 use std::time::SystemTime;
 
@@ -48,7 +48,6 @@ pub(crate) type GlobalTime = Arc<AtomicU64>;
 pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
 //The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
-
 
 /// Builds DelayTimer with custom configuration values.
 ///
@@ -331,10 +330,13 @@ impl DelayTimer {
 
     pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
         let task_instances_chain: TaskInstancesChain = TaskInstancesChain::default();
-        let _task_instances_chain_maintainer: TaskInstancesChainMaintainer =
+        let task_instances_chain_maintainer: TaskInstancesChainMaintainer =
             (&task_instances_chain).into();
 
-        self.seed_timer_event(TimerEvent::InsertTask(Box::new(task)))?;
+        self.seed_timer_event(TimerEvent::InsertTask(
+            Box::new(task),
+            task_instances_chain_maintainer,
+        ))?;
         Ok(task_instances_chain)
     }
 
