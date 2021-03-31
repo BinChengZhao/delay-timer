@@ -222,6 +222,10 @@ impl DelayTimerBuilder {
     fn init_delay_timer(&mut self) -> DelayTimer {
         let timer_event_sender = self.get_timer_event_sender();
 
+        unsafe {
+            GLOBAL_TIMER_EVENT_SENDER = Some(self.get_timer_event_sender());
+        }
+
         let shared_header = self.shared_header.clone();
 
         #[cfg(feature = "status-report")]

@@ -198,7 +198,9 @@ impl EventHandle {
 
             //TODO: The api associated with this variant will be exposed in the future.
             TimerEvent::InsertTask(task, task_instances_chain_maintainer) => {
-                let task_mark = self.add_task(task);
+                let mut task_mark = self.add_task(task);
+                task_mark.set_task_instances_chain_maintainer(task_instances_chain_maintainer);
+
                 self.record_task_mark(task_mark);
             }
 
@@ -215,7 +217,13 @@ impl EventHandle {
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
-                //if has deadline, set recycle_unit.
+                // TODO: If TaskInstancesChainMaintainer Can upgrade success.
+                // Then maintain the Task-Instance.
+                let instance = Instance::default()
+                    .set_task_id(task_id)
+                    .set_record_id(delay_task_handler_box.get_record_id());
+
+                // If has deadline, set recycle_unit.
                 if let Some(deadline) = delay_task_handler_box.get_end_time() {
                     let recycle_unit = RecycleUnit::new(
                         deadline,
@@ -246,7 +254,7 @@ impl EventHandle {
             .unwrap_or_else(|e| println!("{}", e));
     }
 
-    //add task to wheel_queue  slot
+    // Add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Box<Task>) -> TaskMark {
         let second_hand = self.shared_header.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();

@@ -10,7 +10,7 @@ use arc_swap::ArcSwap;
 use event_listener::Event;
 
 /// instance of task running.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Instance {
     /// The id of task.
     task_id: u64,
@@ -18,8 +18,6 @@ pub struct Instance {
     record_id: i64,
     /// The event view of inner task.
     event: Event,
-    /// Event sender that provides events to `EventHandle` processing.
-    timer_event_sender: TimerEventSender,
 }
 /// Chain of task run instances.
 /// For User access to Running-Task's instance.
@@ -36,6 +34,16 @@ pub struct TaskInstancesChainMaintainer {
 }
 
 impl Instance {
+    pub(crate) fn set_task_id(mut self, task_id: u64) -> Instance {
+        self.task_id = task_id;
+        self
+    }
+
+    pub(crate) fn set_record_id(mut self, record_id: i64) -> Instance {
+        self.record_id = record_id;
+        self
+    }
+
     /// Cancel the currently running task instance and block the thread to wait.
     pub fn cancel_and_wait(&self) -> AnyResult<()> {
         self.cancel()?;
@@ -65,9 +73,15 @@ impl Instance {
     }
 
     fn cancel(&self) -> AnyResult<()> {
-        self.timer_event_sender
-            .try_send(TimerEvent::CancelTask(self.task_id, self.record_id))
-            .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+        unsafe {
+            GLOBAL_TIMER_EVENT_SENDER
+                .as_ref()
+                .map(|s| {
+                    s.try_send(TimerEvent::CancelTask(self.task_id, self.record_id))
+                        .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+                })
+                .ok_or(anyhow!("GLOBAL_TIMER_EVENT_SENDER isn't init."))?
+        }
     }
 }
 
