@@ -31,6 +31,9 @@ pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
 
 pub(crate) use crate::entity::RuntimeKind;
+pub(crate) use crate::timer::event_handle::SharedHeader;
+pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBox;
+pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use crate::timer::runtime_trace::task_instance::{
     Instance, TaskInstancesChainMaintainer,
 };

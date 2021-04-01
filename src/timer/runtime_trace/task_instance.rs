@@ -6,8 +6,9 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result as AnyResult};
-use arc_swap::ArcSwap;
 use event_listener::Event;
+use smol::lock::RwLock;
+use futures::executor::block_on;
 
 /// instance of task running.
 #[derive(Debug, Default)]
@@ -21,16 +22,16 @@ pub struct Instance {
 }
 /// Chain of task run instances.
 /// For User access to Running-Task's instance.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TaskInstancesChain {
-    pub(crate) inner: Arc<ArcSwap<LinkedList<Arc<Instance>>>>,
+    pub(crate) inner: Arc<RwLock<Arc<LinkedList<Arc<Instance>>>>>,
 }
 
 /// Chain of task run instances.
 /// For inner maintain to Running-Task's instance.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct TaskInstancesChainMaintainer {
-    pub(crate) inner: Weak<ArcSwap<LinkedList<Arc<Instance>>>>,
+    pub(crate) inner: Weak<RwLock<Arc<LinkedList<Arc<Instance>>>>>,
 }
 
 impl Instance {
@@ -90,7 +91,7 @@ impl TaskInstancesChain {}
 impl Default for TaskInstancesChain {
     fn default() -> Self {
         let shared_list: Arc<LinkedList<Arc<Instance>>> = Arc::new(LinkedList::new());
-        let inner: Arc<ArcSwap<LinkedList<Arc<Instance>>>> = Arc::new(ArcSwap::new(shared_list));
+        let inner: Arc<RwLock<Arc<LinkedList<Arc<Instance>>>>> = Arc::new(RwLock::new(shared_list));
 
         TaskInstancesChain { inner }
     }

@@ -39,7 +39,6 @@ smol = "1.2.5"
 concat-idents = "1.1.2"
 async-trait = "0.1.48"
 event-listener = "2.5.1"
-arc-swap = "1.2.0"
 
 
 # Optional

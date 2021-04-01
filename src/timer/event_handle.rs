@@ -196,7 +196,6 @@ impl EventHandle {
                 self.record_task_mark(task_mark);
             }
 
-            //TODO: The api associated with this variant will be exposed in the future.
             TimerEvent::InsertTask(task, task_instances_chain_maintainer) => {
                 let mut task_mark = self.add_task(task);
                 task_mark.set_task_instances_chain_maintainer(task_instances_chain_maintainer);
@@ -217,23 +216,8 @@ impl EventHandle {
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
-                // TODO: If TaskInstancesChainMaintainer Can upgrade success.
-                // Then maintain the Task-Instance.
-                let instance = Instance::default()
-                    .set_task_id(task_id)
-                    .set_record_id(delay_task_handler_box.get_record_id());
-
-                // If has deadline, set recycle_unit.
-                if let Some(deadline) = delay_task_handler_box.get_end_time() {
-                    let recycle_unit = RecycleUnit::new(
-                        deadline,
-                        delay_task_handler_box.get_task_id(),
-                        delay_task_handler_box.get_record_id(),
-                    );
-                    self.send_recycle_unit_sources_sender(recycle_unit).await;
-                }
-
-                self.task_trace.insert(task_id, delay_task_handler_box);
+                self.maintain_task_status(task_id, delay_task_handler_box)
+                    .await;
             }
 
             TimerEvent::FinishTask(task_id, record_id, _finish_time) => {
@@ -320,7 +304,7 @@ impl EventHandle {
             .remove_task(task_id)
     }
 
-    pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+    pub(crate) fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
         self.shared_header
             .task_flag_map
             .get_mut(&task_id)
@@ -329,6 +313,37 @@ impl EventHandle {
             .dec_parallel_runable_num();
 
         self.task_trace.quit_one_task_handler(task_id, record_id)
+    }
+
+    pub(crate) async fn maintain_task_status(
+        &mut self,
+        task_id: u64,
+        delay_task_handler_box: DelayTaskHandlerBox,
+    ) {
+        // TODO: If TaskInstancesChainMaintainer Can upgrade success.
+        // Then maintain the Task-Instance.
+
+        // self.shared_header
+        //     .wheel_queue
+        //     .get_mut(&slot_mark)
+        //     .unwrap()
+        //     .value_mut();
+
+        let instance = Instance::default()
+            .set_task_id(task_id)
+            .set_record_id(delay_task_handler_box.get_record_id());
+
+        // If has deadline, set recycle_unit.
+        if let Some(deadline) = delay_task_handler_box.get_end_time() {
+            let recycle_unit = RecycleUnit::new(
+                deadline,
+                delay_task_handler_box.get_task_id(),
+                delay_task_handler_box.get_record_id(),
+            );
+            self.send_recycle_unit_sources_sender(recycle_unit).await;
+        }
+
+        self.task_trace.insert(task_id, delay_task_handler_box);
     }
 
     pub(crate) fn init_task_wheel(slots_numbers: u64) -> SharedTaskWheel {
