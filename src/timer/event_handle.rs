@@ -312,6 +312,8 @@ impl EventHandle {
             .value_mut()
             .dec_parallel_runable_num();
 
+        // TODO: In there can notify the user through `Instance`.
+
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 
@@ -323,15 +325,30 @@ impl EventHandle {
         // TODO: If TaskInstancesChainMaintainer Can upgrade success.
         // Then maintain the Task-Instance.
 
-        // self.shared_header
-        //     .wheel_queue
-        //     .get_mut(&slot_mark)
-        //     .unwrap()
-        //     .value_mut();
+        {
+            let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+            let task_mark = task_mark_ref_mut.value_mut();
 
-        let instance = Instance::default()
-            .set_task_id(task_id)
-            .set_record_id(delay_task_handler_box.get_record_id());
+            if let Some(ref mut task_instances_chain_maintainer_ref_mut) =
+                task_mark.task_instances_chain_maintainer
+            {
+                if let Some(task_instances_chain_maintainer) =
+                    task_instances_chain_maintainer_ref_mut.inner.upgrade()
+                {
+                    let mut instance_list_guard = task_instances_chain_maintainer.write().await;
+                    let instance_list = Arc::get_mut(&mut instance_list_guard).unwrap();
+
+                    let instance = Instance::default()
+                        .set_task_id(task_id)
+                        .set_record_id(delay_task_handler_box.get_record_id());
+
+                    instance_list.push_back(Arc::new(instance));
+                } else {
+                    // If user already droped `TaskInstancesChain` , delay-timer don't need maintain `Instance`.
+                    task_mark.task_instances_chain_maintainer = None;
+                }
+            }
+        }
 
         // If has deadline, set recycle_unit.
         if let Some(deadline) = delay_task_handler_box.get_end_time() {

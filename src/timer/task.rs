@@ -17,7 +17,7 @@ use lru::LruCache;
 thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
 
 // TaskMark is used to maintain the status of running tasks.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug)]
 pub(crate) struct TaskMark {
     // The id of task.
     pub(crate) task_id: u64,
@@ -27,7 +27,7 @@ pub(crate) struct TaskMark {
     parallel_runable_num: u64,
     /// Chain of task run instances.
     /// For inner maintain to Running-Task's instance.
-    task_instances_chain_maintainer: Option<TaskInstancesChainMaintainer>,
+    pub(crate) task_instances_chain_maintainer: Option<TaskInstancesChainMaintainer>,
 }
 
 impl TaskMark {

@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result as AnyResult};
 use event_listener::Event;
-use smol::lock::RwLock;
 use futures::executor::block_on;
+use smol::lock::RwLock;
 
 /// instance of task running.
 #[derive(Debug, Default)]
@@ -20,18 +20,20 @@ pub struct Instance {
     /// The event view of inner task.
     event: Event,
 }
+type InstanceList = Arc<LinkedList<Arc<Instance>>>;
+
 /// Chain of task run instances.
 /// For User access to Running-Task's instance.
 #[derive(Debug)]
 pub struct TaskInstancesChain {
-    pub(crate) inner: Arc<RwLock<Arc<LinkedList<Arc<Instance>>>>>,
+    pub(crate) inner: Arc<RwLock<InstanceList>>,
 }
 
 /// Chain of task run instances.
 /// For inner maintain to Running-Task's instance.
 #[derive(Debug, Default)]
 pub struct TaskInstancesChainMaintainer {
-    pub(crate) inner: Weak<RwLock<Arc<LinkedList<Arc<Instance>>>>>,
+    pub(crate) inner: Weak<RwLock<InstanceList>>,
 }
 
 impl Instance {
@@ -86,12 +88,24 @@ impl Instance {
     }
 }
 
-impl TaskInstancesChain {}
+impl TaskInstancesChain {
+    // sync context.
+    pub fn get_instance_list(&self) -> InstanceList {
+        // Just clone Arc don't keeping lock.
+        block_on(self.inner.read()).clone()
+    }
+
+    // async context
+    pub async fn get_instance_list_and_async_await(&self) -> InstanceList {
+        // Just clone Arc don't keeping lock.
+        self.inner.read().await.clone()
+    }
+}
 
 impl Default for TaskInstancesChain {
     fn default() -> Self {
-        let shared_list: Arc<LinkedList<Arc<Instance>>> = Arc::new(LinkedList::new());
-        let inner: Arc<RwLock<Arc<LinkedList<Arc<Instance>>>>> = Arc::new(RwLock::new(shared_list));
+        let shared_list: InstanceList = Arc::new(LinkedList::new());
+        let inner: Arc<RwLock<InstanceList>> = Arc::new(RwLock::new(shared_list));
 
         TaskInstancesChain { inner }
     }
