@@ -3,11 +3,11 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
 use crate::prelude::*;
 
-use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
 use std::thread::AccessError;
+use std::{cell::RefCell, sync::Arc};
 
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use event_listener::Event;
@@ -76,6 +76,51 @@ impl TaskMark {
     ) -> &mut Self {
         self.task_instances_chain_maintainer = Some(task_instances_chain_maintainer);
         self
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_task_instances_chain_maintainer(
+        &mut self,
+    ) -> Option<Arc<AsyncRwLock<InstanceList>>> {
+        let mut task_instances_chain_maintainer_option = None;
+
+        if let Some(ref mut task_instances_chain_maintainer_ref_mut) =
+            self.task_instances_chain_maintainer
+        {
+            task_instances_chain_maintainer_option =
+                task_instances_chain_maintainer_ref_mut.inner.upgrade();
+
+            // If user already droped `TaskInstancesChain` , delay-timer don't need maintain `Instance`.
+            if task_instances_chain_maintainer_option.is_none() {
+                self.task_instances_chain_maintainer = None;
+            }
+        }
+
+        task_instances_chain_maintainer_option
+    }
+
+    pub(crate) async fn notify_cancel_finish(
+        &mut self,
+        task_id: u64,
+        record_id: i64,
+    ) -> Option<Arc<Instance>> {
+        let task_instances_chain_maintainer_option = self.get_task_instances_chain_maintainer();
+
+        let task_instances_chain_maintainer = task_instances_chain_maintainer_option?;
+        let mut instance_list_guard = task_instances_chain_maintainer.write().await;
+
+        let instance_list = Arc::get_mut(&mut instance_list_guard)?;
+
+        let index = instance_list
+            .iter()
+            .position(|d| d.get_record_id() == record_id)?;
+
+        let mut has_remove_instance_list = instance_list.split_off(index);
+        let remove_instance = has_remove_instance_list.pop_front();
+        instance_list.append(&mut has_remove_instance_list);
+
+        remove_instance.as_ref().map(|i| i.notify_cancel_finish());
+        remove_instance
     }
 }
 

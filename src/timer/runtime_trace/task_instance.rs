@@ -8,7 +8,6 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result as AnyResult};
 use event_listener::Event;
 use futures::executor::block_on;
-use smol::lock::RwLock;
 
 /// instance of task running.
 #[derive(Debug, Default)]
@@ -20,23 +19,31 @@ pub struct Instance {
     /// The event view of inner task.
     event: Event,
 }
-type InstanceList = Arc<LinkedList<Arc<Instance>>>;
+pub(crate) type InstanceList = Arc<LinkedList<Arc<Instance>>>;
 
 /// Chain of task run instances.
 /// For User access to Running-Task's instance.
 #[derive(Debug)]
 pub struct TaskInstancesChain {
-    pub(crate) inner: Arc<RwLock<InstanceList>>,
+    pub(crate) inner: Arc<AsyncRwLock<InstanceList>>,
 }
 
 /// Chain of task run instances.
 /// For inner maintain to Running-Task's instance.
 #[derive(Debug, Default)]
 pub struct TaskInstancesChainMaintainer {
-    pub(crate) inner: Weak<RwLock<InstanceList>>,
+    pub(crate) inner: Weak<AsyncRwLock<InstanceList>>,
 }
 
 impl Instance {
+    pub(crate) fn get_task_id(&self) -> u64 {
+        self.task_id
+    }
+
+    pub(crate) fn get_record_id(&self) -> i64 {
+        self.record_id
+    }
+
     pub(crate) fn set_task_id(mut self, task_id: u64) -> Instance {
         self.task_id = task_id;
         self
@@ -45,6 +52,10 @@ impl Instance {
     pub(crate) fn set_record_id(mut self, record_id: i64) -> Instance {
         self.record_id = record_id;
         self
+    }
+
+    pub(crate) fn notify_cancel_finish(&self) {
+        self.event.notify(usize::MAX);
     }
 
     /// Cancel the currently running task instance and block the thread to wait.
@@ -105,7 +116,7 @@ impl TaskInstancesChain {
 impl Default for TaskInstancesChain {
     fn default() -> Self {
         let shared_list: InstanceList = Arc::new(LinkedList::new());
-        let inner: Arc<RwLock<InstanceList>> = Arc::new(RwLock::new(shared_list));
+        let inner: Arc<AsyncRwLock<InstanceList>> = Arc::new(AsyncRwLock::new(shared_list));
 
         TaskInstancesChain { inner }
     }

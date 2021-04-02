@@ -212,7 +212,7 @@ impl EventHandle {
                 self.shared_header.task_flag_map.cancel(&task_id);
             }
             TimerEvent::CancelTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id);
+                self.cancel_task(task_id, record_id).await;
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
@@ -224,7 +224,7 @@ impl EventHandle {
                 //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
                 // Provide a separate start time for the external, record_id time with a delay.
                 // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.
-                self.cancel_task(task_id, record_id);
+                self.cancel_task(task_id, record_id).await;
             }
         }
     }
@@ -304,15 +304,15 @@ impl EventHandle {
             .remove_task(task_id)
     }
 
-    pub(crate) fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
-        self.shared_header
-            .task_flag_map
-            .get_mut(&task_id)
-            .unwrap()
-            .value_mut()
-            .dec_parallel_runable_num();
+    pub(crate) async fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+        let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+        let task_mark = task_mark_ref_mut.value_mut();
 
-        // TODO: In there can notify the user through `Instance`.
+        task_mark.dec_parallel_runable_num();
+
+        // In there can notify the user through `Instance`.
+        // TODO: Maybe call this through `quit_one_task_handler` result.
+        task_mark.notify_cancel_finish(task_id, record_id).await;
 
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
@@ -322,31 +322,24 @@ impl EventHandle {
         task_id: u64,
         delay_task_handler_box: DelayTaskHandlerBox,
     ) {
-        // TODO: If TaskInstancesChainMaintainer Can upgrade success.
-        // Then maintain the Task-Instance.
-
         {
-            let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
-            let task_mark = task_mark_ref_mut.value_mut();
+            let task_instances_chain_maintainer_option = self
+                .shared_header
+                .task_flag_map
+                .get_mut(&task_id)
+                .unwrap()
+                .value_mut()
+                .get_task_instances_chain_maintainer();
 
-            if let Some(ref mut task_instances_chain_maintainer_ref_mut) =
-                task_mark.task_instances_chain_maintainer
-            {
-                if let Some(task_instances_chain_maintainer) =
-                    task_instances_chain_maintainer_ref_mut.inner.upgrade()
-                {
-                    let mut instance_list_guard = task_instances_chain_maintainer.write().await;
-                    let instance_list = Arc::get_mut(&mut instance_list_guard).unwrap();
+            if let Some(task_instances_chain_maintainer) = task_instances_chain_maintainer_option {
+                let mut instance_list_guard = task_instances_chain_maintainer.write().await;
+                let instance_list = Arc::get_mut(&mut instance_list_guard).unwrap();
 
-                    let instance = Instance::default()
-                        .set_task_id(task_id)
-                        .set_record_id(delay_task_handler_box.get_record_id());
+                let instance = Instance::default()
+                    .set_task_id(task_id)
+                    .set_record_id(delay_task_handler_box.get_record_id());
 
-                    instance_list.push_back(Arc::new(instance));
-                } else {
-                    // If user already droped `TaskInstancesChain` , delay-timer don't need maintain `Instance`.
-                    task_mark.task_instances_chain_maintainer = None;
-                }
+                instance_list.push_back(Arc::new(instance));
             }
         }
 

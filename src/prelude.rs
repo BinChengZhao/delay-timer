@@ -13,7 +13,7 @@
 pub use crate::entity::{get_timestamp, get_timestamp_micros, DelayTimer, DelayTimerBuilder};
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
-pub use crate::timer::runtime_trace::task_instance::TaskInstancesChain;
+pub use crate::timer::runtime_trace::task_instance::{Instance, TaskInstancesChain};
 pub use crate::timer::task::TaskContext;
 pub use crate::timer::task::{Frequency, ScheduleIteratorTimeZone, Task, TaskBuilder};
 pub use crate::timer::timer_core::TimerEvent;
@@ -35,7 +35,7 @@ pub(crate) use crate::timer::event_handle::SharedHeader;
 pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBox;
 pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use crate::timer::runtime_trace::task_instance::{
-    Instance, TaskInstancesChainMaintainer,
+    InstanceList, TaskInstancesChainMaintainer,
 };
 
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList};
@@ -45,7 +45,7 @@ pub(crate) static mut GLOBAL_TIMER_EVENT_SENDER: Option<TimerEventSender> = None
 
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 pub(crate) use smol::future::yield_now;
-pub(crate) use smol::lock::Mutex as AsyncMutex;
+pub(crate) use smol::lock::{Mutex as AsyncMutex, RwLock as AsyncRwLock};
 
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
