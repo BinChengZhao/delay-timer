@@ -310,9 +310,8 @@ impl EventHandle {
 
         task_mark.dec_parallel_runable_num();
 
-        // In there can notify the user through `Instance`.
-        // TODO: Maybe call this through `quit_one_task_handler` result.
-        task_mark.notify_cancel_finish(task_id, record_id).await;
+        // Here the user can be notified that the task instance has disappeared via `Instance`.
+        task_mark.notify_cancel_finish(record_id).await;
 
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }

@@ -36,6 +36,8 @@ pub struct TaskInstancesChainMaintainer {
 }
 
 impl Instance {
+    
+    #[allow(dead_code)]
     pub(crate) fn get_task_id(&self) -> u64 {
         self.task_id
     }
@@ -59,7 +61,7 @@ impl Instance {
     }
 
     /// Cancel the currently running task instance and block the thread to wait.
-    pub fn cancel_and_wait(&self) -> AnyResult<()> {
+    pub fn cancel_with_wait(&self) -> AnyResult<()> {
         self.cancel()?;
 
         self.event.listen().wait();
@@ -68,7 +70,7 @@ impl Instance {
 
     /// Cancel the currently running task instance and block the thread to wait
     /// for an expected amount of time.
-    pub fn cancel_and_wait_timeout(&self, timeout: Duration) -> AnyResult<()> {
+    pub fn cancel_with_wait_timeout(&self, timeout: Duration) -> AnyResult<()> {
         self.cancel()?;
 
         self.event
@@ -79,7 +81,7 @@ impl Instance {
     }
 
     /// Cancel the currently running task instance and async-await it.
-    pub async fn cancel_and_async_wait(&self) -> AnyResult<()> {
+    pub async fn cancel_with_async_wait(&self) -> AnyResult<()> {
         self.cancel()?;
 
         self.event.listen().await;
@@ -100,14 +102,14 @@ impl Instance {
 }
 
 impl TaskInstancesChain {
-    // sync context.
+    /// Get the list of instances in the context of synchronization.
     pub fn get_instance_list(&self) -> InstanceList {
         // Just clone Arc don't keeping lock.
         block_on(self.inner.read()).clone()
     }
 
-    // async context
-    pub async fn get_instance_list_and_async_await(&self) -> InstanceList {
+    /// Get the list of instances in the context of asynchronous.
+    pub async fn get_instance_list_with_async_await(&self) -> InstanceList {
         // Just clone Arc don't keeping lock.
         self.inner.read().await.clone()
     }

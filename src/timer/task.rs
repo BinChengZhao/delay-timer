@@ -10,7 +10,6 @@ use std::thread::AccessError;
 use std::{cell::RefCell, sync::Arc};
 
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
-use event_listener::Event;
 use lru::LruCache;
 
 //TODO: Add doc.
@@ -101,7 +100,6 @@ impl TaskMark {
 
     pub(crate) async fn notify_cancel_finish(
         &mut self,
-        task_id: u64,
         record_id: i64,
     ) -> Option<Arc<Instance>> {
         let task_instances_chain_maintainer_option = self.get_task_instances_chain_maintainer();
