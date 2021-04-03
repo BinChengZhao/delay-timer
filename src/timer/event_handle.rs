@@ -356,17 +356,20 @@ impl EventHandle {
                         .set_record_id(delay_task_handler_box.get_record_id());
 
                     instance_list.push_back(Arc::new(instance));
-
-                    unsafe {
-                        Arc::increment_strong_count(instance_list_ptr);
-                    }
                 }
-                {
-                    // If can't get &mut T explain becuse outsize Arc<LinkedList<Arc<Instance>>> is drop.
 
-                    //FIXME: be care for `Arc<LinkedList<Arc<Instance>>>` strong-count sub overflow.
-                    // maybe needed change `get_task_instances_chain_maintainer`.
+                // Restore a reference count.
+                unsafe {
+                    Arc::increment_strong_count(instance_list_ptr);
                 }
+
+                // FIXME: be care for `Arc<LinkedList<Arc<Instance>>>` strong-count sub overflow.
+                // maybe needed change `get_task_instances_chain_maintainer`.
+
+                // FIXME:Add a separate state (Atomic) to 
+                // maintain evidence of external (`TaskInstancesChain` `InstanceList`) alive,
+                // do not use Weak to lift Arc or 
+                // determine external state by reference counting.
             }
         }
 
