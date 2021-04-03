@@ -35,7 +35,7 @@ pub(crate) use crate::timer::event_handle::SharedHeader;
 pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBox;
 pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use crate::timer::runtime_trace::task_instance::{
-    InstanceList, TaskInstancesChainMaintainer,
+    InstanceList, InstanceListInner, TaskInstancesChainMaintainer,
 };
 
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList};

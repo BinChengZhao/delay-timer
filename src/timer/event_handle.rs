@@ -332,6 +332,15 @@ impl EventHandle {
 
             if let Some(task_instances_chain_maintainer) = task_instances_chain_maintainer_option {
                 let mut instance_list_guard = task_instances_chain_maintainer.write().await;
+                // First clone Arc<LinkedList<Arc<Instance>>> to 'pointer'.
+                // Keeping strong-ref-count eq 3.
+                // Then call 'pointer'.into_raw() and Arc::decrement_strong_count 2 times.
+                
+                // Call Arc::get_mut , if outside Arc<LinkedList<Arc<Instance>>> is also live, we can get &mut T 
+                // Just mut it.
+                
+                // If can't get &mut T explain becuse outsize Arc<LinkedList<Arc<Instance>>> is drop.
+                // Just break it.
                 let instance_list = Arc::get_mut(&mut instance_list_guard).unwrap();
 
                 let instance = Instance::default()

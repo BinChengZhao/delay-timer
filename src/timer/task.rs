@@ -80,7 +80,7 @@ impl TaskMark {
     #[inline(always)]
     pub(crate) fn get_task_instances_chain_maintainer(
         &mut self,
-    ) -> Option<Arc<AsyncRwLock<InstanceList>>> {
+    ) -> Option<Arc<AsyncRwLock<InstanceListInner>>> {
         let mut task_instances_chain_maintainer_option = None;
 
         if let Some(ref mut task_instances_chain_maintainer_ref_mut) =
@@ -98,10 +98,7 @@ impl TaskMark {
         task_instances_chain_maintainer_option
     }
 
-    pub(crate) async fn notify_cancel_finish(
-        &mut self,
-        record_id: i64,
-    ) -> Option<Arc<Instance>> {
+    pub(crate) async fn notify_cancel_finish(&mut self, record_id: i64) -> Option<Arc<Instance>> {
         let task_instances_chain_maintainer_option = self.get_task_instances_chain_maintainer();
 
         let task_instances_chain_maintainer = task_instances_chain_maintainer_option?;
