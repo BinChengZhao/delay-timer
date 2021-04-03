@@ -1,7 +1,7 @@
 use delay_timer::prelude::*;
 use smol::Timer;
-use std::time::Duration;
 use std::thread::park_timeout;
+use std::time::Duration;
 
 // cargo run --package delay_timer --example dynamic_cancel --features=full
 
@@ -14,7 +14,6 @@ fn main() {
     park_timeout(Duration::from_secs(2));
 
     dbg!(instance_list.front());
-
 }
 
 fn build_task(mut task_builder: TaskBuilder) -> Task {

@@ -38,6 +38,7 @@ pub struct TaskInstancesChain {
 /// For inner maintain to Running-Task's instance.
 #[derive(Debug, Default)]
 pub struct TaskInstancesChainMaintainer {
+    // Maybe needed be Arc<AsyncRwLock<InstanceListInner>>.
     pub(crate) inner: Weak<AsyncRwLock<InstanceListInner>>,
 }
 
@@ -122,13 +123,21 @@ impl InstanceList {
 
 impl TaskInstancesChain {
     /// Get the list of instances in the context of synchronization.
-    pub fn get_instance_list(&self) -> InstanceList {
+
+    // Here you need to use `self:Self` to redeem `InstanceList`
+    // And avoid using self:&Self because &Self can call `get_instance_list` multiple times
+    // And generate multiple Arc's smart pointers.
+    pub fn get_instance_list(self) -> InstanceList {
         // Just clone Arc don't keeping lock.
         InstanceList(block_on(self.inner.read()).clone())
     }
 
     /// Get the list of instances in the context of asynchronous.
-    pub async fn get_instance_list_with_async_await(&self) -> InstanceList {
+
+    // Here you need to use `self:Self` to redeem `InstanceList`
+    // And avoid using self:&Self because &Self can call `get_instance_list_with_async_await` multiple times
+    // And generate multiple Arc's smart pointers.
+    pub async fn get_instance_list_with_async_await(self) -> InstanceList {
         // Just clone Arc don't keeping lock.
         InstanceList(self.inner.read().await.clone())
     }

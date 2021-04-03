@@ -222,6 +222,7 @@ impl DelayTimerBuilder {
     fn init_delay_timer(&mut self) -> DelayTimer {
         let timer_event_sender = self.get_timer_event_sender();
 
+        // Maintains the `TimerEventSender` of the last initialized `DelayTimer` in GLOBAL_TIMER_EVENT_SENDER.
         unsafe {
             GLOBAL_TIMER_EVENT_SENDER = Some(self.get_timer_event_sender());
         }

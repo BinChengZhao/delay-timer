@@ -41,6 +41,8 @@ pub(crate) use crate::timer::runtime_trace::task_instance::{
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList};
 /// Global event sender that provides events to `EventHandle` processing.
 /// Use Option-None to overcome  `only be initialized with constant functions and values`.
+
+// Maintains the `TimerEventSender` of the last initialized `DelayTimer` in GLOBAL_TIMER_EVENT_SENDER.
 pub(crate) static mut GLOBAL_TIMER_EVENT_SENDER: Option<TimerEventSender> = None;
 
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
