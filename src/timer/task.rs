@@ -114,6 +114,11 @@ impl TaskMark {
         let remove_instance = has_remove_instance_list.pop_front();
         instance_list.append(&mut has_remove_instance_list);
 
+        // TODO:It may not be necessary to remove this Arc<Instance>,
+        // because it is possible that the external InstanceList still 
+        // has the 'removed Arc<Instance> data cached in the cpu cache.'
+
+        // TODO:Just let Instance maintain a state and notify the external on it.
         remove_instance.as_ref().map(|i| i.notify_cancel_finish());
         remove_instance
     }

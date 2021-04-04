@@ -366,9 +366,9 @@ impl EventHandle {
                 // FIXME: be care for `Arc<LinkedList<Arc<Instance>>>` strong-count sub overflow.
                 // maybe needed change `get_task_instances_chain_maintainer`.
 
-                // FIXME:Add a separate state (Atomic) to 
+                // FIXME:Add a separate state (Atomic) to
                 // maintain evidence of external (`TaskInstancesChain` `InstanceList`) alive,
-                // do not use Weak to lift Arc or 
+                // do not use Weak to lift Arc or
                 // determine external state by reference counting.
             }
         }

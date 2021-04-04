@@ -5,6 +5,7 @@ use std::collections::LinkedList;
 use std::convert::From;
 use std::iter::Peekable;
 use std::ops::Deref;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
@@ -38,7 +39,7 @@ pub struct TaskInstancesChain {
 /// For inner maintain to Running-Task's instance.
 #[derive(Debug, Default)]
 pub struct TaskInstancesChainMaintainer {
-    // Maybe needed be Arc<AsyncRwLock<InstanceListInner>>.
+    //TODO: Maybe needed be Arc<AsyncRwLock<InstanceListInner>>.
     pub(crate) inner: Weak<AsyncRwLock<InstanceListInner>>,
 }
 
@@ -145,6 +146,7 @@ impl TaskInstancesChain {
 
 impl Default for TaskInstancesChain {
     fn default() -> Self {
+        let a = AtomicUsize::new(1);
         let shared_list: InstanceListInner = Arc::new(LinkedList::new());
         let inner: Arc<AsyncRwLock<InstanceListInner>> = Arc::new(AsyncRwLock::new(shared_list));
 
