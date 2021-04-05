@@ -16,6 +16,8 @@ use super::timer::{
     Slot,
 };
 use crate::prelude::*;
+use crate::timer::runtime_trace::task_instance::task_instance_chain_pair;
+
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
@@ -334,9 +336,7 @@ impl DelayTimer {
     // }
 
     pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
-        let task_instances_chain: TaskInstancesChain = TaskInstancesChain::default();
-        let task_instances_chain_maintainer: TaskInstancesChainMaintainer =
-            (&task_instances_chain).into();
+        let (task_instances_chain, task_instances_chain_maintainer) = task_instance_chain_pair();
 
         self.seed_timer_event(TimerEvent::InsertTask(
             Box::new(task),

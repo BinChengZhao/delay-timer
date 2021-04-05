@@ -2,45 +2,68 @@ use crate::prelude::*;
 
 use std::collections::linked_list::Iter;
 use std::collections::LinkedList;
-use std::convert::From;
 use std::iter::Peekable;
-use std::ops::Deref;
-use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Weak};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result as AnyResult};
 use event_listener::Event;
-use futures::executor::block_on;
+use smol::channel::{unbounded, Receiver, Sender};
 
 /// instance of task running.
 #[derive(Debug, Default)]
 pub struct Instance {
+    /// The header of the taskInstance.
+    header: Arc<InstanceHeader>,
     /// The id of task.
     task_id: u64,
     /// The id of task running record.
     record_id: i64,
-    /// The event view of inner task.
-    event: Event,
 }
-pub(crate) type InstanceListInner = Arc<LinkedList<Arc<Instance>>>;
 
 #[derive(Debug, Default)]
-pub struct InstanceList(InstanceListInner);
+pub(crate) struct InstanceHeader {
+    /// The event view of inner taskInstance.
+    event: Event,
+    /// The state of inner taskInstance.
+    state: AtomicUsize,
+}
+
+pub(crate) fn task_instance_chain_pair() -> (TaskInstancesChain, TaskInstancesChainMaintainer) {
+    let (inner_sender, inner_receiver) = unbounded::<Instance>();
+    let inner_state = Arc::new(AtomicUsize::new(state::instance_chain::LIVING));
+    let inner_list = LinkedList::new();
+
+    let chain = TaskInstancesChain {
+        inner_receiver,
+        inner_state: inner_state.clone(),
+    };
+    let chain_maintainer = TaskInstancesChainMaintainer {
+        inner_sender,
+        inner_state,
+        inner_list,
+    };
+
+    (chain, chain_maintainer)
+}
 
 /// Chain of task run instances.
 /// For User access to Running-Task's instance.
 #[derive(Debug)]
 pub struct TaskInstancesChain {
-    pub(crate) inner: Arc<AsyncRwLock<InstanceListInner>>,
+    pub(crate) inner_receiver: Receiver<Instance>,
+    pub(crate) inner_state: Arc<AtomicUsize>,
 }
 
 /// Chain of task run instances.
 /// For inner maintain to Running-Task's instance.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TaskInstancesChainMaintainer {
     //TODO: Maybe needed be Arc<AsyncRwLock<InstanceListInner>>.
-    pub(crate) inner: Weak<AsyncRwLock<InstanceListInner>>,
+    pub(crate) inner_sender: Sender<Instance>,
+    pub(crate) inner_state: Arc<AtomicUsize>,
+    pub(crate) inner_list: LinkedList<Instance>,
 }
 
 impl Instance {
@@ -63,15 +86,19 @@ impl Instance {
         self
     }
 
+    pub(crate) fn set_header_state(&self, state: usize) {
+        self.header.state.store(state, Ordering::Release);
+    }
+
     pub(crate) fn notify_cancel_finish(&self) {
-        self.event.notify(usize::MAX);
+        self.header.event.notify(usize::MAX);
     }
 
     /// Cancel the currently running task instance and block the thread to wait.
     pub fn cancel_with_wait(&self) -> AnyResult<()> {
         self.cancel()?;
 
-        self.event.listen().wait();
+        self.header.event.listen().wait();
         Ok(())
     }
 
@@ -80,7 +107,8 @@ impl Instance {
     pub fn cancel_with_wait_timeout(&self, timeout: Duration) -> AnyResult<()> {
         self.cancel()?;
 
-        self.event
+        self.header
+            .event
             .listen()
             .wait_timeout(timeout)
             .then(|| ())
@@ -91,7 +119,7 @@ impl Instance {
     pub async fn cancel_with_async_wait(&self) -> AnyResult<()> {
         self.cancel()?;
 
-        self.event.listen().await;
+        self.header.event.listen().await;
         Ok(())
     }
 
@@ -108,55 +136,18 @@ impl Instance {
     }
 }
 
-impl InstanceList {
-    pub fn peek(&self) -> Peekable<Iter<'_, Arc<Instance>>> {
-        self.0.iter().peekable()
-    }
+// impl InstanceList {
+//     pub fn peek(&self) -> Peekable<Iter<'_, Arc<Instance>>> {
+//         self.0.iter().peekable()
+//     }
 
-    pub fn front(&self) -> Option<&Instance> {
-        self.0.front().map(|e| e.deref())
-    }
+//     pub fn front(&self) -> Option<&Instance> {
+//         self.0.front().map(|e| e.deref())
+//     }
 
-    pub fn back(&self) -> Option<&Instance> {
-        self.0.back().map(|e| e.deref())
-    }
-}
+//     pub fn back(&self) -> Option<&Instance> {
+//         self.0.back().map(|e| e.deref())
+//     }
+// }
 
-impl TaskInstancesChain {
-    /// Get the list of instances in the context of synchronization.
-
-    // Here you need to use `self:Self` to redeem `InstanceList`
-    // And avoid using self:&Self because &Self can call `get_instance_list` multiple times
-    // And generate multiple Arc's smart pointers.
-    pub fn get_instance_list(self) -> InstanceList {
-        // Just clone Arc don't keeping lock.
-        InstanceList(block_on(self.inner.read()).clone())
-    }
-
-    /// Get the list of instances in the context of asynchronous.
-
-    // Here you need to use `self:Self` to redeem `InstanceList`
-    // And avoid using self:&Self because &Self can call `get_instance_list_with_async_await` multiple times
-    // And generate multiple Arc's smart pointers.
-    pub async fn get_instance_list_with_async_await(self) -> InstanceList {
-        // Just clone Arc don't keeping lock.
-        InstanceList(self.inner.read().await.clone())
-    }
-}
-
-impl Default for TaskInstancesChain {
-    fn default() -> Self {
-        let a = AtomicUsize::new(1);
-        let shared_list: InstanceListInner = Arc::new(LinkedList::new());
-        let inner: Arc<AsyncRwLock<InstanceListInner>> = Arc::new(AsyncRwLock::new(shared_list));
-
-        TaskInstancesChain { inner }
-    }
-}
-
-impl From<&TaskInstancesChain> for TaskInstancesChainMaintainer {
-    fn from(value: &TaskInstancesChain) -> TaskInstancesChainMaintainer {
-        let inner = Arc::downgrade(&value.inner);
-        TaskInstancesChainMaintainer { inner }
-    }
-}
+impl TaskInstancesChain {}
