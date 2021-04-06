@@ -311,67 +311,43 @@ impl EventHandle {
         task_mark.dec_parallel_runable_num();
 
         // Here the user can be notified that the task instance has disappeared via `Instance`.
-        task_mark.notify_cancel_finish(record_id).await;
+        task_mark.notify_cancel_finish(record_id);
 
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
+
+    // pub(crate) async fn finish_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+    //     let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+    //     let task_mark = task_mark_ref_mut.value_mut();
+
+    //     task_mark.dec_parallel_runable_num();
+
+    //     // Here the user can be notified that the task instance has disappeared via `Instance`.
+    //     task_mark.finish_task(record_id).await;
+
+    //     self.task_trace.quit_one_task_handler(task_id, record_id)
+    // }
 
     pub(crate) async fn maintain_task_status(
         &mut self,
         task_id: u64,
         delay_task_handler_box: DelayTaskHandlerBox,
     ) {
-        // {
-        //     let task_instances_chain_maintainer_option = self
-        //         .shared_header
-        //         .task_flag_map
-        //         .get_mut(&task_id)
-        //         .unwrap()
-        //         .value_mut()
-        //         .get_task_instances_chain_maintainer();
+        {
+            let mut task_mark = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
 
-        //     if let Some(task_instances_chain_maintainer) = task_instances_chain_maintainer_option {
-        //         let mut instance_list_guard = task_instances_chain_maintainer.write().await;
+            let task_instances_chain_maintainer_option =
+                task_mark.value_mut().get_task_instances_chain_maintainer();
 
-        //         // The first step is to get a raw-ptr of Arc<LinkedList<Arc<Instance>>> to `instance_list_ptr`,
-        //         // in order to use `Arc::decrement_strong_count` later.
-        //         let instance_list_ptr = Arc::into_raw(instance_list_guard.clone());
-
-        //         // Normally the strong-ref-count here is 3.
-        //         // In order to actively acquire `&mut LinkedList<Arc<Instance>>`,
-        //         // It is necessary to maintain strong-ref-count to 1 by `Arc::decrement_strong_count`.
-        //         unsafe {
-        //             Arc::decrement_strong_count(instance_list_ptr);
-        //             Arc::decrement_strong_count(instance_list_ptr);
-        //         }
-
-        //         // Get `&mut LinkedList<Arc<Instance>>` here with `Arc::get_mut`.
-        //         // If the external `Arc<LinkedList<Arc<Instance>>>` has been dropped, the return value is None.
-
-        //         // If the external `Arc<LinkedList<Arc<Instance>>>` still exists
-        //         // The return value is `Some(&mut LinkedList<Arc<Instance>>)`.
-        //         if let Some(instance_list) = Arc::get_mut(&mut instance_list_guard) {
-        //             let instance = Instance::default()
-        //                 .set_task_id(task_id)
-        //                 .set_record_id(delay_task_handler_box.get_record_id());
-
-        //             instance_list.push_back(Arc::new(instance));
-        //         }
-
-        //         // Restore a reference count.
-        //         unsafe {
-        //             Arc::increment_strong_count(instance_list_ptr);
-        //         }
-
-        //         // FIXME: be care for `Arc<LinkedList<Arc<Instance>>>` strong-count sub overflow.
-        //         // maybe needed change `get_task_instances_chain_maintainer`.
-
-        //         // FIXME:Add a separate state (Atomic) to
-        //         // maintain evidence of external (`TaskInstancesChain` `InstanceList`) alive,
-        //         // do not use Weak to lift Arc or
-        //         // determine external state by reference counting.
-        //     }
-        // }
+            if let Some(task_instances_chain_maintainer) = task_instances_chain_maintainer_option {
+                let instance = Instance::default()
+                    .set_task_id(task_id)
+                    .set_record_id(delay_task_handler_box.get_record_id());
+                task_instances_chain_maintainer
+                    .inner_list
+                    .push_back(instance);
+            }
+        }
 
         // If has deadline, set recycle_unit.
         if let Some(deadline) = delay_task_handler_box.get_end_time() {

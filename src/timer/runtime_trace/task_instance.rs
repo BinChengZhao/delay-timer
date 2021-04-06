@@ -22,12 +22,21 @@ pub struct Instance {
     record_id: i64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct InstanceHeader {
     /// The event view of inner taskInstance.
     event: Event,
     /// The state of inner taskInstance.
     state: AtomicUsize,
+}
+
+impl Default for InstanceHeader {
+    fn default() -> Self {
+        let event = Event::new();
+        let state = AtomicUsize::new(state::instance::RUNNING);
+
+        InstanceHeader { event, state }
+    }
 }
 
 pub(crate) fn task_instance_chain_pair() -> (TaskInstancesChain, TaskInstancesChainMaintainer) {
@@ -91,6 +100,12 @@ impl Instance {
     }
 
     pub(crate) fn notify_cancel_finish(&self) {
+        self.set_header_state(state::instance::CANCELLED);
+        self.header.event.notify(usize::MAX);
+    }
+
+    pub(crate) fn notify_complete_finish(&self) {
+        self.set_header_state(state::instance::COMPLETED);
         self.header.event.notify(usize::MAX);
     }
 
@@ -135,19 +150,5 @@ impl Instance {
         }
     }
 }
-
-// impl InstanceList {
-//     pub fn peek(&self) -> Peekable<Iter<'_, Arc<Instance>>> {
-//         self.0.iter().peekable()
-//     }
-
-//     pub fn front(&self) -> Option<&Instance> {
-//         self.0.front().map(|e| e.deref())
-//     }
-
-//     pub fn back(&self) -> Option<&Instance> {
-//         self.0.back().map(|e| e.deref())
-//     }
-// }
 
 impl TaskInstancesChain {}

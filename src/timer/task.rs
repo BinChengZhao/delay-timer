@@ -6,6 +6,7 @@ use crate::prelude::*;
 use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
+use std::sync::atomic::Ordering;
 use std::thread::AccessError;
 use std::{cell::RefCell, sync::Arc};
 
@@ -77,30 +78,38 @@ impl TaskMark {
         self
     }
 
-    pub(crate) async fn notify_cancel_finish(&mut self, record_id: i64) -> Option<Arc<Instance>> {
-        todo!();
-        // let task_instances_chain_maintainer_option = self.get_task_instances_chain_maintainer();
+    pub(crate) fn get_task_instances_chain_maintainer(
+        &mut self,
+    ) -> Option<&mut TaskInstancesChainMaintainer> {
+        let state = self
+            .task_instances_chain_maintainer
+            .as_ref()
+            .map(|c| c.inner_state.load(Ordering::Acquire));
 
-        // let task_instances_chain_maintainer = task_instances_chain_maintainer_option?;
-        // let mut instance_list_guard = task_instances_chain_maintainer.write().await;
+        if state == Some(state::instance_chain::DROPPED) {
+            self.task_instances_chain_maintainer = None;
+        }
 
-        // let instance_list = Arc::get_mut(&mut instance_list_guard)?;
+        self.task_instances_chain_maintainer.as_mut()
+    }
 
-        // let index = instance_list
-        //     .iter()
-        //     .position(|d| d.get_record_id() == record_id)?;
+    pub(crate) async fn notify_cancel_finish(&mut self, record_id: i64) -> Option<Instance> {
+        let task_instances_chain_maintainer = self.get_task_instances_chain_maintainer()?;
 
-        // let mut has_remove_instance_list = instance_list.split_off(index);
-        // let remove_instance = has_remove_instance_list.pop_front();
-        // instance_list.append(&mut has_remove_instance_list);
+        let index = task_instances_chain_maintainer
+            .inner_list
+            .iter()
+            .position(|d| d.get_record_id() == record_id)?;
 
-        // // TODO:It may not be necessary to remove this Arc<Instance>,
-        // // because it is possible that the external InstanceList still
-        // // has the 'removed Arc<Instance> data cached in the cpu cache.'
+        let mut has_remove_instance_list =
+            task_instances_chain_maintainer.inner_list.split_off(index);
+        let remove_instance = has_remove_instance_list.pop_front();
+        task_instances_chain_maintainer
+            .inner_list
+            .append(&mut has_remove_instance_list);
 
-        // // TODO:Just let Instance maintain a state and notify the external on it.
-        // remove_instance.as_ref().map(|i| i.notify_cancel_finish());
-        // remove_instance
+        remove_instance.as_ref().map(|i| i.notify_cancel_finish());
+        remove_instance
     }
 }
 
