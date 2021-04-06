@@ -13,6 +13,8 @@ pub struct StatusReporter {
 }
 
 impl StatusReporter {
+
+    /// Get `PublicEvent` via `StatusReporter`.
     pub fn get_public_event(&self) -> AnyResult<PublicEvent> {
         let event = self.inner.try_recv()?;
         Ok(event)
@@ -23,10 +25,14 @@ impl StatusReporter {
     }
 }
 
+/// `PublicEvent`, describes the open events that occur in the delay-timer of the task.
 #[derive(Debug, Copy, Clone)]
 pub enum PublicEvent {
+    /// Describes which task is removed.
     RemoveTask(u64),
+    /// Describes which task produced a new running instance, record the id.
     RunningTask(u64, i64),
+    /// Describe which task instance completed。
     FinishTask(u64, i64),
 }
 
@@ -48,6 +54,7 @@ impl TryFrom<&TimerEvent> for PublicEvent {
 }
 
 impl PublicEvent {
+    /// Get the task_id corresponding to the event.
    pub fn get_task_id(&self) -> u64 {
         match self {
             PublicEvent::RemoveTask(ref task_id) => *task_id,
@@ -56,6 +63,7 @@ impl PublicEvent {
         }
     }
 
+    /// Get the record_id corresponding to the event.
    pub fn get_record_id(&self) -> Option<i64> {
         match self {
             PublicEvent::RemoveTask(_) => None,

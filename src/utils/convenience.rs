@@ -47,6 +47,7 @@ pub mod functions {
     }
 
     cfg_tokio_support!(
+        /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
         pub fn tokio_unblock_process_task_fn(
             shell_command: String,
         ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {

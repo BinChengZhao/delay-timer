@@ -343,9 +343,10 @@ impl EventHandle {
                 let instance = Instance::default()
                     .set_task_id(task_id)
                     .set_record_id(delay_task_handler_box.get_record_id());
+
                 task_instances_chain_maintainer
-                    .inner_list
-                    .push_back(instance);
+                    .push_instance(instance)
+                    .await;
             }
         }
 

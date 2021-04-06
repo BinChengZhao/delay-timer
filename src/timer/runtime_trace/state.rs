@@ -1,12 +1,12 @@
-pub(crate) mod instance {
+pub mod instance {
     /// Set if the task is running.
-    pub(crate) const RUNNING: usize = 1 << 1;
+    pub const RUNNING: usize = 1 << 1;
 
     /// Set if the task has been completed.
-    pub(crate) const COMPLETED: usize = 1 << 2;
+    pub const COMPLETED: usize = 1 << 2;
 
     /// Set if the task has been Cancelled.
-    pub(crate) const CANCELLED: usize = 1 << 3;
+    pub const CANCELLED: usize = 1 << 3;
 }
 
 pub(crate) mod instance_chain {

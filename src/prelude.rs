@@ -30,6 +30,9 @@ pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
 
+/// State of the task run instance.
+pub type InstanceState = usize;
+
 pub(crate) use crate::entity::RuntimeKind;
 pub(crate) use crate::timer::event_handle::SharedHeader;
 pub(crate) use crate::timer::runtime_trace::state;
