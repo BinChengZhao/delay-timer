@@ -386,11 +386,10 @@ pub mod shell_command {
         };
 
         let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
-        if let Some(filename) = sub_command_inner.next() {
-            Some(create_stdio_file(angle_bracket, filename))
-        } else {
-            None
-        }
+
+        sub_command_inner
+            .next()
+            .map(|filename| create_stdio_file(angle_bracket, filename))
     }
 
     //After confirming that there is a redirect file, parse the command before the command '>'.

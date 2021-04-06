@@ -212,7 +212,7 @@ impl EventHandle {
                 self.shared_header.task_flag_map.cancel(&task_id);
             }
             TimerEvent::CancelTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id).await;
+                self.cancel_task(task_id, record_id);
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
@@ -224,7 +224,7 @@ impl EventHandle {
                 //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
                 // Provide a separate start time for the external, record_id time with a delay.
                 // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.
-                self.cancel_task(task_id, record_id).await;
+                self.finish_task(task_id, record_id);
             }
         }
     }
@@ -304,29 +304,29 @@ impl EventHandle {
             .remove_task(task_id)
     }
 
-    pub(crate) async fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+    pub(crate) fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
         let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
         let task_mark = task_mark_ref_mut.value_mut();
 
         task_mark.dec_parallel_runable_num();
 
         // Here the user can be notified that the task instance has disappeared via `Instance`.
-        task_mark.notify_cancel_finish(record_id);
+        task_mark.notify_cancel_finish(record_id, state::instance::CANCELLED);
 
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 
-    // pub(crate) async fn finish_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
-    //     let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
-    //     let task_mark = task_mark_ref_mut.value_mut();
+    pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+        let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+        let task_mark = task_mark_ref_mut.value_mut();
 
-    //     task_mark.dec_parallel_runable_num();
+        task_mark.dec_parallel_runable_num();
 
-    //     // Here the user can be notified that the task instance has disappeared via `Instance`.
-    //     task_mark.finish_task(record_id).await;
+        // Here the user can be notified that the task instance has disappeared via `Instance`.
+        task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED);
 
-    //     self.task_trace.quit_one_task_handler(task_id, record_id)
-    // }
+        self.task_trace.quit_one_task_handler(task_id, record_id)
+    }
 
     pub(crate) async fn maintain_task_status(
         &mut self,

@@ -66,11 +66,9 @@ impl TaskTrace {
         }
 
         //remove current task_handler_box.
-        if let Some(mut task_handler_box) = list_mut_cursor.remove_current() {
-            Some(task_handler_box.quit())
-        } else {
-            None
-        }
+        list_mut_cursor
+            .remove_current()
+            .map(|mut task_handler_box| task_handler_box.quit())
     }
 
     #[cfg(not(RUSTC_IS_NIGHTLY))]

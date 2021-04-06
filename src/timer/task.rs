@@ -3,12 +3,12 @@
 use super::runtime_trace::task_handle::DelayTaskHandler;
 use crate::prelude::*;
 
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::thread::AccessError;
-use std::{cell::RefCell, sync::Arc};
 
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
@@ -93,7 +93,11 @@ impl TaskMark {
         self.task_instances_chain_maintainer.as_mut()
     }
 
-    pub(crate) async fn notify_cancel_finish(&mut self, record_id: i64) -> Option<Instance> {
+    pub(crate) fn notify_cancel_finish(
+        &mut self,
+        record_id: i64,
+        state: usize,
+    ) -> Option<Instance> {
         let task_instances_chain_maintainer = self.get_task_instances_chain_maintainer()?;
 
         let index = task_instances_chain_maintainer
@@ -108,7 +112,9 @@ impl TaskMark {
             .inner_list
             .append(&mut has_remove_instance_list);
 
-        remove_instance.as_ref().map(|i| i.notify_cancel_finish());
+        if let Some(i) = remove_instance.as_ref() {
+            i.notify_cancel_finish(state)
+        }
         remove_instance
     }
 }

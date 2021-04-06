@@ -10,10 +10,9 @@ fn main() {
     let task_builder = TaskBuilder::default();
 
     let instance_chain = delay_timer.insert_task(build_task(task_builder)).unwrap();
-    let instance_list = instance_chain.get_instance_list();
     park_timeout(Duration::from_secs(2));
+    instance_chain.next().unwrap().cancel_with_wait().unwrap();
 
-    dbg!(instance_list.front());
 }
 
 fn build_task(mut task_builder: TaskBuilder) -> Task {

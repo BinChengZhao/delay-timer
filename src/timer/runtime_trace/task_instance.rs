@@ -1,8 +1,6 @@
 use crate::prelude::*;
 
-use std::collections::linked_list::Iter;
 use std::collections::LinkedList;
-use std::iter::Peekable;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -99,13 +97,8 @@ impl Instance {
         self.header.state.store(state, Ordering::Release);
     }
 
-    pub(crate) fn notify_cancel_finish(&self) {
-        self.set_header_state(state::instance::CANCELLED);
-        self.header.event.notify(usize::MAX);
-    }
-
-    pub(crate) fn notify_complete_finish(&self) {
-        self.set_header_state(state::instance::COMPLETED);
+    pub(crate) fn notify_cancel_finish(&self, state: usize) {
+        self.set_header_state(state);
         self.header.event.notify(usize::MAX);
     }
 
@@ -127,7 +120,7 @@ impl Instance {
             .listen()
             .wait_timeout(timeout)
             .then(|| ())
-            .ok_or(anyhow!("Waiting for cancellation timeout"))
+            .ok_or_else(|| anyhow!("Waiting for cancellation timeout"))
     }
 
     /// Cancel the currently running task instance and async-await it.
@@ -146,9 +139,19 @@ impl Instance {
                     s.try_send(TimerEvent::CancelTask(self.task_id, self.record_id))
                         .with_context(|| "Failed Send Event from seed_timer_event".to_string())
                 })
-                .ok_or(anyhow!("GLOBAL_TIMER_EVENT_SENDER isn't init."))?
+                .ok_or_else(|| anyhow!("GLOBAL_TIMER_EVENT_SENDER isn't init."))?
         }
     }
 }
 
-impl TaskInstancesChain {}
+impl TaskInstancesChain {
+    pub fn next(&self)->AnyResult<Instance>{
+        Ok(self.inner_receiver.try_recv()?)
+    }
+}
+
+impl Drop for TaskInstancesChain{
+    fn drop(&mut self) {
+        self.inner_state.store(state::instance_chain::DROPPED, Ordering::Release);
+    }
+}
