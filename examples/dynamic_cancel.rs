@@ -1,5 +1,4 @@
 use delay_timer::prelude::*;
-use futures::join;
 use smol::Timer;
 use tokio::runtime::Runtime;
 
@@ -8,7 +7,7 @@ use std::time::Duration;
 // cargo run --package delay_timer --example dynamic_cancel --features=full
 
 fn main() {
-    sync_cancel();
+    // sync_cancel();
     async_cancel();
 }
 
@@ -52,19 +51,20 @@ fn async_cancel() {
                 .unwrap();
         };
 
+        task_instance.await;
         let shell_task_instance = async {
-            shell_task_instance_chain
+            dbg!(shell_task_instance_chain
                 .next_with_async_wait()
                 .await
-                .unwrap()
+                .unwrap())
                 .cancel_with_async_wait()
                 .await
                 .unwrap();
         };
-        //
-        join!(task_instance, shell_task_instance);
 
-        // .unwrap();
+        shell_task_instance.await;
+
+
     });
 }
 
@@ -77,7 +77,7 @@ fn build_task(mut task_builder: TaskBuilder) -> Task {
 
     task_builder
         .set_task_id(1)
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_frequency(Frequency::Repeated("0/6 * * * * * *"))
         .set_maximun_parallel_runable_num(2)
         .spawn(body)
         .unwrap()
@@ -86,9 +86,10 @@ fn build_task(mut task_builder: TaskBuilder) -> Task {
 fn build_shell_task(mut task_builder: TaskBuilder) -> Task {
     let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
     task_builder
-        .set_frequency(Frequency::Repeated("0/2 * * * * * *"))
+    .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
         .set_task_id(3)
-        .set_maximum_running_time(5)
+        .set_maximum_running_time(10)
+        .set_maximun_parallel_runable_num(1)
         .spawn(body)
         .unwrap()
 }

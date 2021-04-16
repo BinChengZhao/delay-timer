@@ -21,6 +21,13 @@ pub struct Instance {
     record_id: i64,
 }
 
+// TODO: Maybe expose that type.
+#[derive(Debug, Clone)]
+pub struct TaskInstance {
+    instance:Instance,
+    timer_event_sender:TimerEventSender
+}
+
 #[derive(Debug)]
 pub(crate) struct InstanceHeader {
     /// The event view of inner taskInstance.
@@ -46,6 +53,7 @@ pub(crate) fn task_instance_chain_pair() -> (TaskInstancesChain, TaskInstancesCh
     let chain = TaskInstancesChain {
         inner_receiver,
         inner_state: inner_state.clone(),
+        timer_event_sender:None
     };
     let chain_maintainer = TaskInstancesChainMaintainer {
         inner_sender,
@@ -62,6 +70,7 @@ pub(crate) fn task_instance_chain_pair() -> (TaskInstancesChain, TaskInstancesCh
 pub struct TaskInstancesChain {
     pub(crate) inner_receiver: Receiver<Instance>,
     pub(crate) inner_state: Arc<AtomicUsize>,
+    pub(crate) timer_event_sender: Option<TimerEventSender>,
 }
 
 /// Chain of task run instances.
@@ -161,6 +170,8 @@ impl TaskInstancesChainMaintainer {
 impl TaskInstancesChain {
     /// Non-blocking get the next task instance.
     pub fn next(&self) -> AnyResult<Instance> {
+    // TODO: InstanceX{sender:self.sender.clone(), instance:Instance}
+
         Ok(self.inner_receiver.try_recv()?)
     }
 

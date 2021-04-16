@@ -45,6 +45,7 @@ pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList};
 /// Use Option-None to overcome  `only be initialized with constant functions and values`.
 
 // Maintains the `TimerEventSender` of the last initialized `DelayTimer` in GLOBAL_TIMER_EVENT_SENDER.
+//TODO: Some problem when have to Delaytimer.
 pub(crate) static mut GLOBAL_TIMER_EVENT_SENDER: Option<TimerEventSender> = None;
 
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};

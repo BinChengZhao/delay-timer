@@ -336,8 +336,9 @@ impl DelayTimer {
     // }
 
     pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
-        let (task_instances_chain, task_instances_chain_maintainer) = task_instance_chain_pair();
-
+        let (mut task_instances_chain, task_instances_chain_maintainer) = task_instance_chain_pair();
+        task_instances_chain.timer_event_sender = Some(self.timer_event_sender.clone());
+        
         self.seed_timer_event(TimerEvent::InsertTask(
             Box::new(task),
             task_instances_chain_maintainer,
