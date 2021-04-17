@@ -224,11 +224,6 @@ impl DelayTimerBuilder {
     fn init_delay_timer(&mut self) -> DelayTimer {
         let timer_event_sender = self.get_timer_event_sender();
 
-        // Maintains the `TimerEventSender` of the last initialized `DelayTimer` in GLOBAL_TIMER_EVENT_SENDER.
-        unsafe {
-            GLOBAL_TIMER_EVENT_SENDER = Some(self.get_timer_event_sender());
-        }
-
         let shared_header = self.shared_header.clone();
 
         #[cfg(feature = "status-report")]
@@ -336,9 +331,10 @@ impl DelayTimer {
     // }
 
     pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
-        let (mut task_instances_chain, task_instances_chain_maintainer) = task_instance_chain_pair();
+        let (mut task_instances_chain, task_instances_chain_maintainer) =
+            task_instance_chain_pair();
         task_instances_chain.timer_event_sender = Some(self.timer_event_sender.clone());
-        
+
         self.seed_timer_event(TimerEvent::InsertTask(
             Box::new(task),
             task_instances_chain_maintainer,

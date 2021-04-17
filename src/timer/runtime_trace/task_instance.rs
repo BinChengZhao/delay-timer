@@ -21,11 +21,11 @@ pub struct Instance {
     record_id: i64,
 }
 
-// TODO: Maybe expose that type.
+/// Public instance of task running.
 #[derive(Debug, Clone)]
 pub struct TaskInstance {
-    instance:Instance,
-    timer_event_sender:TimerEventSender
+    pub(crate) instance: Instance,
+    pub(crate) timer_event_sender: TimerEventSender,
 }
 
 #[derive(Debug)]
@@ -53,7 +53,7 @@ pub(crate) fn task_instance_chain_pair() -> (TaskInstancesChain, TaskInstancesCh
     let chain = TaskInstancesChain {
         inner_receiver,
         inner_state: inner_state.clone(),
-        timer_event_sender:None
+        timer_event_sender: None,
     };
     let chain_maintainer = TaskInstancesChainMaintainer {
         inner_sender,
@@ -85,51 +85,82 @@ pub struct TaskInstancesChainMaintainer {
 
 impl Instance {
     #[allow(dead_code)]
+    #[inline(always)]
     pub(crate) fn get_task_id(&self) -> u64 {
         self.task_id
     }
 
+    #[inline(always)]
     pub(crate) fn get_record_id(&self) -> i64 {
         self.record_id
     }
 
+    #[inline(always)]
     pub(crate) fn set_task_id(mut self, task_id: u64) -> Instance {
         self.task_id = task_id;
         self
     }
 
+    #[inline(always)]
     pub(crate) fn set_record_id(mut self, record_id: i64) -> Instance {
         self.record_id = record_id;
         self
     }
 
+    #[inline(always)]
     pub(crate) fn set_state(&self, state: usize) {
         self.header.state.store(state, Ordering::Release);
     }
 
     /// Get state of Instance.
+    #[inline(always)]
     pub fn get_state(&self) -> InstanceState {
         self.header.state.load(Ordering::Acquire)
     }
+
+    #[inline(always)]
     pub(crate) fn notify_cancel_finish(&self, state: usize) {
         self.set_state(state);
         self.header.event.notify(usize::MAX);
     }
+}
+
+impl TaskInstance {
+    #[allow(dead_code)]
+    #[inline(always)]
+    pub(crate) fn get_task_id(&self) -> u64 {
+        self.instance.get_task_id()
+    }
+
+    #[allow(dead_code)]
+    #[inline(always)]
+    pub(crate) fn get_record_id(&self) -> i64 {
+        self.instance.get_record_id()
+    }
+
+    /// Get state of Instance.
+    #[inline(always)]
+    pub fn get_state(&self) -> InstanceState {
+        self.instance.get_state()
+    }
 
     /// Cancel the currently running task instance and block the thread to wait.
+    #[inline(always)]
     pub fn cancel_with_wait(&self) -> AnyResult<InstanceState> {
         self.cancel()?;
 
-        self.header.event.listen().wait();
+        self.instance.header.event.listen().wait();
         Ok(self.get_state())
     }
 
     /// Cancel the currently running task instance and block the thread to wait
     /// for an expected amount of time.
+    #[inline(always)]
     pub fn cancel_with_wait_timeout(&self, timeout: Duration) -> AnyResult<InstanceState> {
         self.cancel()?;
 
-        self.header
+        self.instance
+            .header
             .event
             .listen()
             .wait_timeout(timeout)
@@ -138,23 +169,22 @@ impl Instance {
     }
 
     /// Cancel the currently running task instance and async-await it.
+    #[inline(always)]
     pub async fn cancel_with_async_wait(&self) -> AnyResult<InstanceState> {
         self.cancel()?;
 
-        self.header.event.listen().await;
+        self.instance.header.event.listen().await;
         Ok(self.get_state())
     }
 
+    #[inline(always)]
     fn cancel(&self) -> AnyResult<()> {
-        unsafe {
-            GLOBAL_TIMER_EVENT_SENDER
-                .as_ref()
-                .map(|s| {
-                    s.try_send(TimerEvent::CancelTask(self.task_id, self.record_id))
-                        .with_context(|| "Failed Send Event from seed_timer_event".to_string())
-                })
-                .ok_or_else(|| anyhow!("GLOBAL_TIMER_EVENT_SENDER isn't init."))?
-        }
+        self.timer_event_sender
+            .try_send(TimerEvent::CancelTask(
+                self.instance.task_id,
+                self.instance.record_id,
+            ))
+            .with_context(|| "Failed Send Event from seed_timer_event".to_string())
     }
 }
 
@@ -169,20 +199,46 @@ impl TaskInstancesChainMaintainer {
 }
 impl TaskInstancesChain {
     /// Non-blocking get the next task instance.
-    pub fn next(&self) -> AnyResult<Instance> {
-    // TODO: InstanceX{sender:self.sender.clone(), instance:Instance}
+    pub fn next(&self) -> AnyResult<TaskInstance> {
+        let timer_event_sender = self.get_timer_event_sender()?;
 
-        Ok(self.inner_receiver.try_recv()?)
+        Ok(self
+            .inner_receiver
+            .try_recv()
+            .map(|instance| TaskInstance {
+                instance,
+                timer_event_sender,
+            })?)
     }
 
     /// Blocking get the next task instance.
-    pub fn next_with_wait(&self) -> AnyResult<Instance> {
-        Ok(block_on(self.inner_receiver.recv())?)
+    pub fn next_with_wait(&self) -> AnyResult<TaskInstance> {
+        let timer_event_sender = self.get_timer_event_sender()?;
+
+        let instance = block_on(self.inner_receiver.recv())?;
+
+        Ok(TaskInstance {
+            instance,
+            timer_event_sender,
+        })
     }
 
     /// Async-await get the next task instance.
-    pub async fn next_with_async_wait(&self) -> AnyResult<Instance> {
-        Ok(self.inner_receiver.recv().await?)
+    pub async fn next_with_async_wait(&self) -> AnyResult<TaskInstance> {
+        let timer_event_sender = self.get_timer_event_sender()?;
+
+        let instance = self.inner_receiver.recv().await?;
+
+        Ok(TaskInstance {
+            instance,
+            timer_event_sender,
+        })
+    }
+
+    fn get_timer_event_sender(&self) -> AnyResult<Sender<TimerEvent>> {
+        self.timer_event_sender
+            .clone()
+            .ok_or(anyhow!("without `timer_event_sender`."))
     }
 }
 

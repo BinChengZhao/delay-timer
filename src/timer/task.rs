@@ -685,4 +685,24 @@ mod tests {
 
         assert!(task.check_arrived());
     }
+
+    // TODO: should reimplement Clone for ScheduleIteratorOwned.
+    #[test]
+    fn test_analyze_cron_expression() {
+        use super::{DelayTimerScheduleIteratorOwned, ScheduleIteratorTimeZone};
+        use std::time::{Duration};
+        use std::thread::sleep;
+
+        
+        let mut  schedule_iterator_first = DelayTimerScheduleIteratorOwned::analyze_cron_expression(ScheduleIteratorTimeZone::Utc, "0/6 * * * * * *").unwrap();
+
+        sleep(Duration::from_secs(5));
+
+        let mut schedule_iterator_second = DelayTimerScheduleIteratorOwned::analyze_cron_expression(ScheduleIteratorTimeZone::Utc, "0/6 * * * * * *").unwrap();
+     
+        // Two different starting values should not be the same.
+        assert_ne!(schedule_iterator_first.next(), schedule_iterator_second.next());
+
+    }
+
 }
