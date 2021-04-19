@@ -29,63 +29,49 @@ Supports configuration of the maximum number of parallelism of tasks.
 
  ``` rust
 
- #[macro_use]
- use delay_timer::prelude::*;
+use anyhow::Result;
+use delay_timer::prelude::*;
 
- use std::str::FromStr;
- use std::sync::atomic::{
-     AtomicUsize,
-     Ordering::{Acquire, Release},
- };
- use std::sync::{atomic::AtomicI32, Arc};
- use std::thread::{self, park_timeout};
- use std::time::Duration;
- use smol::Timer;
- use hyper::{Client, Uri};
+fn main() -> Result<()> {
+    let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
 
- fn main() {
-     let delay_timer = DelayTimerBuilder::default().build();
+    // Develop a print job that runs in an asynchronous cycle.
+    let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
 
-     // Add an asynchronous task to delay_timer.
-     delay_timer.add_task(build_task(TaskBuilder::default()));
+    // Get the running instance of task 1.
+    let task_instance = task_instance_chain.next_with_wait()?;
 
-     // Since the tasks are executed in 8-second cycles,
-     // we deal with something else.
-     // Do someting about 8s.
-     thread::sleep(Duration::new(8, 1_000_000));
-     delay_timer.remove_task(1);
-     delay_timer.stop_delay_timer();
- }
+    // Cancel running task instances.
+    task_instance.cancel_with_wait()?;
 
- fn build_task(mut task_builder: TaskBuilder) -> Task {
-     let body = create_async_fn_body!({
-         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
-         dbg!(res.body_string().await.unwrap());
-     });
+    // Remove task which id is 1.
+    delay_timer.remove_task(1)?;
 
-     task_builder
-         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerEightSeconds))
-         .set_task_id(2)
-         .set_maximum_running_time(5)
-         .spawn(body)
-         .unwrap()
- }
- 
- enum AuspiciousTime {
-     PerSevenSeconds,
-     PerEightSeconds,
-     LoveTime,
- }
+    // No new tasks are accepted; running tasks are not affected.
+    delay_timer.stop_delay_timer()?;
 
- impl Into<CandyCronStr> for AuspiciousTime {
-     fn into(self) -> CandyCronStr {
-         match self {
-             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
-             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
-             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
-         }
-     }
- }
+    Ok(())
+}
+
+fn build_task_async_print() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
+    let body = create_async_fn_body!({
+        println!("create_async_fn_body!");
+
+        Timer::after(Duration::from_secs(3)).await;
+
+        println!("create_async_fn_body:i'success");
+    });
+
+    task_builder
+        .set_task_id(1)
+        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_maximun_parallel_runable_num(2)
+        .spawn(body)
+        .unwrap()
+}
+
  ```
 
 
@@ -95,16 +81,13 @@ Supports configuration of the maximum number of parallelism of tasks.
  #[macro_use]
  use delay_timer::prelude::*;
 
- use std::str::FromStr;
  use std::sync::atomic::{
      AtomicUsize,
      Ordering::{Acquire, Release},
  };
- use std::sync::{atomic::AtomicI32, Arc};
- use std::thread::{self, park_timeout};
+ use std::sync::Arc;
  use std::time::Duration;
  use smol::Timer;
- use hyper::{Client, Uri};
 
 
  let delay_timer = DelayTimer::new();
@@ -125,7 +108,7 @@ Supports configuration of the maximum number of parallelism of tasks.
      .spawn(body)
      .unwrap();
 
- delay_timer.add_task(task).unwrap();
+ delay_timer.add_task(task);
 
  ```
 
@@ -135,16 +118,6 @@ Supports configuration of the maximum number of parallelism of tasks.
  ``` rust
  #[macro_use]
  use delay_timer::prelude::*;
-
- use std::str::FromStr;
- use std::sync::atomic::{
-     AtomicUsize,
-     Ordering::{Acquire, Release},
- };
- use std::sync::{atomic::AtomicI32, Arc};
- use std::thread::{self, park_timeout};
- use std::time::Duration;
- use smol::Timer;
  use hyper::{Client, Uri};
 
  fn build_task(mut task_builder: TaskBuilder) -> Task {
@@ -177,12 +150,12 @@ Supports configuration of the maximum number of parallelism of tasks.
      let client = Client::new();
 
      let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
-      let uri: Uri = url.parse().unwrap();
-      let res = client.get(uri).await.unwrap();
-      println!("Response: {}", res.status());
-      // Concatenate the body stream into a single buffer...
-      let buf = hyper::body::to_bytes(res).await.unwrap();
-      println!("body: {:?}", buf);
+     let uri: Uri = url.parse().unwrap();
+     let res = client.get(uri).await.unwrap();
+     println!("Response: {}", res.status());
+     // Concatenate the body stream into a single buffer...
+     let buf = hyper::body::to_bytes(res).await.unwrap();
+     println!("body: {:?}", buf);
   }
   
   enum AuspiciousTime {

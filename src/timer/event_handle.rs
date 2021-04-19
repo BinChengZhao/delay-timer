@@ -266,8 +266,8 @@ impl EventHandle {
             .set_slot_mark(slot_seed)
             .set_parallel_runable_num(0);
 
-            task_mart
-        }
+        task_mart
+    }
 
     // for record task-mark.
     pub(crate) fn record_task_mark(&mut self, task_mark: TaskMark) {

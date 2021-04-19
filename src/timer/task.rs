@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::thread::AccessError;
 
-use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
+use cron_clock::{Schedule, ScheduleIteratorOwned, Utc, TimeZone};
 use lru::LruCache;
 
 //TODO: Add doc.
@@ -137,7 +137,6 @@ pub(crate) enum FrequencyInner {
     ///Type of countdown.
     CountDown(u32, DelayTimerScheduleIteratorOwned),
 }
-
 /// Set the time zone for the time of the expression iteration.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum ScheduleIteratorTimeZone {
@@ -213,6 +212,18 @@ impl DelayTimerScheduleIteratorOwned {
     }
 
     #[inline(always)]
+    pub(crate) fn refresh_previous_datetime(&mut self) {
+        match self {
+            Self::Utc(ref mut iterator) => iterator.refresh_previous_datetime(Utc),
+            Self::Local(ref mut iterator) => iterator.refresh_previous_datetime(Local),
+           
+            // FIXME: fix this.
+            Self::FixedOffset(ref mut iterator) => todo!(),
+        }
+    }
+
+
+    #[inline(always)]
     pub(crate) fn next(&mut self) -> i64 {
         match self {
             Self::Utc(ref mut iterator) => iterator.next().unwrap().timestamp(),
@@ -236,7 +247,11 @@ impl DelayTimerScheduleIteratorOwned {
         CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
             let mut lru_cache = expression_cache.borrow_mut();
             if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
-                return schedule_iterator.clone();
+               
+                let mut schedule_iterator_copy = schedule_iterator.clone();
+                schedule_iterator_copy.refresh_previous_datetime();
+                
+                return schedule_iterator_copy;
             }
             let task_schedule =
                 DelayTimerScheduleIteratorOwned::new(schedule_iterator_time_zone_query.clone());
@@ -690,19 +705,28 @@ mod tests {
     #[test]
     fn test_analyze_cron_expression() {
         use super::{DelayTimerScheduleIteratorOwned, ScheduleIteratorTimeZone};
-        use std::time::{Duration};
         use std::thread::sleep;
+        use std::time::Duration;
 
-        
-        let mut  schedule_iterator_first = DelayTimerScheduleIteratorOwned::analyze_cron_expression(ScheduleIteratorTimeZone::Utc, "0/6 * * * * * *").unwrap();
+        let mut schedule_iterator_first = DelayTimerScheduleIteratorOwned::analyze_cron_expression(
+            ScheduleIteratorTimeZone::Utc,
+            "0/6 * * * * * *",
+        )
+        .unwrap();
 
         sleep(Duration::from_secs(5));
 
-        let mut schedule_iterator_second = DelayTimerScheduleIteratorOwned::analyze_cron_expression(ScheduleIteratorTimeZone::Utc, "0/6 * * * * * *").unwrap();
-     
+        let mut schedule_iterator_second =
+            DelayTimerScheduleIteratorOwned::analyze_cron_expression(
+                ScheduleIteratorTimeZone::Utc,
+                "0/6 * * * * * *",
+            )
+            .unwrap();
+
         // Two different starting values should not be the same.
-        assert_ne!(schedule_iterator_first.next(), schedule_iterator_second.next());
-
+        assert_ne!(
+            schedule_iterator_first.next(),
+            schedule_iterator_second.next()
+        );
     }
-
 }

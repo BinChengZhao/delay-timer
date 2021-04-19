@@ -1,36 +1,50 @@
 use anyhow::Result;
 use delay_timer::prelude::*;
 use smol::Timer;
-use std::thread::{current, park, sleep, Thread};
+use std::thread::{current, park, Thread};
 use std::time::Duration;
 use surf;
 
 // cargo run --package delay_timer --example demo --features=full
 
-fn main() {
+fn main() -> Result<()> {
     let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
-    let task_builder = TaskBuilder::default();
 
-    delay_timer.add_task(build_task1(task_builder)).unwrap();
+    // Develop a print job that runs in an asynchronous cycle.
+    let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
 
-    delay_timer.add_task(build_task2(task_builder)).unwrap();
-    delay_timer.add_task(build_task3(task_builder)).unwrap();
-    delay_timer.add_task(build_task5(task_builder)).unwrap();
-    delay_timer.add_task(build_task7(task_builder)).unwrap();
+    // Develop an http request task that runs in an asynchronous cycle.
+    delay_timer.add_task(build_task_async_request())?;
 
-    // Let's do someting about 2s.
-    sleep(Duration::new(2, 1_000_000));
+    // Develop a php script task that runs in an asynchronous cycle.
+    delay_timer.add_task(build_task_async_execute_process())?;
 
-    let task1_record_id = filter_task_recodeid(&delay_timer, |&x| x.get_task_id() == 1).unwrap();
-    delay_timer.cancel_task(1, task1_record_id).unwrap();
-    delay_timer.remove_task(1).unwrap();
+    // Develop a task that runs in an asynchronous cycle (using a custom asynchronous template).
+    delay_timer.add_task(build_task_customized_async_task())?;
 
-    delay_timer.add_task(build_wake_task(task_builder)).unwrap();
+    // Get the running instance of task 1.
+    let task_instance = task_instance_chain.next_with_wait()?;
+
+    // Cancel running task instances.
+    task_instance.cancel_with_wait()?;
+
+    // Remove task which id is 1.
+    delay_timer.remove_task(1)?;
+
+    // Develop a task that runs in an asynchronous cycle to wake up the current thread.
+    delay_timer.add_task(build_wake_task())?;
+
     park();
-    delay_timer.stop_delay_timer().unwrap();
+
+    // No new tasks are accepted; running tasks are not affected.
+    delay_timer.stop_delay_timer()?;
+
+    Ok(())
 }
 
-fn build_task1(mut task_builder: TaskBuilder) -> Task {
+fn build_task_async_print() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
     let body = create_async_fn_body!({
         println!("create_async_fn_body!");
 
@@ -38,6 +52,7 @@ fn build_task1(mut task_builder: TaskBuilder) -> Task {
 
         println!("create_async_fn_body:i'success");
     });
+
     task_builder
         .set_task_id(1)
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
@@ -46,13 +61,16 @@ fn build_task1(mut task_builder: TaskBuilder) -> Task {
         .unwrap()
 }
 
-fn build_task2(mut task_builder: TaskBuilder) -> Task {
+fn build_task_async_request() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
     let body = create_async_fn_body!({
         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
         dbg!(res.body_string().await.unwrap());
         Timer::after(Duration::from_secs(3)).await;
         dbg!("Task2 is done.");
     });
+
     task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerEightSeconds))
         .set_task_id(2)
@@ -61,7 +79,9 @@ fn build_task2(mut task_builder: TaskBuilder) -> Task {
         .unwrap()
 }
 
-fn build_task3(mut task_builder: TaskBuilder) -> Task {
+fn build_task_async_execute_process() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
     let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
     task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Minutely))
@@ -71,26 +91,14 @@ fn build_task3(mut task_builder: TaskBuilder) -> Task {
         .unwrap()
 }
 
-fn build_task5(mut task_builder: TaskBuilder) -> Task {
+fn build_task_customized_async_task() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
     let body = generate_closure_template("delay_timer is easy to use. .".into());
     task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::LoveTime))
         .set_task_id(5)
         .set_maximum_running_time(5)
-        .spawn(body)
-        .unwrap()
-}
-
-fn build_task7(mut task_builder: TaskBuilder) -> Task {
-    let body = create_async_fn_body!({
-        dbg!(get_timestamp());
-
-        Timer::after(Duration::from_secs(3)).await;
-    });
-    task_builder
-        .set_task_id(7)
-        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerDayFiveAclock))
-        .set_maximun_parallel_runable_num(2)
         .spawn(body)
         .unwrap()
 }
@@ -117,7 +125,9 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
     Ok(())
 }
 
-fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
+fn build_wake_task() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
     let thread: Thread = current();
     let body = move |_| {
         println!("bye bye");
@@ -133,20 +143,8 @@ fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
         .unwrap()
 }
 
-fn filter_task_recodeid<P>(delay_timer: &DelayTimer, predicate: P) -> Option<i64>
-where
-    P: FnMut(&PublicEvent) -> bool,
-{
-    let mut public_events = Vec::<PublicEvent>::new();
-
-    while let Ok(public_event) = delay_timer.get_public_event() {
-        public_events.push(public_event);
-    }
-
-    let public_event = public_events.into_iter().find(predicate)?;
-    public_event.get_record_id()
-}
-
+// Custom cron-expression syntax sugar mapping.
+#[allow(dead_code)]
 enum AuspiciousTime {
     PerSevenSeconds,
     PerEightSeconds,
