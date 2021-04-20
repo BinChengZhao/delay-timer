@@ -259,7 +259,7 @@ impl DelayTimerScheduleIteratorOwned {
             let mut lru_cache = expression_cache.borrow_mut();
             if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
                 let mut schedule_iterator_copy = schedule_iterator.clone();
-                
+
                 // Reset the internal base time to avoid expiration time during internal iterations.
                 schedule_iterator_copy.refresh_previous_datetime(time_zone);
 
