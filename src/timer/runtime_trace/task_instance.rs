@@ -179,6 +179,12 @@ impl TaskInstance {
 
     #[inline(always)]
     fn cancel(&self) -> AnyResult<()> {
+        if self.get_state() != state::instance::RUNNING {
+            return Err(anyhow!(
+                "The task has been (completed or canceled) and cannot be cancelled."
+            ));
+        }
+
         self.timer_event_sender
             .try_send(TimerEvent::CancelTask(
                 self.instance.task_id,
@@ -238,7 +244,7 @@ impl TaskInstancesChain {
     fn get_timer_event_sender(&self) -> AnyResult<Sender<TimerEvent>> {
         self.timer_event_sender
             .clone()
-            .ok_or(anyhow!("without `timer_event_sender`."))
+            .ok_or_else(|| anyhow!("without `timer_event_sender`."))
     }
 }
 

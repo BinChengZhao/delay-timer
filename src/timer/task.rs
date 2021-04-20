@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::thread::AccessError;
 
-use cron_clock::{Schedule, ScheduleIteratorOwned, Utc, TimeZone};
+use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
 
 //TODO: Add doc.
@@ -154,6 +154,15 @@ pub(crate) struct ScheduleIteratorTimeZoneQuery {
     cron_expression: String,
 }
 
+impl ScheduleIteratorTimeZone {
+    fn get_fixed_offset(&self) -> AnyResult<FixedOffset> {
+        match self {
+            ScheduleIteratorTimeZone::FixedOffset(offset) => Ok(*offset),
+            _ => Err(anyhow!("No variant of FixedOffset.")),
+        }
+    }
+}
+
 impl Default for ScheduleIteratorTimeZone {
     fn default() -> Self {
         ScheduleIteratorTimeZone::Local
@@ -212,16 +221,18 @@ impl DelayTimerScheduleIteratorOwned {
     }
 
     #[inline(always)]
-    pub(crate) fn refresh_previous_datetime(&mut self) {
+    pub(crate) fn refresh_previous_datetime(&mut self, time_zone: ScheduleIteratorTimeZone) {
         match self {
             Self::Utc(ref mut iterator) => iterator.refresh_previous_datetime(Utc),
             Self::Local(ref mut iterator) => iterator.refresh_previous_datetime(Local),
-           
-            // FIXME: fix this.
-            Self::FixedOffset(ref mut iterator) => todo!(),
+
+            Self::FixedOffset(ref mut iterator) => {
+                if let Ok(offset) = time_zone.get_fixed_offset() {
+                    iterator.refresh_previous_datetime(offset);
+                }
+            }
         }
     }
-
 
     #[inline(always)]
     pub(crate) fn next(&mut self) -> i64 {
@@ -247,10 +258,11 @@ impl DelayTimerScheduleIteratorOwned {
         CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
             let mut lru_cache = expression_cache.borrow_mut();
             if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
-               
                 let mut schedule_iterator_copy = schedule_iterator.clone();
-                schedule_iterator_copy.refresh_previous_datetime();
                 
+                // Reset the internal base time to avoid expiration time during internal iterations.
+                schedule_iterator_copy.refresh_previous_datetime(time_zone);
+
                 return schedule_iterator_copy;
             }
             let task_schedule =

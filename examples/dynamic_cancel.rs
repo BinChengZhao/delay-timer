@@ -9,11 +9,6 @@ use std::time::Duration;
 fn main() {
     sync_cancel();
     println!("");
-    println!("");
-    println!("");
-    println!("");
-    println!("");
-
     async_cancel();
 }
 
