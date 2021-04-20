@@ -33,9 +33,11 @@ use anyhow::Result;
 use delay_timer::prelude::*;
 
 fn main() -> Result<()> {
+    // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
     let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
 
     // Develop a print job that runs in an asynchronous cycle.
+    // A chain of task instances.
     let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
 
     // Get the running instance of task 1.

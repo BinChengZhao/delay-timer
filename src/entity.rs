@@ -263,27 +263,6 @@ impl DelayTimer {
     }
 
     /// Add a task in timer_core by event-channel.
-
-    /// TODO: In the future, adding a task may return a `Handle` to the implementation of Future,
-    /// through which the running information associated with the task can be queried.
-    /// TODO: The above logic will be put into `insert_task`-api later .
-
-    // Here is an expected implementation, which is not yet determined.
-    ///```
-    // let delay_timer = DelayTimer::default();
-    //
-    // let join_handle = delay_timer.insert_task(_).unwrap();
-    //
-    // let peek : Option<Peek<&Instance>> = join_handle.peek().await;
-    // let peek : Result<Option<Peek<&Instance>>> join_handle.try_peek();
-    //
-    // let instance : Option<Intance> =  join_handle.next().await.unwrap();
-    // let instance : Result<Option<Intance>> =  join_handle.try_next().unwrap();
-    //
-    // instance.cancel();
-    //
-    ///```
-
     pub fn add_task(&self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
@@ -303,32 +282,6 @@ impl DelayTimer {
     // a copy is passed to the inside via `insert_task`,
     // the internal maintenance of the state is mainly through EventHandle's sub-workers,
     // mainly note the `UpdateTask` event and `CancelTask` events and `FinishTask` events.
-
-    // `Instance` is a hub for internal and external.
-    // struct Instance{
-    //     task_id: u64,
-    //     record_id: i64,
-    //     state: AtomicBool,
-    //     event_listener: listener OR Event
-    // }
-
-    // impl Instance{
-    //     pub async fn async_cancel(&self){
-    //         if self.state.load(Acquire){
-    //             self.event_listener.await;
-    //         }
-
-    // update or through seed_timer_event(TimerEvent::CancelTask(task_id, record_id));
-    // }
-    //
-    //     pub fn cancel(&self){
-    //         if self.state.load(Acquire){
-    //             self.event_listener.wait();
-    //         }
-
-    // update or through seed_timer_event(TimerEvent::CancelTask(task_id, record_id));
-    // }
-    // }
 
     pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
         let (mut task_instances_chain, task_instances_chain_maintainer) =

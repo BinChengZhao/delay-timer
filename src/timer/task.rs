@@ -440,7 +440,7 @@ impl<'a> TaskBuilder<'a> {
     /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
     /// disallowed. This feature can make some sense in theory, but the current
     /// implementation is incorrect and can lead to memory unsafety (see
-    /// [issue #20126][iss20126]), so it has been disabled for now.
+    /// (issue #20126), so it has been disabled for now.
 
     #[inline(always)]
     pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
@@ -547,7 +547,7 @@ impl<'a> TaskBuilder<'a> {
     /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
     /// disallowed. This feature can make some sense in theory, but the current
     /// implementation is incorrect and can lead to memory unsafety (see
-    /// [issue #20126][iss20126]), so it has been disabled for now.
+    /// (issue #20126), so it has been disabled for now.
 
     /// So I can't go through Drop and handle these automatically.
     pub fn free(&mut self) {
