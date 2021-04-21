@@ -15,4 +15,8 @@ pub(crate) mod instance_chain {
 
     /// Set if the TaskInstancesChain has been dropped.
     pub(crate) const DROPPED: usize = 1 << 2;
+
+    /// Set if the `TaskInstancesChainMaintainer` has been dropped.
+    /// Indicates that the running instance of the task is no longer maintained.
+    pub(crate) const ABANDONED: usize = 1 << 3;
 }

@@ -52,8 +52,8 @@ pretty_env_logger = "0.4"
 mockall = "0.8.2"
 
 [dev-dependencies.async-std]
-version = "1.6.3"
-features = ["attributes"]
+version = "1.9.0"
+features = ["attributes", "unstable"]
 
 [build-dependencies]
 autocfg = "1"

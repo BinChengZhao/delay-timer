@@ -209,6 +209,8 @@ impl EventHandle {
 
             TimerEvent::RemoveTask(task_id) => {
                 self.remove_task(task_id).await;
+
+                //FIXME: cancel maybe doesn't execute drop.
                 self.shared_header.task_flag_map.cancel(&task_id);
             }
             TimerEvent::CancelTask(task_id, record_id) => {

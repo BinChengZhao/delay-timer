@@ -67,6 +67,7 @@ fn build_task_async_request() -> Task {
     let body = create_async_fn_body!({
         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
         dbg!(res.body_string().await.unwrap());
+
         Timer::after(Duration::from_secs(3)).await;
         dbg!("Task2 is done.");
     });

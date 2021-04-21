@@ -241,7 +241,19 @@ impl TaskInstancesChain {
         })
     }
 
+    /// Get state of TaskInstancesChain.
+    #[inline(always)]
+    fn get_state(&self) -> InstanceState {
+        self.inner_state.load(Ordering::Acquire)
+    }
+
     fn get_timer_event_sender(&self) -> AnyResult<Sender<TimerEvent>> {
+        if self.get_state() == state::instance_chain::ABANDONED {
+            return Err(anyhow!(
+                "Running instance of the task is no longer maintained."
+            ));
+        }
+
         self.timer_event_sender
             .clone()
             .ok_or_else(|| anyhow!("without `timer_event_sender`."))
@@ -252,5 +264,12 @@ impl Drop for TaskInstancesChain {
     fn drop(&mut self) {
         self.inner_state
             .store(state::instance_chain::DROPPED, Ordering::Release);
+    }
+}
+
+impl Drop for TaskInstancesChainMaintainer {
+    fn drop(&mut self) {
+        self.inner_state
+            .store(state::instance_chain::ABANDONED, Ordering::Release);
     }
 }
