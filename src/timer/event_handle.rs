@@ -212,7 +212,11 @@ impl EventHandle {
                 self.shared_header.task_flag_map.remove(&task_id);
             }
             TimerEvent::CancelTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id);
+                self.cancel_task(task_id, record_id, state::instance::CANCELLED);
+            }
+
+            TimerEvent::TimeoutTask(task_id, record_id) => {
+                self.cancel_task(task_id, record_id, state::instance::TIMEOUT);
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
@@ -304,14 +308,19 @@ impl EventHandle {
             .remove_task(task_id)
     }
 
-    pub(crate) fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+    pub(crate) fn cancel_task(
+        &mut self,
+        task_id: u64,
+        record_id: i64,
+        state: usize,
+    ) -> Option<Result<()>> {
         let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
         let task_mark = task_mark_ref_mut.value_mut();
 
         task_mark.dec_parallel_runable_num();
 
         // Here the user can be notified that the task instance has disappeared via `Instance`.
-        task_mark.notify_cancel_finish(record_id, state::instance::CANCELLED);
+        task_mark.notify_cancel_finish(record_id, state);
 
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }

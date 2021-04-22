@@ -119,6 +119,8 @@ pub enum TimerEvent {
     RemoveTask(u64),
     /// Cancel a Task running instance in Timer .
     CancelTask(u64, i64),
+    /// Cancel a timeout Task running instance in Timer .
+    TimeoutTask(u64, i64),
     //TODO: Here it should be structured and no longer use tuples.
     /// Finished a Task running instance in Timer .
     FinishTask(u64, i64, u64),

@@ -14,6 +14,49 @@ use std::thread::{self, park_timeout};
 use std::time::Duration;
 
 use smol::Timer;
+
+#[test]
+fn test_instance_state() -> anyhow::Result<()> {
+    let delay_timer = DelayTimer::new();
+
+    let body = create_async_fn_body!({
+        Timer::after(Duration::from_secs(1)).await;
+    });
+
+    let task = TaskBuilder::default()
+        .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
+        .set_task_id(1)
+        .set_maximun_parallel_runable_num(3)
+        .spawn(body)?;
+    let task_instance_chain = delay_timer.insert_task(task)?;
+
+    // Get the first task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // The task was still running when the instance was first obtained.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // Unsolicited mission cancellation.
+    instance.cancel_with_wait()?;
+    assert_eq!(instance.get_state(), instance::CANCELLED);
+
+    // Get the second task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // Just got the instance when it was still running.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // The task execution is completed after about 1 second.
+    park_timeout(Duration::from_millis(1001));
+
+    // This should be the completed state.
+    assert_eq!(instance.get_state(), instance::COMPLETED);
+
+    Ok(())
+}
+
+// TODO: Add unit test about instance-state timeout.
+
 #[test]
 fn go_works() {
     // Coordinates the inner-Runtime with the external(test-thread) clock.
@@ -21,7 +64,6 @@ fn go_works() {
     let mut schedule_itertor: ScheduleIteratorOwned<Local> = Schedule::from_str(expression)
         .unwrap()
         .upcoming_owned(Local);
-    // schedule_itertor.next();
 
     let mut next_exec_time;
     let mut current_time;

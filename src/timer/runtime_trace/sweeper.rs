@@ -110,7 +110,7 @@ impl RecyclingBins {
                     let recycle_unit = (&mut recycle_unit_heap).pop().map(|v| v.0).unwrap();
 
                     //handle send-error.
-                    self.send_timer_event(TimerEvent::CancelTask(
+                    self.send_timer_event(TimerEvent::TimeoutTask(
                         recycle_unit.task_id,
                         recycle_unit.record_id,
                     ))
