@@ -28,7 +28,6 @@ use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
 use snowflake::SnowflakeIdBucket;
-use waitmap::WaitMap;
 
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
@@ -40,16 +39,16 @@ cfg_status_report!(
     use anyhow::anyhow;
 );
 
-//Set it. Motivation to move forward.
+// Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
-//Global sencond hand.
+// Global sencond hand.
 pub(crate) type SencondHand = Arc<AtomicU64>;
-//Global Timestamp.
+// Global Timestamp.
 pub(crate) type GlobalTime = Arc<AtomicU64>;
-//Shared task-wheel for operate.
-pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
-//The slot currently used for storing global tasks.
-pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
+// Shared task-wheel for operate.
+pub(crate) type SharedTaskWheel = Arc<DashMap<u64, Slot>>;
+// The slot currently used for storing global tasks.
+pub(crate) type SharedTaskFlagMap = Arc<DashMap<u64, TaskMark>>;
 
 /// Builds DelayTimer with custom configuration values.
 ///
@@ -138,7 +137,7 @@ impl Default for RuntimeKind {
 impl Default for SharedHeader {
     fn default() -> Self {
         let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
-        let task_flag_map = Arc::new(WaitMap::new());
+        let task_flag_map = Arc::new(DashMap::new());
         let second_hand = Arc::new(AtomicU64::new(0));
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));

@@ -22,7 +22,6 @@ use std::sync::{
     atomic::Ordering::{Acquire, Release},
     Arc,
 };
-use waitmap::WaitMap;
 
 cfg_status_report!(
     use std::convert::TryFrom;
@@ -210,8 +209,7 @@ impl EventHandle {
             TimerEvent::RemoveTask(task_id) => {
                 self.remove_task(task_id).await;
 
-                //FIXME: cancel maybe doesn't execute drop.
-                self.shared_header.task_flag_map.cancel(&task_id);
+                self.shared_header.task_flag_map.remove(&task_id);
             }
             TimerEvent::CancelTask(task_id, record_id) => {
                 self.cancel_task(task_id, record_id);
@@ -366,7 +364,7 @@ impl EventHandle {
     }
 
     pub(crate) fn init_task_wheel(slots_numbers: u64) -> SharedTaskWheel {
-        let task_wheel = WaitMap::new();
+        let task_wheel = DashMap::new();
 
         for i in 0..slots_numbers {
             task_wheel.insert(i, Slot::new());

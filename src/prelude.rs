@@ -41,8 +41,7 @@ pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBoxBuil
 pub(crate) use crate::timer::runtime_trace::task_instance::TaskInstancesChainMaintainer;
 
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList};
-/// Global event sender that provides events to `EventHandle` processing.
-/// Use Option-None to overcome  `only be initialized with constant functions and values`.
+pub(crate) use dashmap::DashMap;
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;

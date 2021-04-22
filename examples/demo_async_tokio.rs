@@ -5,8 +5,11 @@ use anyhow::Result;
 use smol::Timer;
 use std::time::Duration;
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> Result<()> {
+    // In addition to the mixed (smol & tokio) runtime
+    // You can also share a tokio runtime with delayTimer, please see api `DelayTimerBuilder::tokio_runtime` for details.
+
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
     let delay_timer = DelayTimerBuilder::default().build();
 
@@ -24,7 +27,8 @@ async fn main() -> Result<()> {
 
     // Cancel running shell-task instances.
     shell_task_instance_chain
-        .next()?
+        .next_with_async_wait()
+        .await?
         .cancel_with_async_wait()
         .await?;
 
