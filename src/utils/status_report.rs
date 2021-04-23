@@ -32,8 +32,10 @@ pub enum PublicEvent {
     RemoveTask(u64),
     /// Describes which task produced a new running instance, record the id.
     RunningTask(u64, i64),
-    /// Describe which task instance completed。
+    /// Describe which task instance completed.
     FinishTask(u64, i64),
+    /// Describe which task instance timeout .
+    TimeoutTask(u64, i64),
 }
 
 impl TryFrom<&TimerEvent> for PublicEvent {
@@ -48,6 +50,11 @@ impl TryFrom<&TimerEvent> for PublicEvent {
             TimerEvent::FinishTask(task_id, record_id, _) => {
                 Ok(PublicEvent::FinishTask(*task_id, *record_id))
             }
+
+            TimerEvent::TimeoutTask(task_id, record_id) => {
+                Ok(PublicEvent::TimeoutTask(*task_id, *record_id))
+            }
+
             _ => Err("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!"),
         }
     }
@@ -60,6 +67,7 @@ impl PublicEvent {
             PublicEvent::RemoveTask(ref task_id) => *task_id,
             PublicEvent::RunningTask(ref task_id, _) => *task_id,
             PublicEvent::FinishTask(ref task_id, _) => *task_id,
+            PublicEvent::TimeoutTask(ref task_id, _) => *task_id,
         }
     }
 
@@ -69,6 +77,8 @@ impl PublicEvent {
             PublicEvent::RemoveTask(_) => None,
             PublicEvent::RunningTask(_,ref record_id) => Some(*record_id),
             PublicEvent::FinishTask(_,ref record_id) => Some(*record_id),
+            PublicEvent::TimeoutTask(_,ref record_id) => Some(*record_id),
+      
         }
     }
 }

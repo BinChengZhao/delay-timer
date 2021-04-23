@@ -126,6 +126,8 @@ pub enum TimerEvent {
     FinishTask(u64, i64, u64),
     /// Append a new instance of a running task .
     AppendTaskHandle(u64, DelayTaskHandlerBox),
+    /// Take the initiative to perform once Task.
+    AdvanceTask(u64),
 }
 #[derive(Clone, Debug)]
 /// delay-timer internal timer wheel core.

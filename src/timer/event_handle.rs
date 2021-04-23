@@ -8,20 +8,17 @@
 //! 2. A communication center for internal and external workers.
 
 pub(crate) use super::super::entity::{SharedHeader, SharedTaskWheel};
-use super::runtime_trace::{
-    sweeper::{RecycleUnit, RecyclingBins},
-    task_handle::TaskTrace,
-};
+use super::runtime_trace::sweeper::{RecycleUnit, RecyclingBins};
+use super::runtime_trace::task_handle::TaskTrace;
 pub(crate) use super::timer_core::{TimerEvent, DEFAULT_TIMER_SLOT_COUNT};
 use super::{Slot, Task, TaskMark};
-
 use crate::prelude::*;
+
+use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::Arc;
+
 use anyhow::Result;
 use smol::channel::unbounded;
-use std::sync::{
-    atomic::Ordering::{Acquire, Release},
-    Arc,
-};
 
 cfg_status_report!(
     use std::convert::TryFrom;
@@ -206,6 +203,10 @@ impl EventHandle {
                 self.update_task(task).await;
             }
 
+            TimerEvent::AdvanceTask(task_id) => {
+                self.advance_task(task_id).await;
+            }
+
             TimerEvent::RemoveTask(task_id) => {
                 self.remove_task(task_id).await;
 
@@ -255,7 +256,7 @@ impl EventHandle {
 
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
 
-        //copu task_id
+        // copy task_id
         let task_id = task.task_id;
         self.shared_header
             .wheel_queue
@@ -292,6 +293,31 @@ impl EventHandle {
             .unwrap()
             .value_mut()
             .update_task(*task)
+    }
+
+    // Take the initiative to perform once Task.
+    pub(crate) async fn advance_task(&mut self, task_id: u64) -> Option<Task> {
+        let task_mark = self.shared_header.task_flag_map.get(&task_id)?;
+
+        let slot_mark = task_mark.value().get_slot_mark();
+
+        let task = {
+            self.shared_header
+                .wheel_queue
+                .get_mut(&slot_mark)
+                .unwrap()
+                .value_mut()
+                .remove_task(task_id)?
+        };
+
+        let slot_seed = self.shared_header.second_hand.load(Acquire) + 1;
+
+        self.shared_header
+            .wheel_queue
+            .get_mut(&slot_seed)
+            .unwrap()
+            .value_mut()
+            .add_task(task)
     }
 
     // for remove task.
