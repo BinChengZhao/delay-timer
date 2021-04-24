@@ -95,7 +95,7 @@ pub mod shell_command {
         /// Executes the command as a child process, waiting for it to finish and collecting all of its output.
         async fn wait_with_output(self) -> IoResult<Output>;
         /// Convert stdout to stdio.
-        fn stdout_to_stdio(&mut self) -> Option<Stdio>;
+        async fn stdout_to_stdio(&mut self) -> Option<Stdio>;
     }
 
     #[async_trait]
@@ -103,7 +103,7 @@ pub mod shell_command {
         async fn wait_with_output(self) -> IoResult<Output> {
             self.wait_with_output()
         }
-        fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+        async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
             self.stdout.take().map(Stdio::from)
         }
     }
@@ -114,8 +114,11 @@ pub mod shell_command {
             self.output().await
         }
 
-        fn stdout_to_stdio(&mut self) -> Option<Stdio> {
-            todo!()
+        async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+            if let Some(stdout) = self.stdout.take() {
+                return stdout.into_stdio().await.ok();
+            }
+            None
         }
     }
 
@@ -126,7 +129,7 @@ pub mod shell_command {
                 self.wait_with_output().await
             }
 
-            fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+            async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
                 self.stdout.take().map(|s| s.try_into().ok()).flatten()
             }
         }
@@ -148,6 +151,10 @@ pub mod shell_command {
     impl<Child: ChildUnify> ChildGuardX<Child> {
         pub(crate) fn new(child: Child) -> Self {
             Self { child }
+        }
+
+        pub(crate) async fn wait_with_output(self) -> IoResult<Output> {
+            self.child.wait_with_output().await
         }
     }
 
@@ -282,7 +289,7 @@ pub mod shell_command {
     //  There are a lot of system calls that happen when this method is called,
     //  the speed of execution depends on the parsing of the command and the speed of the process fork,
     //  after which it should be split into unblock().
-    pub fn parse_and_runx<Child: ChildUnify, Command: CommandUnify<Child>>(
+    pub async fn parse_and_runx<Child: ChildUnify, Command: CommandUnify<Child>>(
         input: &str,
     ) -> Result<ChildGuardListX<Child>> {
         // Check to see if process_linked_list is also automatically dropped out of scope
@@ -314,7 +321,10 @@ pub mod shell_command {
             if let Some(previous_command_ref) = previous_command {
                 let mut t = None;
 
-                mem::swap(&mut previous_command_ref.child.stdout_to_stdio(), &mut t);
+                mem::swap(
+                    &mut previous_command_ref.child.stdout_to_stdio().await,
+                    &mut t,
+                );
 
                 if let Some(child_stdio) = t {
                     stdin = child_stdio;

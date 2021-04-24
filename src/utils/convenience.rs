@@ -20,7 +20,10 @@ pub mod functions {
     use super::super::parse::shell_command::RunningMarker;
     use std::time::Duration;
 
-    use super::{super::parse_and_run, AnyResult};
+    use super::{
+        super::{parse_and_run, parse_and_runx},
+        AnyResult,
+    };
     use crate::prelude::*;
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
@@ -37,11 +40,41 @@ pub mod functions {
 
                 loop {
                     if !childs.get_running_marker() {
-                        return context.finishe_task().await;
+                        return context.finishe_task(None).await;
                     }
 
                     Timer::after(Duration::from_secs(1)).await;
                 }
+            }))
+        }
+    }
+
+    /// UnBlock execution of a command line task in delay-timer.
+    pub fn unblock_process_task_fn_x(
+        shell_command: String,
+    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+        use smol::process::{Child, Command};
+        move |context: TaskContext| {
+            let shell_command_clone = shell_command.clone();
+            create_delay_task_handler(async_spawn(async move {
+                let childs = parse_and_runx::<Child, Command>(&shell_command_clone).await;
+
+                if let Err(err) = childs {
+                    context
+                        .finishe_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
+                        .await;
+                    return Err(anyhow!(err.to_string()));
+                }
+
+                let mut childs = childs?;
+
+                let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
+                let output = last_child.wait_with_output().await?;
+                context
+                    .finishe_task(Some(FinishOutput::ProcessOutput(output)))
+                    .await;
+
+                Ok(())
             }))
         }
     }
@@ -62,7 +95,7 @@ pub mod functions {
 
                     loop {
                         if !childs.get_running_marker() {
-                            return context.finishe_task().await;
+                            return context.finishe_task(None).await;
                         }
 
                         sleep_by_tokio(Duration::from_secs(1)).await;

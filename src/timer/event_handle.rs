@@ -162,6 +162,7 @@ impl EventHandle {
     }
 
     async fn handle_event(&mut self) {
+        // Turn on `feature` and have `status_report_sender` go this piece of logic.
         #[cfg(feature = "status-report")]
         if let Some(status_report_sender) = self.status_report_sender.take() {
             while let Ok(event) = self.timer_event_receiver.recv().await {
@@ -176,6 +177,7 @@ impl EventHandle {
             return;
         }
 
+        // Did not turn on `feature` or no `status_report_sender` go this piece of logic.
         while let Ok(event) = self.timer_event_receiver.recv().await {
             self.event_dispatch(event).await;
         }
@@ -225,7 +227,9 @@ impl EventHandle {
                     .await;
             }
 
-            TimerEvent::FinishTask(task_id, record_id, _finish_time) => {
+            TimerEvent::FinishTask(FinishTaskBody {
+                task_id, record_id, ..
+            }) => {
                 //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
                 // Provide a separate start time for the external, record_id time with a delay.
                 // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.

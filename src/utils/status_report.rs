@@ -26,14 +26,14 @@ impl StatusReporter {
 }
 
 /// `PublicEvent`, describes the open events that occur in the delay-timer of the task.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum PublicEvent {
     /// Describes which task is removed.
     RemoveTask(u64),
     /// Describes which task produced a new running instance, record the id.
     RunningTask(u64, i64),
     /// Describe which task instance completed.
-    FinishTask(u64, i64),
+    FinishTask(FinishTaskBody),
     /// Describe which task instance timeout .
     TimeoutTask(u64, i64),
 }
@@ -47,8 +47,9 @@ impl TryFrom<&TimerEvent> for PublicEvent {
             TimerEvent::AppendTaskHandle(_, delay_task_handler_box) => {
                 Ok(PublicEvent::RunningTask(delay_task_handler_box.get_task_id(), delay_task_handler_box.get_record_id()))
             }
-            TimerEvent::FinishTask(task_id, record_id, _) => {
-                Ok(PublicEvent::FinishTask(*task_id, *record_id))
+            TimerEvent::FinishTask(finish_task_body) => {
+                // TODO: Be wary, clone can involve a lot of memory and consume performance.
+                Ok(PublicEvent::FinishTask(finish_task_body.clone()))
             }
 
             TimerEvent::TimeoutTask(task_id, record_id) => {
@@ -66,7 +67,7 @@ impl PublicEvent {
         match self {
             PublicEvent::RemoveTask(ref task_id) => *task_id,
             PublicEvent::RunningTask(ref task_id, _) => *task_id,
-            PublicEvent::FinishTask(ref task_id, _) => *task_id,
+            PublicEvent::FinishTask(FinishTaskBody{task_id,..}) => *task_id,
             PublicEvent::TimeoutTask(ref task_id, _) => *task_id,
         }
     }
@@ -76,7 +77,7 @@ impl PublicEvent {
         match self {
             PublicEvent::RemoveTask(_) => None,
             PublicEvent::RunningTask(_,ref record_id) => Some(*record_id),
-            PublicEvent::FinishTask(_,ref record_id) => Some(*record_id),
+            PublicEvent::FinishTask(FinishTaskBody{record_id,..}) => Some(*record_id),
             PublicEvent::TimeoutTask(_,ref record_id) => Some(*record_id),
       
         }

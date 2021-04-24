@@ -371,14 +371,15 @@ impl TaskContext {
     }
 
     /// Send a task-Finish signal to EventHandle.
-    pub async fn finishe_task(self) {
+    pub async fn finishe_task(self, finish_output: Option<FinishOutput>) {
         if let Some(timer_event_sender) = self.timer_event_sender {
             timer_event_sender
-                .send(TimerEvent::FinishTask(
-                    self.task_id,
-                    self.record_id,
-                    get_timestamp(),
-                ))
+                .send(TimerEvent::FinishTask(FinishTaskBody {
+                    task_id: self.task_id,
+                    record_id: self.record_id,
+                    finish_time: get_timestamp(),
+                    finish_output,
+                }))
                 .await
                 .unwrap();
         }

@@ -102,6 +102,24 @@ impl SmolClock {
     }
 }
 
+/// The information generated when completing a task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinishTaskBody {
+    pub(crate) task_id: u64,
+    pub(crate) record_id: i64,
+    pub(crate) finish_time: u64,
+    pub(crate) finish_output: Option<FinishOutput>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// The output generated when the task is completed.
+pub enum FinishOutput {
+    /// The output generated when the process task is completed.
+    ProcessOutput(std::process::Output),
+    /// Exception output for a task that did not run successfully.
+    ExceptionOutput(String),
+}
+
 //warning: large size difference between variants
 /// Event for Timer Wheel Core.
 #[derive(Debug)]
@@ -121,9 +139,8 @@ pub enum TimerEvent {
     CancelTask(u64, i64),
     /// Cancel a timeout Task running instance in Timer .
     TimeoutTask(u64, i64),
-    //TODO: Here it should be structured and no longer use tuples.
     /// Finished a Task running instance in Timer .
-    FinishTask(u64, i64, u64),
+    FinishTask(FinishTaskBody),
     /// Append a new instance of a running task .
     AppendTaskHandle(u64, DelayTaskHandlerBox),
     /// Take the initiative to perform once Task.

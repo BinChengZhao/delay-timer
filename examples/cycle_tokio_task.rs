@@ -62,7 +62,7 @@ pub fn generate_closure_template(
 
         let future = async move {
             future_inner.await;
-            context.finishe_task().await;
+            context.finishe_task(None).await;
         };
 
         create_delay_task_handler(async_spawn_by_tokio(future))
