@@ -382,7 +382,7 @@ cfg_tokio_support!(
                     format!("tokio-{}", id)
                 })
                 .on_thread_start(|| {
-                    println!("tokio-thread started");
+                    info!("tokio-thread started");
                 })
                 .build()
                 .ok()

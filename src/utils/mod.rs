@@ -8,4 +8,4 @@ cfg_status_report!(
 );
 
 pub use convenience::functions;
-pub use parse::shell_command::{parse_and_run, parse_and_runx};
+pub use parse::shell_command::parse_and_run;

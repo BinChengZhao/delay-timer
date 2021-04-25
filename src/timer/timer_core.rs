@@ -247,7 +247,7 @@ impl Timer {
         self.timer_event_sender
             .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
             .await
-            .unwrap_or_else(|e| println!("{}", e));
+            .unwrap_or_else(|e| error!(" `send_timer_event`: {}", e));
     }
 
     #[inline(always)]

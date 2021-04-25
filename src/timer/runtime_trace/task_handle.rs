@@ -140,7 +140,7 @@ impl Drop for DelayTaskHandlerBox {
             task_handler
                 .get_inner()
                 .quit()
-                .unwrap_or_else(|e| println!("{}", e));
+                .unwrap_or_else(|e| error!(" `DelayTaskHandlerBox::drop` : {}", e));
         }
     }
 }
@@ -224,14 +224,14 @@ impl DelayTaskHandlerBox {
 //Deafult implementation for Child and SmolTask
 //TODO:Maybe i can implementation a proc macro.
 
-impl DelayTaskHandler for ChildGuard {
+impl<Child: ChildUnify> DelayTaskHandler for ChildGuard<Child> {
     fn quit(self: Box<Self>) -> Result<()> {
         drop(self);
         Ok(())
     }
 }
 
-impl DelayTaskHandler for ChildGuardList {
+impl<Child: ChildUnify> DelayTaskHandler for ChildGuardList<Child> {
     fn quit(self: Box<Self>) -> Result<()> {
         drop(self);
         Ok(())

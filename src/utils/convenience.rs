@@ -15,15 +15,7 @@ impl DelayTaskHandler for MyUnit {
 /// The convenient functions to combine.
 pub mod functions {
 
-    use smol::Timer;
-
-    use super::super::parse::shell_command::RunningMarker;
-    use std::time::Duration;
-
-    use super::{
-        super::{parse_and_run, parse_and_runx},
-        AnyResult,
-    };
+    use super::super::parse_and_run;
     use crate::prelude::*;
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
@@ -31,33 +23,11 @@ pub mod functions {
     pub fn unblock_process_task_fn(
         shell_command: String,
     ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-        move |context: TaskContext| {
-            let shell_command_clone = shell_command.clone();
-            create_delay_task_handler(async_spawn(async move {
-                let mut childs = unblock_spawn(move || parse_and_run(&shell_command_clone))
-                    .await
-                    .unwrap();
-
-                loop {
-                    if !childs.get_running_marker() {
-                        return context.finishe_task(None).await;
-                    }
-
-                    Timer::after(Duration::from_secs(1)).await;
-                }
-            }))
-        }
-    }
-
-    /// UnBlock execution of a command line task in delay-timer.
-    pub fn unblock_process_task_fn_x(
-        shell_command: String,
-    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
         use smol::process::{Child, Command};
         move |context: TaskContext| {
             let shell_command_clone = shell_command.clone();
             create_delay_task_handler(async_spawn(async move {
-                let childs = parse_and_runx::<Child, Command>(&shell_command_clone).await;
+                let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
                 if let Err(err) = childs {
                     context
@@ -80,6 +50,8 @@ pub mod functions {
     }
 
     cfg_tokio_support!(
+        use std::time::Duration;
+
         /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
         pub fn tokio_unblock_process_task_fn(
             shell_command: String,
@@ -104,27 +76,6 @@ pub mod functions {
             }
         }
     );
-
-    #[inline(always)]
-    ///Generate a closure from a string of shell commands that will generate a list of processes.
-    pub fn create_process_task_fn(
-        shell_command: String,
-    ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-        move || {
-            create_process_task(&shell_command).unwrap_or_else(|e| {
-                println!("create-process:error:{}", e);
-                create_default_delay_task_handler()
-            })
-        }
-    }
-
-    #[inline(always)]
-    ///Generate a list of processes from a string of shell commands,
-    ///and let it convert to a `DelayTaskHander`.
-    pub fn create_process_task(shell_command: &str) -> AnyResult<Box<dyn DelayTaskHandler>> {
-        let process_linked_list = parse_and_run(shell_command)?;
-        Ok(create_delay_task_handler(process_linked_list))
-    }
 
     #[inline(always)]
     ///convert task_handler of impl DelayTaskHandler to a `Box<dyn DelayTaskHander>`.

@@ -132,7 +132,7 @@ impl RecyclingBins {
         self.timer_event_sender
             .send(event)
             .await
-            .unwrap_or_else(|e| println!("{}", e));
+            .unwrap_or_else(|e| error!(" `send_timer_event` : {}", e));
     }
 
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {

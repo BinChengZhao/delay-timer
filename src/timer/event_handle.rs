@@ -244,7 +244,7 @@ impl EventHandle {
             .sender
             .send(recycle_unit)
             .await
-            .unwrap_or_else(|e| println!("{}", e));
+            .unwrap_or_else(|e| error!("`send_recycle_unit_sources_sender`: {}", e));
     }
 
     // Add task to wheel_queue  slot
