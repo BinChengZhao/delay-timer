@@ -25,6 +25,54 @@ impl StatusReporter {
     }
 }
 
+// Define types independently to avoid coupling internal types.
+/// The information generated when completing a task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicFinishTaskBody {
+    pub(crate) task_id: u64,
+    pub(crate) record_id: i64,
+    pub(crate) finish_time: u64,
+    pub(crate) finish_output: Option<PublicFinishOutput>,
+}
+
+// Define types independently to avoid coupling internal types.
+/// The output generated when the task is completed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PublicFinishOutput {
+    /// The output generated when the process task is completed.
+    ProcessOutput(std::process::Output),
+    /// Exception output for a task that did not run successfully.
+    ExceptionOutput(String),
+}
+
+impl PublicFinishTaskBody{
+
+    /// Get the output on internal completion.
+    pub fn get_finish_output(&mut self) -> Option<PublicFinishOutput>{
+        self.finish_output.take()
+    }
+}
+
+impl From<FinishTaskBody> for PublicFinishTaskBody{
+    fn from(value: FinishTaskBody) -> Self{
+        PublicFinishTaskBody{
+            task_id:value.task_id,
+            record_id:value.record_id,
+            finish_time:value.finish_time,
+            finish_output:value.finish_output.map(|o|o.into()),
+        }
+    }
+}
+
+impl From<FinishOutput> for PublicFinishOutput{
+    fn from(value:FinishOutput) -> Self{
+        match value{
+            FinishOutput::ProcessOutput(o) => PublicFinishOutput::ProcessOutput(o),
+            FinishOutput::ExceptionOutput(o) => PublicFinishOutput::ExceptionOutput(o) 
+        }
+    }
+}
+
 /// `PublicEvent`, describes the open events that occur in the delay-timer of the task.
 #[derive(Debug, Clone)]
 pub enum PublicEvent {
@@ -33,7 +81,7 @@ pub enum PublicEvent {
     /// Describes which task produced a new running instance, record the id.
     RunningTask(u64, i64),
     /// Describe which task instance completed.
-    FinishTask(FinishTaskBody),
+    FinishTask(PublicFinishTaskBody),
     /// Describe which task instance timeout .
     TimeoutTask(u64, i64),
 }
@@ -49,7 +97,7 @@ impl TryFrom<&TimerEvent> for PublicEvent {
             }
             TimerEvent::FinishTask(finish_task_body) => {
                 // TODO: Be wary, clone can involve a lot of memory and consume performance.
-                Ok(PublicEvent::FinishTask(finish_task_body.clone()))
+                Ok(PublicEvent::FinishTask(finish_task_body.clone().into()))
             }
 
             TimerEvent::TimeoutTask(task_id, record_id) => {
@@ -67,7 +115,7 @@ impl PublicEvent {
         match self {
             PublicEvent::RemoveTask(ref task_id) => *task_id,
             PublicEvent::RunningTask(ref task_id, _) => *task_id,
-            PublicEvent::FinishTask(FinishTaskBody{task_id,..}) => *task_id,
+            PublicEvent::FinishTask(PublicFinishTaskBody{task_id,..}) => *task_id,
             PublicEvent::TimeoutTask(ref task_id, _) => *task_id,
         }
     }
@@ -77,7 +125,7 @@ impl PublicEvent {
         match self {
             PublicEvent::RemoveTask(_) => None,
             PublicEvent::RunningTask(_,ref record_id) => Some(*record_id),
-            PublicEvent::FinishTask(FinishTaskBody{record_id,..}) => Some(*record_id),
+            PublicEvent::FinishTask(PublicFinishTaskBody{record_id,..}) => Some(*record_id),
             PublicEvent::TimeoutTask(_,ref record_id) => Some(*record_id),
       
         }

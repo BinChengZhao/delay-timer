@@ -55,7 +55,36 @@ fn test_instance_state() -> anyhow::Result<()> {
     Ok(())
 }
 
-// TODO: Add unit test about instance-state timeout.
+#[test]
+fn test_instance_timeout_state() -> anyhow::Result<()> {
+    let delay_timer = DelayTimer::new();
+
+    let body = create_async_fn_body!({
+        Timer::after(Duration::from_secs(3)).await;
+    });
+
+    let task = TaskBuilder::default()
+        .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
+        .set_task_id(1)
+        .set_maximum_running_time(2)
+        .set_maximun_parallel_runable_num(3)
+        .spawn(body)?;
+    let task_instance_chain = delay_timer.insert_task(task)?;
+
+    // Get the first task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // The task was still running when the instance was first obtained.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // The task execution is timeout after about 2.001 second.
+    park_timeout(Duration::from_millis(2001));
+
+    // This should be the completed state.
+    assert_eq!(instance.get_state(), instance::TIMEOUT);
+
+    Ok(())
+}
 
 #[test]
 fn go_works() {
