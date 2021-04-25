@@ -50,7 +50,7 @@ pub mod functions {
     }
 
     cfg_tokio_support!(
-        use std::time::Duration;
+        use tokio::process::{Child, Command};
 
         /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
         pub fn tokio_unblock_process_task_fn(
@@ -58,20 +58,25 @@ pub mod functions {
         ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
             move |context: TaskContext| {
                 let shell_command_clone = shell_command.clone();
-                create_delay_task_handler(async_spawn_by_tokio(async {
-                    let mut childs =
-                        unblock_spawn_by_tokio(move || parse_and_run(&shell_command_clone))
-                            .await
-                            .expect("unblock task run fail.")
-                            .expect("parse_and_run task run fail.");
+                create_delay_task_handler(async_spawn_by_tokio(async move {
+                    let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
-                    loop {
-                        if !childs.get_running_marker() {
-                            return context.finishe_task(None).await;
-                        }
-
-                        sleep_by_tokio(Duration::from_secs(1)).await;
+                    if let Err(err) = childs {
+                        context
+                            .finishe_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
+                            .await;
+                        return Err(anyhow!(err.to_string()));
                     }
+
+                    let mut childs = childs?;
+
+                    let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
+                    let output = last_child.wait_with_output().await?;
+                    context
+                        .finishe_task(Some(FinishOutput::ProcessOutput(output)))
+                        .await;
+
+                    Ok(())
                 }))
             }
         }

@@ -28,6 +28,8 @@
 //!
 //! use anyhow::Result;
 //! use delay_timer::prelude::*;
+//! use std::time::Duration;
+//! use smol::Timer;
 //!
 //! fn main() -> Result<()> {
 //!     // Build an DelayTimer that uses the default configuration of the `smol` runtime internally.
@@ -75,7 +77,7 @@
 //!
 //!
 //! Use in asynchronous contexts.
-//! ``` rust
+//! ```
 //!
 //! use delay_timer::prelude::*;
 //!
@@ -131,14 +133,15 @@
 //!
 //!
 //!
-//!
+//! ```
 //! Capture the specified environment information and build the closure & task:
-//! ``` rust
+//! ```
 //! #[macro_use]
 //! use delay_timer::prelude::*;
 //!
 //! use std::sync::atomic::{
 //!     AtomicUsize,
+//!     Ordering::{Acquire, Release},
 //! };
 //! use std::sync::Arc;
 //! use std::time::Duration;
@@ -208,7 +211,7 @@
 //!
 //!         let future = async move {
 //!             future_inner.await;
-//!             context.finishe_task().await;
+//!             context.finishe_task(None).await;
 //!         };
 //!
 //!         create_delay_task_handler(async_spawn(future))
@@ -255,7 +258,3 @@ pub mod utils;
 
 pub use anyhow;
 pub use cron_clock;
-
-// TODO:Update redeme: a synchronous context usage scenario and an asynchronous context usage scenario.
-// TODO:Update redeme: a synchronous context usage scenario and an asynchronous context usage scenario.
-// TODO:Update redeme: a synchronous context usage scenario and an asynchronous context usage scenario.

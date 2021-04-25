@@ -5,6 +5,7 @@ use anyhow::Result;
 use smol::Timer;
 use std::time::Duration;
 
+// You can replace the 66 line with the command you expect to execute.
 #[tokio::main]
 async fn main() -> Result<()> {
     // In addition to the mixed (smol & tokio) runtime
@@ -26,7 +27,8 @@ async fn main() -> Result<()> {
     task_instance.cancel_with_async_wait().await?;
 
     // Cancel running shell-task instances.
-    shell_task_instance_chain
+    // Probably already finished running, no need to cancel.
+    let _ = shell_task_instance_chain
         .next_with_async_wait()
         .await?
         .cancel_with_async_wait()

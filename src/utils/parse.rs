@@ -14,7 +14,6 @@ pub mod shell_command {
     use std::convert::AsRef;
     use std::ffi::OsStr;
     use std::fs::{File, OpenOptions};
-    use std::io::Result as IoResult;
     use std::iter::Iterator;
     use std::mem;
     use std::ops::{Deref, DerefMut};
@@ -49,39 +48,10 @@ pub mod shell_command {
                     self
                 }
 
-                fn spawn(&mut self) -> IoResult<$child> {
-                    self.spawn()
+                fn spawn(&mut self) -> AnyResult<$child> {
+                    Ok(self.spawn()?)
                 }
             })+
-        }
-    }
-
-    // impl<Child: ChildUnify> Deref for ChildGuard<Child> {
-    //     type Target = StdChild;
-    //     fn deref(&self) -> &Self::Target {
-    //         &self.child
-    //     }
-    // }
-    macro_rules! impl_deref{
-        ($($child_duard:ty => $child:ty),*) => {
-            $(
-                impl Deref for $child_duard {
-                   type Target = $child;
-
-                   fn deref(&self) -> &Self::Target {
-                       &self.child
-                   }
-                }
-
-                impl DerefMut for $child_duard {
-
-                    fn deref_mut(&self) -> &mut Self::Target {
-                        &mut self.child
-                    }
-                 }
-
-
-              )*
         }
     }
 
@@ -105,18 +75,16 @@ pub mod shell_command {
         fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
 
         /// Executes the command as a child process, returning a handle to it.
-        fn spawn(&mut self) -> IoResult<Child>;
+        fn spawn(&mut self) -> AnyResult<Child>;
     }
 
     impl_command_unify!(Command => StdChild,SmolCommand => SmolChild);
-    // impl_deref!(ChildGuard<SmolChild> => SmolChild,ChildGuard<StdChild>  => StdChild);
 
     cfg_tokio_support!(
         use tokio::process::Command as TokioCommand;
         use tokio::process::Child as TokioChild;
         use std::convert::TryInto;
         impl_command_unify!(TokioCommand => TokioChild);
-        impl_deref!(ChildGuard<TokioChild> => TokioChild);
 
     );
 
@@ -124,32 +92,32 @@ pub mod shell_command {
     /// Trait abstraction of multiple library process handles.
     pub trait ChildUnify: Send + Sync {
         /// Executes the command as a child process, waiting for it to finish and collecting all of its output.
-        async fn wait_with_output(self) -> IoResult<Output>;
+        async fn wait_with_output(self) -> AnyResult<Output>;
         /// Convert stdout to stdio.
         async fn stdout_to_stdio(&mut self) -> Option<Stdio>;
 
         /// Kill the process child.
-        fn kill(&mut self) -> IoResult<()>;
+        fn kill(&mut self) -> AnyResult<()>;
     }
 
     #[async_trait]
     impl ChildUnify for StdChild {
-        async fn wait_with_output(self) -> IoResult<Output> {
-            self.wait_with_output()
+        async fn wait_with_output(self) -> AnyResult<Output> {
+            Ok(self.wait_with_output()?)
         }
         async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
             self.stdout.take().map(Stdio::from)
         }
 
-        fn kill(&mut self) -> IoResult<()> {
-            self.kill()
+        fn kill(&mut self) -> AnyResult<()> {
+            Ok(self.kill()?)
         }
     }
 
     #[async_trait]
     impl ChildUnify for SmolChild {
-        async fn wait_with_output(self) -> IoResult<Output> {
-            self.output().await
+        async fn wait_with_output(self) -> AnyResult<Output> {
+            Ok(self.output().await?)
         }
 
         async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
@@ -159,16 +127,16 @@ pub mod shell_command {
             None
         }
 
-        fn kill(&mut self) -> IoResult<()> {
-            self.kill()
+        fn kill(&mut self) -> AnyResult<()> {
+            Ok(self.kill()?)
         }
     }
 
     cfg_tokio_support!(
         #[async_trait]
         impl ChildUnify for TokioChild {
-            async fn wait_with_output(self) -> IoResult<Output> {
-                self.wait_with_output().await
+            async fn wait_with_output(self) -> AnyResult<Output> {
+                Ok(self.wait_with_output().await?)
             }
 
             async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
@@ -179,8 +147,8 @@ pub mod shell_command {
             // On Unix platforms, this is the equivalent to sending a SIGKILL.
             // Note that on Unix platforms it is possible for a zombie process to remain after a kill is sent;
             // to avoid this, the caller should ensure that either child.wait().await or child.try_wait() is invoked successfully.
-            fn kill(&mut self) -> IoResult<()> {
-                self.start_kill()
+            fn kill(&mut self) -> AnyResult<()> {
+                Ok(self.start_kill()?)
             }
         }
     );
@@ -192,26 +160,31 @@ pub mod shell_command {
 
     impl<Child: ChildUnify> ChildGuard<Child> {
         pub(crate) fn new(child: Child) -> Self {
+            let child = Some(child);
             Self { child }
         }
 
-        pub(crate) async fn wait_with_output(self) -> IoResult<Output> {
-            if let Some(child) = self.take() {
-                Ok(child.wait_with_output().await)
+        pub(crate) async fn wait_with_output(mut self) -> AnyResult<Output> {
+            if let Some(child) = self.child.take() {
+                return child.wait_with_output().await;
             }
+
+            Err(anyhow!("Without child for waiting."))
         }
     }
 
     impl<Child: ChildUnify> Drop for ChildGuard<Child> {
         fn drop(&mut self) {
-            self.child
-                .kill()
-                .unwrap_or_else(|e| error!(" `ChildGuard` : {}", e));
+            if let Some(child) = self.child.as_mut() {
+                child
+                    .kill()
+                    .unwrap_or_else(|e| error!(" `ChildGuard` : {}", e));
+            }
         }
     }
 
     impl<Child: ChildUnify> Deref for ChildGuard<Child> {
-        type Target = Child;
+        type Target = Option<Child>;
         fn deref(&self) -> &Self::Target {
             &self.child
         }
@@ -252,19 +225,18 @@ pub mod shell_command {
             let command = parts.next().unwrap();
             let args = parts;
 
-            //Standard input to the current process.
-            //If previous_command is present, it inherits the standard output of the previous command.
-            //If not, it inherits the current parent process.
+            // Standard input to the current process.
+            // If previous_command is present, it inherits the standard output of the previous command.
+            // If not, it inherits the current parent process.
             let previous_command = process_linked_list.back_mut();
             let mut stdin = Stdio::inherit();
 
             if let Some(previous_command_ref) = previous_command {
                 let mut t = None;
 
-                mem::swap(
-                    &mut previous_command_ref.child.stdout_to_stdio().await,
-                    &mut t,
-                );
+                if let Some(child_mut) = previous_command_ref.child.as_mut() {
+                    mem::swap(&mut child_mut.stdout_to_stdio().await, &mut t);
+                }
 
                 if let Some(child_stdio) = t {
                     stdin = child_stdio;

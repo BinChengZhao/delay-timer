@@ -266,22 +266,8 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
-    /// The container used to provide a shared/cross-threaded data structure base is Arc, to support concurrent reads (potentially more read and write less).
-
-    /// Since the external environment that relies on `delay-timer` is indeterminate and potentially synchronous context, the asynchronous synchronous primitive AsyncRwlock<Arc<T>> is not sufficient for the user.
-
-    /// Providing synchronous primitives such as Arc<std::sync::RwLock<T>> will block Executor in asynchronous runtime.
-
-    /// The most balanced data structure is ArcSwap<Arc<T>>
-
-    // Translated with www.DeepL.com/Translator (free version)
-
-    // TODO: ArcSwap<Arc<LinkedList<Weak<Instance>>>> The type may be adjusted.
-    // Create a shared data type wrapped in ArcSwap, a copy is left to the outside as a handle,
-    // a copy is passed to the inside via `insert_task`,
-    // the internal maintenance of the state is mainly through EventHandle's sub-workers,
-    // mainly note the `UpdateTask` event and `CancelTask` events and `FinishTask` events.
-
+    /// Add a task in timer_core by event-channel.
+    /// But it will return a handle that can constantly take out new instances of the task.
     pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
         let (mut task_instances_chain, task_instances_chain_maintainer) =
             task_instance_chain_pair();

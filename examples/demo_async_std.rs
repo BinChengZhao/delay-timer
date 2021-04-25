@@ -5,6 +5,7 @@ use anyhow::Result;
 use smol::Timer;
 use std::time::Duration;
 
+// You can replace the 62 line with the command you expect to execute.
 #[async_std::main]
 async fn main() -> Result<()> {
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
@@ -23,10 +24,11 @@ async fn main() -> Result<()> {
     task_instance.cancel_with_async_wait().await?;
 
     // Cancel running shell-task instances.
-    shell_task_instance_chain
+    // Probably already finished running, no need to cancel.
+    let _ = shell_task_instance_chain
         .next()?
         .cancel_with_async_wait()
-        .await?;
+        .await;
 
     // Remove task which id is 1.
     delay_timer.remove_task(1)?;
@@ -57,7 +59,7 @@ fn build_task_async_print() -> Task {
 fn build_task_async_execute_process() -> Task {
     let mut task_builder = TaskBuilder::default();
 
-    let body = unblock_process_task_fn_x("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
+    let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
     task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
         .set_task_id(3)

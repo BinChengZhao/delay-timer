@@ -20,7 +20,7 @@ fn test_instance_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
     let body = create_async_fn_body!({
-        Timer::after(Duration::from_secs(1)).await;
+        Timer::after(Duration::from_millis(100)).await;
     });
 
     let task = TaskBuilder::default()
@@ -46,8 +46,8 @@ fn test_instance_state() -> anyhow::Result<()> {
     // Just got the instance when it was still running.
     assert_eq!(instance.get_state(), instance::RUNNING);
 
-    // The task execution is completed after about 1 second.
-    park_timeout(Duration::from_millis(1001));
+    // The task execution is completed after about 110 millisecond.
+    park_timeout(Duration::from_millis(110));
 
     // This should be the completed state.
     assert_eq!(instance.get_state(), instance::COMPLETED);
@@ -86,13 +86,14 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(replace_shell_command)]
 #[test]
 fn test_shell_task_instance_timeout_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
     // Before doing this test, please make sure that your local machine can execute this command.
     let shell_command = "php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt";
-    let body = unblock_process_task_fn_x(shell_command.into());
+    let body = unblock_process_task_fn(shell_command.into());
 
     let task = TaskBuilder::default()
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
@@ -122,6 +123,7 @@ fn test_shell_task_instance_timeout_state() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(replace_shell_command)]
 #[test]
 fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
     let mut delay_timer = DelayTimerBuilder::default().enable_status_report().build();
@@ -130,8 +132,8 @@ fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
         .ok_or(anyhow!("Without `status_reporter`."))?;
 
     // Before doing this test, please make sure that your local machine can execute this command.
-    let shell_command = "php -v | grep Z";
-    let body = unblock_process_task_fn_x(shell_command.into());
+    let shell_command = "php -v";
+    let body = unblock_process_task_fn(shell_command.into());
 
     let task = TaskBuilder::default()
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
