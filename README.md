@@ -34,7 +34,7 @@ use delay_timer::prelude::*;
 
 fn main() -> Result<()> {
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
-    let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
+    let delay_timer = DelayTimerBuilder::default().build();
 
     // Develop a print job that runs in an asynchronous cycle.
     // A chain of task instances.
