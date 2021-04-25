@@ -441,7 +441,7 @@ cfg_status_report!(
         /// Access to public events through DelayTimer.
         pub fn get_public_event(&self) -> anyhow::Result<PublicEvent> {
             if let Some(status_reporter) = self.status_reporter.as_ref() {
-                return status_reporter.get_public_event();
+                return status_reporter.next_public_event();
             }
 
             Err(anyhow!("Have no status-reporter."))

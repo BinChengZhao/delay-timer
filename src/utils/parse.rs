@@ -341,17 +341,17 @@ pub mod shell_command {
                 true
             } else {
                 let stdout;
-                if commands.peek().is_some() {
-                    // there is another command piped behind this one
-                    // prepare to send output to the next command
-                    stdout = Stdio::piped();
-                } else {
-                    // there are no more commands piped behind this one
-                    // send output to shell stdout
-                    // TODO:It shouldn't be the standard output of the parent process in the context,
-                    // there should be a default file to record it.
-                    stdout = Stdio::inherit();
-                };
+                // if commands.peek().is_some() {
+                //     // there is another command piped behind this one
+                //     // prepare to send output to the next command
+                stdout = Stdio::piped();
+                // } else {
+                //     // there are no more commands piped behind this one
+                //     // send output to shell stdout
+                //     // TODO:It shouldn't be the standard output of the parent process in the context,
+                //     // there should be a default file to record it.
+                //     stdout = Stdio::inherit();
+                // };
                 process = output.stdout(stdout).spawn()?;
                 false
             };

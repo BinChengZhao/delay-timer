@@ -2,6 +2,8 @@
 //! to the outside world.
 use crate::prelude::*;
 use std::convert::TryFrom;
+use future_lite::block_on;
+
 
 /// # Required features
 ///
@@ -14,10 +16,20 @@ pub struct StatusReporter {
 
 impl StatusReporter {
 
-    /// Get `PublicEvent` via `StatusReporter`.
-    pub fn get_public_event(&self) -> AnyResult<PublicEvent> {
+    /// Non-blocking get `PublicEvent` via `StatusReporter`.
+    pub fn next_public_event(&self) -> AnyResult<PublicEvent> {
         let event = self.inner.try_recv()?;
         Ok(event)
+    }
+
+    /// Blocking get `PublicEvent` via `StatusReporter`.
+    pub fn next_public_event_with_wait(&self) -> AnyResult<PublicEvent> {
+        Ok(block_on(self.inner.recv())?)
+    }
+
+    /// Async get `PublicEvent` via `StatusReporter`.
+    pub async fn next_public_event_with_async_wait(&self) -> AnyResult<PublicEvent> {
+        Ok(self.inner.recv().await?)
     }
 
     pub(crate) fn new(inner: AsyncReceiver<PublicEvent>) -> Self {

@@ -57,7 +57,7 @@ fn build_task_async_print() -> Task {
 fn build_task_async_execute_process() -> Task {
     let mut task_builder = TaskBuilder::default();
 
-    let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
+    let body = unblock_process_task_fn_x("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
     task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
         .set_task_id(3)

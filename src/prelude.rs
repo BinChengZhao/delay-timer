@@ -24,6 +24,7 @@ pub use crate::utils::convenience::cron_expression_grammatical_candy::{
 };
 pub use crate::utils::convenience::functions::{
     create_default_delay_task_handler, create_delay_task_handler, unblock_process_task_fn,
+    unblock_process_task_fn_x,
 };
 
 pub use anyhow::{anyhow, Result as AnyResult};
