@@ -50,8 +50,6 @@ pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender}
 pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
 
-//ChildUnify
-
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 
