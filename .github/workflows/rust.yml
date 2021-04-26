@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [nightly]
+        rust: [stable]
     steps:
       - uses: actions/checkout@v2
 
@@ -35,3 +35,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --all --benches --bins --examples --tests --all-features
