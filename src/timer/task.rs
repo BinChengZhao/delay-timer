@@ -714,7 +714,6 @@ mod tests {
         assert!(task.check_arrived());
     }
 
-    // TODO: should reimplement Clone for ScheduleIteratorOwned.
     #[test]
     fn test_analyze_cron_expression() {
         use super::{DelayTimerScheduleIteratorOwned, ScheduleIteratorTimeZone};
