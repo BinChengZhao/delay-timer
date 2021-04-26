@@ -23,7 +23,6 @@ Update examples:
     Add, dynamically cancel running task example case.
 
 Enriched documentation.
- master (#11)  v0.4.0
 
 
 
