@@ -19,7 +19,8 @@ The minimum-supported version of `rustc` is **1.49**.
 Except for the simple execution in a few seconds, you can also specify a specific date, 
 such as Sunday at 4am to execute a backup task.
 
-Supports configuration of the maximum number of parallelism of tasks.
+##### Supports configuration of the maximum number of parallelism of tasks.
+##### Dynamically cancel a running task instance by means of a handle.
 
 ![image](https://github.com/BinChengZhao/delay-timer/blob/master/structural_drawing/DelayTImer.png)
 
