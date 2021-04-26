@@ -14,7 +14,7 @@ pub use crate::entity::{get_timestamp, get_timestamp_micros, DelayTimer, DelayTi
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::state::instance;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
-pub use crate::timer::runtime_trace::task_instance::{Instance, TaskInstancesChain};
+pub use crate::timer::runtime_trace::task_instance::{Instance, TaskInstance, TaskInstancesChain};
 pub use crate::timer::task::TaskContext;
 pub use crate::timer::task::{Frequency, ScheduleIteratorTimeZone, Task, TaskBuilder};
 pub use crate::timer::timer_core::{FinishOutput, FinishTaskBody, TimerEvent};

@@ -723,7 +723,7 @@ mod tests {
 
         let mut schedule_iterator_first = DelayTimerScheduleIteratorOwned::analyze_cron_expression(
             ScheduleIteratorTimeZone::Utc,
-            "0/6 * * * * * *",
+            "0/3 * * * * * *",
         )
         .unwrap();
 
@@ -732,7 +732,7 @@ mod tests {
         let mut schedule_iterator_second =
             DelayTimerScheduleIteratorOwned::analyze_cron_expression(
                 ScheduleIteratorTimeZone::Utc,
-                "0/6 * * * * * *",
+                "0/3 * * * * * *",
             )
             .unwrap();
 
