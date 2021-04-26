@@ -16,6 +16,7 @@ use super::timer::{
     Slot,
 };
 use crate::prelude::*;
+use crate::timer::runtime_trace::task_instance::task_instance_chain_pair;
 
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64};
@@ -27,7 +28,6 @@ use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
 use snowflake::SnowflakeIdBucket;
-use waitmap::WaitMap;
 
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
@@ -39,16 +39,16 @@ cfg_status_report!(
     use anyhow::anyhow;
 );
 
-//Set it. Motivation to move forward.
+// Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
-//Global sencond hand.
+// Global sencond hand.
 pub(crate) type SencondHand = Arc<AtomicU64>;
-//Global Timestamp.
+// Global Timestamp.
 pub(crate) type GlobalTime = Arc<AtomicU64>;
-//Shared task-wheel for operate.
-pub(crate) type SharedTaskWheel = Arc<WaitMap<u64, Slot>>;
-//The slot currently used for storing global tasks.
-pub(crate) type SharedTaskFlagMap = Arc<WaitMap<u64, TaskMark>>;
+// Shared task-wheel for operate.
+pub(crate) type SharedTaskWheel = Arc<DashMap<u64, Slot>>;
+// The slot currently used for storing global tasks.
+pub(crate) type SharedTaskFlagMap = Arc<DashMap<u64, TaskMark>>;
 
 /// Builds DelayTimer with custom configuration values.
 ///
@@ -86,19 +86,19 @@ pub struct DelayTimer {
 /// SharedHeader Store the core context of the runtime.
 #[derive(Clone)]
 pub struct SharedHeader {
-    //The task wheel has a slot dimension.
+    // The task wheel has a slot dimension.
     pub(crate) wheel_queue: SharedTaskWheel,
-    //Task distribution map to track where tasks are in a slot for easy removal.
+    // Task distribution map to track where tasks are in a slot for easy removal.
     pub(crate) task_flag_map: SharedTaskFlagMap,
-    //The hands of the clock.
+    // The hands of the clock.
     pub(crate) second_hand: SencondHand,
-    //Global Timestamp.
+    // Global Timestamp.
     pub(crate) global_time: GlobalTime,
-    //Delay_timer flag for running
+    // Delay_timer flag for running
     pub(crate) shared_motivation: SharedMotivation,
-    //RuntimeInstance
+    // RuntimeInstance
     pub(crate) runtime_instance: RuntimeInstance,
-    //Unique id generator.
+    // Unique id generator.
     pub(crate) snowflakeid_bucket: SnowflakeIdBucket,
 }
 
@@ -137,7 +137,7 @@ impl Default for RuntimeKind {
 impl Default for SharedHeader {
     fn default() -> Self {
         let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
-        let task_flag_map = Arc::new(WaitMap::new());
+        let task_flag_map = Arc::new(DashMap::new());
         let second_hand = Arc::new(AtomicU64::new(0));
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
@@ -262,26 +262,27 @@ impl DelayTimer {
     }
 
     /// Add a task in timer_core by event-channel.
-    /// TODO: In the future, adding a task may return a `Handle` to the implementation of Future,
-    /// through which the running information associated with the task can be queried.
-
-    // Here is an expected implementation, which is not yet determined.
-    ///```
-    // let delay_timer = DelayTimer::default();
-    //
-    // let join_handle = delay_timer.add_task(_).unwrap();
-    //
-    // let peek : Option<Peek<&Instance>> = join_handle.peek().await;
-    // let peek : Result<Option<Peek<&Instance>>> join_handle.try_peek();
-    //
-    // let instance : Option<Intance> =  join_handle.next().await.unwrap();
-    // let instance : Result<Option<Intance>> =  join_handle.try_next().unwrap();
-    //
-    // instance.cancel();
-    //
-    ///```
     pub fn add_task(&self, task: Task) -> Result<()> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
+    }
+
+    /// Add a task in timer_core by event-channel.
+    /// But it will return a handle that can constantly take out new instances of the task.
+    pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
+        let (mut task_instances_chain, task_instances_chain_maintainer) =
+            task_instance_chain_pair();
+        task_instances_chain.timer_event_sender = Some(self.timer_event_sender.clone());
+
+        self.seed_timer_event(TimerEvent::InsertTask(
+            Box::new(task),
+            task_instances_chain_maintainer,
+        ))?;
+        Ok(task_instances_chain)
+    }
+
+    /// Update a task in timer_core by event-channel.
+    pub fn update_task(&self, task: Task) -> Result<()> {
+        self.seed_timer_event(TimerEvent::UpdateTask(Box::new(task)))
     }
 
     /// Remove a task in timer_core by event-channel.
@@ -367,7 +368,7 @@ cfg_tokio_support!(
                     format!("tokio-{}", id)
                 })
                 .on_thread_start(|| {
-                    println!("tokio-thread started");
+                    info!("tokio-thread started");
                 })
                 .build()
                 .ok()
@@ -426,7 +427,7 @@ cfg_status_report!(
         /// Access to public events through DelayTimer.
         pub fn get_public_event(&self) -> anyhow::Result<PublicEvent> {
             if let Some(status_reporter) = self.status_reporter.as_ref() {
-                return status_reporter.get_public_event();
+                return status_reporter.next_public_event();
             }
 
             Err(anyhow!("Have no status-reporter."))

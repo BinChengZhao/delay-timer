@@ -26,81 +26,126 @@
 //!
 //! ``` rust
 //!
-//! #[macro_use]
+//! use anyhow::Result;
 //! use delay_timer::prelude::*;
-//!
-//! use std::str::FromStr;
-//! use std::sync::atomic::{
-//!     AtomicUsize,
-//!     Ordering::{Acquire, Release},
-//! };
-//! use std::sync::{atomic::AtomicI32, Arc};
-//! use std::thread::{self, park_timeout};
 //! use std::time::Duration;
 //! use smol::Timer;
-//! use hyper::{Client, Uri};
 //!
-//! fn main() {
+//! fn main() -> Result<()> {
+//!     // Build an DelayTimer that uses the default configuration of the `smol` runtime internally.
 //!     let delay_timer = DelayTimerBuilder::default().build();
 //!
-//!     // Add an asynchronous task to delay_timer.
-//!     delay_timer.add_task(build_task(TaskBuilder::default()));
-//!     // Since the tasks are executed in 8-second cycles,
-//!     // we deal with something else.
-//!     // Do someting about 8s.
-//!     thread::sleep(Duration::new(8, 1_000_000));
-//!     delay_timer.remove_task(1);
-//!     delay_timer.stop_delay_timer();
+//!     // Develop a print job that runs in an asynchronous cycle.
+//!     // A chain of task instances.
+//!     let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+//!
+//!     // Get the running instance of task 1.
+//!     let task_instance = task_instance_chain.next_with_wait()?;
+//!
+//!     // Cancel running task instances.
+//!     task_instance.cancel_with_wait()?;
+//!
+//!     // Remove task which id is 1.
+//!     delay_timer.remove_task(1)?;
+//!
+//!     // No new tasks are accepted; running tasks are not affected.
+//!     delay_timer.stop_delay_timer()?;
+//!
+//!     Ok(())
 //! }
 //!
-//! fn build_task(mut task_builder: TaskBuilder) -> Task {
+//! fn build_task_async_print() -> Task {
+//!     let mut task_builder = TaskBuilder::default();
+//!
 //!     let body = create_async_fn_body!({
-//!         let mut res = surf::get("https://httpbin.org/get").await.unwrap();
-//!         dbg!(res.body_string().await.unwrap());
+//!         println!("create_async_fn_body!");
+//!
+//!         Timer::after(Duration::from_secs(3)).await;
+//!
+//!         println!("create_async_fn_body:i'success");
 //!     });
 //!
 //!     task_builder
-//!         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerEightSeconds))
-//!         .set_task_id(2)
-//!         .set_maximum_running_time(5)
+//!         .set_task_id(1)
+//!         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+//!         .set_maximun_parallel_runable_num(2)
 //!         .spawn(body)
 //!         .unwrap()
 //! }
 //!
-//! enum AuspiciousTime {
-//!     PerSevenSeconds,
-//!     PerEightSeconds,
-//!     LoveTime,
-//! }
-//!
-//! impl Into<CandyCronStr> for AuspiciousTime {
-//!     fn into(self) -> CandyCronStr {
-//!         match self {
-//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
-//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
-//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
-//!         }
-//!     }
-//! }
 //! ```
 //!
 //!
+//! Use in asynchronous contexts.
+//! ```
 //!
+//! use delay_timer::prelude::*;
+//!
+//! use anyhow::Result;
+//!
+//! use smol::Timer;
+//! use std::time::Duration;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<()> {
+//!     // In addition to the mixed (smol & tokio) runtime
+//!     // You can also share a tokio runtime with delayTimer, please see api `DelayTimerBuilder::tokio_runtime` for details.
+//!
+//!     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
+//!     let delay_timer = DelayTimerBuilder::default().build();
+//!
+//!     // Develop a print job that runs in an asynchronous cycle.
+//!     let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+//!
+//!     // Get the running instance of task 1.
+//!     let task_instance = task_instance_chain.next_with_async_wait().await?;
+//!
+//!     // Cancel running task instances.
+//!     task_instance.cancel_with_async_wait().await?;
+//!
+//!
+//!     // Remove task which id is 1.
+//!     delay_timer.remove_task(1)?;
+//!
+//!     // No new tasks are accepted; running tasks are not affected.
+//!     delay_timer.stop_delay_timer()
+//! }
+//!
+//! fn build_task_async_print() -> Task {
+//!     let mut task_builder = TaskBuilder::default();
+//!
+//!     let body = create_async_fn_body!({
+//!         println!("create_async_fn_body!");
+//!
+//!         Timer::after(Duration::from_secs(3)).await;
+//!
+//!         println!("create_async_fn_body:i'success");
+//!     });
+//!
+//!     task_builder
+//!         .set_task_id(1)
+//!         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
+//!         .set_maximun_parallel_runable_num(2)
+//!         .spawn(body)
+//!         .unwrap()
+//! }
+//!
+//!
+//!
+//!
+//! ```
 //! Capture the specified environment information and build the closure & task:
-//! ``` rust
+//! ```
 //! #[macro_use]
 //! use delay_timer::prelude::*;
 //!
-//! use std::str::FromStr;
 //! use std::sync::atomic::{
 //!     AtomicUsize,
 //!     Ordering::{Acquire, Release},
 //! };
-//! use std::sync::{atomic::AtomicI32, Arc};
-//! use std::thread::{self, park_timeout};
+//! use std::sync::Arc;
 //! use std::time::Duration;
 //! use smol::Timer;
-//! use hyper::{Client, Uri};
 //!
 //!
 //! let delay_timer = DelayTimer::new();
@@ -166,7 +211,7 @@
 //!
 //!         let future = async move {
 //!             future_inner.await;
-//!             context.finishe_task().await;
+//!             context.finishe_task(None).await;
 //!         };
 //!
 //!         create_delay_task_handler(async_spawn(future))
@@ -201,9 +246,9 @@
 //!     }
 //! }
 //! ```
+#![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(RUSTC_IS_NIGHTLY, feature(linked_list_cursors))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-// TODO:When the version is stable in the future, we should consider using stable compile unified.
 #[macro_use]
 pub mod macros;
 pub mod entity;
@@ -211,4 +256,5 @@ pub mod prelude;
 pub mod timer;
 pub mod utils;
 
+pub use anyhow;
 pub use cron_clock;

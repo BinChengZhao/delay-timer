@@ -1,6 +1,6 @@
 [package]
 name = "delay_timer"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
@@ -29,33 +29,37 @@ status-report = []
 
 
 [dependencies]
-cron_clock = "0.6.7"
-anyhow = "1.0.31"
+cron_clock = "0.7.0"
+anyhow = "^1.0.31"
 rs-snowflake = "0.5.0"
-waitmap = "1.1.0"
-lru = "0.6.1"
-futures = "0.3.8"
-smol = "1.2.5"
-concat-idents = "1.1.1"
+dashmap = "^4.0.2"
+lru = "^0.6.5"
+futures = "^0.3.13"
+smol = "^1.2.5"
+concat-idents = "1.1.2"
+async-trait = "^0.1.48"
+event-listener = "^2.5.1"
+log = "^0.4.14"
 
 
 # Optional
-tokio = { version = "1.2.*", features = ["full"] , optional = true }
+tokio = { version = "^1.3.0", features = ["full"] , optional = true }
 
 [dev-dependencies]
-surf = "2.1.0"
-tokio = { version = "1.2.*", features = ["full"] }
-hyper= {version  = "0.14.2" , features = ["full"] }
-pretty_env_logger = "0.4"
-mockall = "0.8.2"
+surf = "^2.1.0"
+tokio = { version = "^1.3.0", features = ["full"] }
+hyper= {version  = "^0.14.2" , features = ["full"] }
+pretty_env_logger = "^0.4"
+mockall = "^0.8.2"
+env_logger = "^0.8.3"
 
 [dev-dependencies.async-std]
-version = "1.6.3"
-features = ["attributes"]
+version = "^1.9.0"
+features = ["attributes", "unstable"]
 
 [build-dependencies]
 autocfg = "1"
-rustc_version = "0.2"
+rustc_version = "^0.2"
 
 # Append the cfg-tag:docsrs to activate the feature(doc_cfg) attribute
 # when generating a document on docs.rs.

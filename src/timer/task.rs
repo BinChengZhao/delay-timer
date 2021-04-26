@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
+use std::sync::atomic::Ordering;
 use std::thread::AccessError;
 
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
@@ -15,41 +16,106 @@ use lru::LruCache;
 //TODO: Add doc.
 thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
 
-// TaskMark is use to remove/stop the task.
-#[derive(Default, Debug, Clone, Copy)]
+// TaskMark is used to maintain the status of running tasks.
+#[derive(Default, Debug)]
 pub(crate) struct TaskMark {
+    // The id of task.
     pub(crate) task_id: u64,
+    // The wheel slot where the task is located.
     slot_mark: u64,
+    // Number of tasks running in parallel.
     parallel_runable_num: u64,
+    /// Chain of task run instances.
+    /// For inner maintain to Running-Task's instance.
+    pub(crate) task_instances_chain_maintainer: Option<TaskInstancesChainMaintainer>,
 }
 
 impl TaskMark {
-    pub(crate) fn new(task_id: u64, slot_mark: u64, parallel_runable_num: u64) -> Self {
-        TaskMark {
-            task_id,
-            slot_mark,
-            parallel_runable_num,
-        }
+    #[inline(always)]
+    pub(crate) fn set_task_id(&mut self, task_id: u64) -> &mut Self {
+        self.task_id = task_id;
+        self
     }
 
+    #[inline(always)]
     pub(crate) fn get_slot_mark(&self) -> u64 {
         self.slot_mark
     }
 
+    #[inline(always)]
+    pub(crate) fn set_slot_mark(&mut self, slot_mark: u64) -> &mut Self {
+        self.slot_mark = slot_mark;
+        self
+    }
+
+    #[inline(always)]
     pub(crate) fn get_parallel_runable_num(&self) -> u64 {
         self.parallel_runable_num
     }
 
-    pub(crate) fn set_slot_mark(&mut self, slot_mark: u64) {
-        self.slot_mark = slot_mark;
+    #[inline(always)]
+    pub(crate) fn set_parallel_runable_num(&mut self, parallel_runable_num: u64) -> &mut Self {
+        self.parallel_runable_num = parallel_runable_num;
+        self
     }
 
+    #[inline(always)]
     pub(crate) fn inc_parallel_runable_num(&mut self) {
         self.parallel_runable_num += 1;
     }
 
+    #[inline(always)]
     pub(crate) fn dec_parallel_runable_num(&mut self) {
         self.parallel_runable_num = self.parallel_runable_num.checked_sub(1).unwrap_or_default();
+    }
+
+    #[inline(always)]
+    pub(crate) fn set_task_instances_chain_maintainer(
+        &mut self,
+        task_instances_chain_maintainer: TaskInstancesChainMaintainer,
+    ) -> &mut Self {
+        self.task_instances_chain_maintainer = Some(task_instances_chain_maintainer);
+        self
+    }
+
+    pub(crate) fn get_task_instances_chain_maintainer(
+        &mut self,
+    ) -> Option<&mut TaskInstancesChainMaintainer> {
+        let state = self
+            .task_instances_chain_maintainer
+            .as_ref()
+            .map(|c| c.inner_state.load(Ordering::Acquire));
+
+        if state == Some(state::instance_chain::DROPPED) {
+            self.task_instances_chain_maintainer = None;
+        }
+
+        self.task_instances_chain_maintainer.as_mut()
+    }
+
+    pub(crate) fn notify_cancel_finish(
+        &mut self,
+        record_id: i64,
+        state: usize,
+    ) -> Option<Instance> {
+        let task_instances_chain_maintainer = self.get_task_instances_chain_maintainer()?;
+
+        let index = task_instances_chain_maintainer
+            .inner_list
+            .iter()
+            .position(|d| d.get_record_id() == record_id)?;
+
+        let mut has_remove_instance_list =
+            task_instances_chain_maintainer.inner_list.split_off(index);
+        let remove_instance = has_remove_instance_list.pop_front();
+        task_instances_chain_maintainer
+            .inner_list
+            .append(&mut has_remove_instance_list);
+
+        if let Some(i) = remove_instance.as_ref() {
+            i.notify_cancel_finish(state)
+        }
+        remove_instance
     }
 }
 
@@ -71,7 +137,6 @@ pub(crate) enum FrequencyInner {
     ///Type of countdown.
     CountDown(u32, DelayTimerScheduleIteratorOwned),
 }
-
 /// Set the time zone for the time of the expression iteration.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum ScheduleIteratorTimeZone {
@@ -87,6 +152,15 @@ pub enum ScheduleIteratorTimeZone {
 pub(crate) struct ScheduleIteratorTimeZoneQuery {
     time_zone: ScheduleIteratorTimeZone,
     cron_expression: String,
+}
+
+impl ScheduleIteratorTimeZone {
+    fn get_fixed_offset(&self) -> AnyResult<FixedOffset> {
+        match self {
+            ScheduleIteratorTimeZone::FixedOffset(offset) => Ok(*offset),
+            _ => Err(anyhow!("No variant of FixedOffset.")),
+        }
+    }
 }
 
 impl Default for ScheduleIteratorTimeZone {
@@ -147,6 +221,20 @@ impl DelayTimerScheduleIteratorOwned {
     }
 
     #[inline(always)]
+    pub(crate) fn refresh_previous_datetime(&mut self, time_zone: ScheduleIteratorTimeZone) {
+        match self {
+            Self::Utc(ref mut iterator) => iterator.refresh_previous_datetime(Utc),
+            Self::Local(ref mut iterator) => iterator.refresh_previous_datetime(Local),
+
+            Self::FixedOffset(ref mut iterator) => {
+                if let Ok(offset) = time_zone.get_fixed_offset() {
+                    iterator.refresh_previous_datetime(offset);
+                }
+            }
+        }
+    }
+
+    #[inline(always)]
     pub(crate) fn next(&mut self) -> i64 {
         match self {
             Self::Utc(ref mut iterator) => iterator.next().unwrap().timestamp(),
@@ -170,7 +258,12 @@ impl DelayTimerScheduleIteratorOwned {
         CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
             let mut lru_cache = expression_cache.borrow_mut();
             if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
-                return schedule_iterator.clone();
+                let mut schedule_iterator_copy = schedule_iterator.clone();
+
+                // Reset the internal base time to avoid expiration time during internal iterations.
+                schedule_iterator_copy.refresh_previous_datetime(time_zone);
+
+                return schedule_iterator_copy;
             }
             let task_schedule =
                 DelayTimerScheduleIteratorOwned::new(schedule_iterator_time_zone_query.clone());
@@ -241,19 +334,26 @@ pub struct TaskBuilder<'a> {
 type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 
 #[derive(Debug, Clone, Default)]
+/// Task runtime context.
 pub struct TaskContext {
+    /// The id of Task.
     pub task_id: u64,
+    /// The id of the task running instance.
     pub record_id: i64,
+    /// Hook functions that may be used in the future.
     pub then_fn: Option<fn()>,
-    pub timer_event_sender: Option<TimerEventSender>,
+    /// Event Sender for Timer Wheel Core.
+    pub(crate) timer_event_sender: Option<TimerEventSender>,
 }
 
 impl TaskContext {
+    /// Get the id of task.
     pub fn task_id(&mut self, task_id: u64) -> &mut Self {
         self.task_id = task_id;
         self
     }
 
+    /// Get the id of the task running instance.
     pub fn record_id(&mut self, record_id: i64) -> &mut Self {
         self.record_id = record_id;
         self
@@ -264,19 +364,22 @@ impl TaskContext {
         self
     }
 
+    /// Get hook functions that may be used in the future.
     pub fn then_fn(&mut self, then_fn: fn()) -> &mut Self {
         self.then_fn = Some(then_fn);
         self
     }
 
-    pub async fn finishe_task(self) {
+    /// Send a task-Finish signal to EventHandle.
+    pub async fn finishe_task(self, finish_output: Option<FinishOutput>) {
         if let Some(timer_event_sender) = self.timer_event_sender {
             timer_event_sender
-                .send(TimerEvent::FinishTask(
-                    self.task_id,
-                    self.record_id,
-                    get_timestamp(),
-                ))
+                .send(TimerEvent::FinishTask(FinishTaskBody {
+                    task_id: self.task_id,
+                    record_id: self.record_id,
+                    finish_time: get_timestamp(),
+                    finish_output,
+                }))
                 .await
                 .unwrap();
         }
@@ -292,6 +395,7 @@ impl fmt::Debug for SafeStructBoxedFn {
 }
 
 #[derive(Debug)]
+/// Periodic Task Structures.
 pub struct Task {
     /// Unique task-id.
     pub task_id: u64,
@@ -337,7 +441,7 @@ impl<'a> TaskBuilder<'a> {
     /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
     /// disallowed. This feature can make some sense in theory, but the current
     /// implementation is incorrect and can lead to memory unsafety (see
-    /// [issue #20126][iss20126]), so it has been disabled for now.
+    /// (issue #20126), so it has been disabled for now.
 
     #[inline(always)]
     pub fn set_frequency_by_candy<T: Into<CandyCronStr>>(
@@ -444,7 +548,7 @@ impl<'a> TaskBuilder<'a> {
     /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
     /// disallowed. This feature can make some sense in theory, but the current
     /// implementation is incorrect and can lead to memory unsafety (see
-    /// [issue #20126][iss20126]), so it has been disabled for now.
+    /// (issue #20126), so it has been disabled for now.
 
     /// So I can't go through Drop and handle these automatically.
     pub fn free(&mut self) {
@@ -498,6 +602,7 @@ impl Task {
     }
 
     #[inline(always)]
+    /// Get the maximum running time of the task.
     pub fn get_maximum_running_time(&self, start_time: u64) -> Option<u64> {
         self.maximum_running_time.map(|t| t + start_time)
     }
@@ -607,5 +712,33 @@ mod tests {
         assert!(!task.is_can_running());
 
         assert!(task.check_arrived());
+    }
+
+    #[test]
+    fn test_analyze_cron_expression() {
+        use super::{DelayTimerScheduleIteratorOwned, ScheduleIteratorTimeZone};
+        use std::thread::sleep;
+        use std::time::Duration;
+
+        let mut schedule_iterator_first = DelayTimerScheduleIteratorOwned::analyze_cron_expression(
+            ScheduleIteratorTimeZone::Utc,
+            "0/3 * * * * * *",
+        )
+        .unwrap();
+
+        sleep(Duration::from_secs(5));
+
+        let mut schedule_iterator_second =
+            DelayTimerScheduleIteratorOwned::analyze_cron_expression(
+                ScheduleIteratorTimeZone::Utc,
+                "0/3 * * * * * *",
+            )
+            .unwrap();
+
+        // Two different starting values should not be the same.
+        assert_ne!(
+            schedule_iterator_first.next(),
+            schedule_iterator_second.next()
+        );
     }
 }

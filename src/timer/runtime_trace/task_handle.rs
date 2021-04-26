@@ -66,11 +66,9 @@ impl TaskTrace {
         }
 
         //remove current task_handler_box.
-        if let Some(mut task_handler_box) = list_mut_cursor.remove_current() {
-            Some(task_handler_box.quit())
-        } else {
-            None
-        }
+        list_mut_cursor
+            .remove_current()
+            .map(|mut task_handler_box| task_handler_box.quit())
     }
 
     #[cfg(not(RUSTC_IS_NIGHTLY))]
@@ -92,10 +90,11 @@ impl TaskTrace {
 }
 
 //I export that trait for that crate user.
-//| You can implement this trait for your type `T`,
-//|and then you can define the function that returns the `Box<T> as Box<dyn DelayTaskHandler>` closure,
-//|  which can be wrapped by the TaskBuilder and then thrown into the time wheel for constant rotation.
+/// You can implement this trait for your type `T`,
+/// and then you can define the function that returns the `Box<T> as Box<dyn DelayTaskHandler>` closure,
+/// which can be wrapped by the TaskBuilder and then thrown into the time wheel for constant rotation.
 pub trait DelayTaskHandler: Send + Sync {
+    /// Stopping a running task instance.
     fn quit(self: Box<Self>) -> Result<()>;
 }
 
@@ -141,7 +140,7 @@ impl Drop for DelayTaskHandlerBox {
             task_handler
                 .get_inner()
                 .quit()
-                .unwrap_or_else(|e| println!("{}", e));
+                .unwrap_or_else(|e| error!(" `DelayTaskHandlerBox::drop` : {}", e));
         }
     }
 }
@@ -225,14 +224,14 @@ impl DelayTaskHandlerBox {
 //Deafult implementation for Child and SmolTask
 //TODO:Maybe i can implementation a proc macro.
 
-impl DelayTaskHandler for ChildGuard {
+impl<Child: ChildUnify> DelayTaskHandler for ChildGuard<Child> {
     fn quit(self: Box<Self>) -> Result<()> {
         drop(self);
         Ok(())
     }
 }
 
-impl DelayTaskHandler for ChildGuardList {
+impl<Child: ChildUnify> DelayTaskHandler for ChildGuardList<Child> {
     fn quit(self: Box<Self>) -> Result<()> {
         drop(self);
         Ok(())

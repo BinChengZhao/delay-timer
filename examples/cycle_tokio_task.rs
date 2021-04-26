@@ -1,3 +1,4 @@
+use anyhow::Result;
 use delay_timer::prelude::*;
 use hyper::{Client, Uri};
 use std::thread::{current, park, Thread};
@@ -5,17 +6,26 @@ use std::thread::{current, park, Thread};
 // When you try to run that's example nedd add feature `tokio-support`.
 // cargo run --example=cycle_tokio_task --features=tokio-support
 
-fn main() {
+fn main() -> Result<()> {
+    // Build an DelayTimer that uses the default configuration of the Tokio runtime internally.
     let delay_timer = DelayTimerBuilder::default().tokio_runtime(None).build();
-    let task_builder = TaskBuilder::default();
-    delay_timer.add_task(build_task(task_builder)).unwrap();
-    delay_timer.add_task(build_wake_task(task_builder)).unwrap();
 
+    // Develop a task that runs in an asynchronous cycle (using a custom asynchronous template).
+    delay_timer.add_task(build_task_customized_async_task())?;
+
+    // Develop a task that runs in an asynchronous cycle to wake up the current thread.
+    delay_timer.add_task(build_wake_task())?;
     park();
-    delay_timer.stop_delay_timer().unwrap();
+
+    // No new tasks are accepted; running tasks are not affected.
+    delay_timer.stop_delay_timer()?;
+
+    Ok(())
 }
 
-fn build_task(mut task_builder: TaskBuilder) -> Task {
+fn build_task_customized_async_task() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
     let body = generate_closure_template("'delay_timer-is-easy-to-use.'".into());
 
     task_builder
@@ -26,7 +36,9 @@ fn build_task(mut task_builder: TaskBuilder) -> Task {
         .unwrap()
 }
 
-fn build_wake_task(mut task_builder: TaskBuilder) -> Task {
+fn build_wake_task() -> Task {
+    let mut task_builder = TaskBuilder::default();
+
     let thread: Thread = current();
     let body = move |_| {
         println!("bye bye");
@@ -50,7 +62,7 @@ pub fn generate_closure_template(
 
         let future = async move {
             future_inner.await;
-            context.finishe_task().await;
+            context.finishe_task(None).await;
         };
 
         create_delay_task_handler(async_spawn_by_tokio(future))

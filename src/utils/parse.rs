@@ -1,79 +1,221 @@
 //! parse
 //! It is a module that parses and executes commands.
+
+/// Collection of functions related to shell commands and processes.
 pub mod shell_command {
+    use crate::prelude::*;
     use anyhow::*;
+
+    use async_trait::async_trait;
+
+    use smol::process::{Child as SmolChild, Command as SmolCommand};
+
     use std::collections::LinkedList;
+    use std::convert::AsRef;
+    use std::ffi::OsStr;
     use std::fs::{File, OpenOptions};
-    use std::io::Result as IoResult;
     use std::iter::Iterator;
     use std::mem;
     use std::ops::{Deref, DerefMut};
     use std::path::Path;
-    use std::process::{Child, Command, ExitStatus, Stdio};
+    use std::process::{Child as StdChild, Command, Output, Stdio};
 
-    pub type ChildGuardList = LinkedList<ChildGuard>;
-    #[derive(Debug)]
-    pub struct ChildGuard {
-        pub(crate) child: Child,
+    /// The linkedlist of ChildGuard.
+    pub type ChildGuardList<T> = LinkedList<ChildGuard<T>>;
+
+    macro_rules! impl_command_unify{
+        ($($command:ty => $child:ty),+) => {
+            $(impl CommandUnify<$child> for $command {
+                fn new<S: AsRef<OsStr>>(program: S) -> Self {
+                    Self::new(program.as_ref())
+                }
+                fn args<I, S>(&mut self, args: I) -> &mut Self
+                where
+                    I: IntoIterator<Item = S>,
+                    S: AsRef<OsStr>,
+                {
+                    self.args(args);
+                    self
+                }
+
+                fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self {
+                    self.stdin(cfg);
+                    self
+                }
+
+                fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self {
+                    self.stdout(cfg);
+                    self
+                }
+
+                fn spawn(&mut self) -> AnyResult<$child> {
+                    Ok(self.spawn()?)
+                }
+            })+
+        }
     }
 
-    impl ChildGuard {
+    /// Abstraction of command methods in multiple libraries.
+    pub trait CommandUnify<Child: ChildUnify>: Sized {
+        /// Constructs a new Command for launching the program at path program.
+        fn new<S: AsRef<OsStr>>(program: S) -> Self {
+            Self::new(program.as_ref())
+        }
+
+        /// Adds multiple arguments to pass to the program.
+        fn args<I, S>(&mut self, args: I) -> &mut Self
+        where
+            I: IntoIterator<Item = S>,
+            S: AsRef<OsStr>;
+
+        /// Configuration for the child process's standard input (stdin) handle.
+        fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
+
+        /// Configuration for the child process's standard output (stdout) handle.
+        fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
+
+        /// Executes the command as a child process, returning a handle to it.
+        fn spawn(&mut self) -> AnyResult<Child>;
+    }
+
+    impl_command_unify!(Command => StdChild,SmolCommand => SmolChild);
+
+    cfg_tokio_support!(
+        use tokio::process::Command as TokioCommand;
+        use tokio::process::Child as TokioChild;
+        use std::convert::TryInto;
+        impl_command_unify!(TokioCommand => TokioChild);
+
+    );
+
+    #[async_trait]
+    /// Trait abstraction of multiple library process handles.
+    pub trait ChildUnify: Send + Sync {
+        /// Executes the command as a child process, waiting for it to finish and collecting all of its output.
+        async fn wait_with_output(self) -> AnyResult<Output>;
+        /// Convert stdout to stdio.
+        async fn stdout_to_stdio(&mut self) -> Option<Stdio>;
+
+        /// Kill the process child.
+        fn kill(&mut self) -> AnyResult<()>;
+    }
+
+    #[async_trait]
+    impl ChildUnify for StdChild {
+        async fn wait_with_output(self) -> AnyResult<Output> {
+            Ok(self.wait_with_output()?)
+        }
+        async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+            self.stdout.take().map(Stdio::from)
+        }
+
+        fn kill(&mut self) -> AnyResult<()> {
+            Ok(self.kill()?)
+        }
+    }
+
+    #[async_trait]
+    impl ChildUnify for SmolChild {
+        async fn wait_with_output(self) -> AnyResult<Output> {
+            Ok(self.output().await?)
+        }
+
+        async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+            if let Some(stdout) = self.stdout.take() {
+                return stdout.into_stdio().await.ok();
+            }
+            None
+        }
+
+        fn kill(&mut self) -> AnyResult<()> {
+            Ok(self.kill()?)
+        }
+    }
+
+    cfg_tokio_support!(
+        #[async_trait]
+        impl ChildUnify for TokioChild {
+            async fn wait_with_output(self) -> AnyResult<Output> {
+                Ok(self.wait_with_output().await?)
+            }
+
+            async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+                self.stdout.take().map(|s| s.try_into().ok()).flatten()
+            }
+
+            // Attempts to force the child to exit, but does not wait for the request to take effect.
+            // On Unix platforms, this is the equivalent to sending a SIGKILL.
+            // Note that on Unix platforms it is possible for a zombie process to remain after a kill is sent;
+            // to avoid this, the caller should ensure that either child.wait().await or child.try_wait() is invoked successfully.
+            fn kill(&mut self) -> AnyResult<()> {
+                Ok(self.start_kill()?)
+            }
+        }
+    );
+    #[derive(Debug)]
+    /// Guarding of process handles.
+    pub struct ChildGuard<Child: ChildUnify> {
+        pub(crate) child: Option<Child>,
+    }
+
+    impl<Child: ChildUnify> ChildGuard<Child> {
         pub(crate) fn new(child: Child) -> Self {
+            let child = Some(child);
             Self { child }
         }
-    }
 
-    impl Drop for ChildGuard {
-        fn drop(&mut self) {
-            self.child.kill().unwrap_or_else(|e| println!("{}", e));
+        pub(crate) async fn wait_with_output(mut self) -> AnyResult<Output> {
+            if let Some(child) = self.child.take() {
+                return child.wait_with_output().await;
+            }
+
+            Err(anyhow!("Without child for waiting."))
         }
     }
 
-    impl Deref for ChildGuard {
-        type Target = Child;
+    impl<Child: ChildUnify> Drop for ChildGuard<Child> {
+        fn drop(&mut self) {
+            if let Some(child) = self.child.as_mut() {
+                child
+                    .kill()
+                    .unwrap_or_else(|e| error!(" `ChildGuard` : {}", e));
+            }
+        }
+    }
+
+    impl<Child: ChildUnify> Deref for ChildGuard<Child> {
+        type Target = Option<Child>;
         fn deref(&self) -> &Self::Target {
             &self.child
         }
     }
 
-    impl DerefMut for ChildGuard {
+    impl<Child: ChildUnify> DerefMut for ChildGuard<Child> {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.child
-        }
-    }
-
-    pub(crate) trait RunningMarker {
-        fn get_running_marker(&mut self) -> bool;
-    }
-
-    impl RunningMarker for LinkedList<ChildGuard> {
-        fn get_running_marker(&mut self) -> bool {
-            self.iter_mut()
-                .map(|c| c.try_wait())
-                .collect::<Vec<IoResult<Option<ExitStatus>>>>()
-                .into_iter()
-                .any(|c| matches!(c, Ok(None)))
         }
     }
 
     //that code base on 'build-your-own-shell-rust'. Thanks you Josh Mcguigan.
 
     /// Generate a list of processes from a string of shell commands.
-    // There are a lot of system calls that happen when this method is called,
+    //  There are a lot of system calls that happen when this method is called,
     //  the speed of execution depends on the parsing of the command and the speed of the process fork,
     //  after which it should be split into unblock().
-    pub fn parse_and_run(input: &str) -> Result<ChildGuardList> {
+    pub async fn parse_and_run<Child: ChildUnify, Command: CommandUnify<Child>>(
+        input: &str,
+    ) -> Result<ChildGuardList<Child>> {
         // Check to see if process_linked_list is also automatically dropped out of scope
         // by ERROR's early return and an internal kill method is executed.
 
-        let mut process_linked_list: ChildGuardList = LinkedList::new();
+        let mut process_linked_list: ChildGuardList<Child> = LinkedList::new();
         // must be peekable so we know when we are on the last command
-        let mut commands = input.trim().split(" | ").peekable();
+        let commands = input.trim().split(" | ").peekable();
         //if str has >> | > ,after spawn return.
 
         let mut _stdio: Stdio;
 
-        while let Some(mut command) = commands.next() {
+        for mut command in commands {
             let check_redirect_result = _has_redirect_file(command);
             if check_redirect_result.is_some() {
                 command = _remove_angle_bracket_command(command)?;
@@ -83,18 +225,21 @@ pub mod shell_command {
             let command = parts.next().unwrap();
             let args = parts;
 
-            //Standard input to the current process.
-            //If previous_command is present, it inherits the standard output of the previous command.
-            //If not, it inherits the current parent process.
+            // Standard input to the current process.
+            // If previous_command is present, it inherits the standard output of the previous command.
+            // If not, it inherits the current parent process.
             let previous_command = process_linked_list.back_mut();
             let mut stdin = Stdio::inherit();
 
             if let Some(previous_command_ref) = previous_command {
                 let mut t = None;
-                mem::swap(&mut previous_command_ref.child.stdout, &mut t);
+
+                if let Some(child_mut) = previous_command_ref.child.as_mut() {
+                    mem::swap(&mut child_mut.stdout_to_stdio().await, &mut t);
+                }
 
                 if let Some(child_stdio) = t {
-                    stdin = Stdio::from(child_stdio);
+                    stdin = child_stdio;
                 }
             }
 
@@ -108,22 +253,22 @@ pub mod shell_command {
                 true
             } else {
                 let stdout;
-                if commands.peek().is_some() {
-                    // there is another command piped behind this one
-                    // prepare to send output to the next command
-                    stdout = Stdio::piped();
-                } else {
-                    // there are no more commands piped behind this one
-                    // send output to shell stdout
-                    // TODO:It shouldn't be the standard output of the parent process in the context,
-                    // there should be a default file to record it.
-                    stdout = Stdio::inherit();
-                };
+                // if commands.peek().is_some() {
+                //     // there is another command piped behind this one
+                //     // prepare to send output to the next command
+                stdout = Stdio::piped();
+                // } else {
+                //     // there are no more commands piped behind this one
+                //     // send output to shell stdout
+                //     // TODO:It shouldn't be the standard output of the parent process in the context,
+                //     // there should be a default file to record it.
+                //     stdout = Stdio::inherit();
+                // };
                 process = output.stdout(stdout).spawn()?;
                 false
             };
 
-            process_linked_list.push_back(ChildGuard::new(process));
+            process_linked_list.push_back(ChildGuard::<Child>::new(process));
 
             if end_flag {
                 break;
@@ -163,11 +308,10 @@ pub mod shell_command {
         };
 
         let mut sub_command_inner = command.trim().split_inclusive(angle_bracket).rev();
-        if let Some(filename) = sub_command_inner.next() {
-            Some(create_stdio_file(angle_bracket, filename))
-        } else {
-            None
-        }
+
+        sub_command_inner
+            .next()
+            .map(|filename| create_stdio_file(angle_bracket, filename))
     }
 
     //After confirming that there is a redirect file, parse the command before the command '>'.
@@ -185,10 +329,6 @@ pub mod shell_command {
         if angle_bracket == ">>" {
             file_tmp.append(true);
         }
-
-        // Where you need to return a Result, use Result<T, anyhow::Error> or the equivalent anyhow::Result<T>.
-        //You can use it? Throws any type of error that implements std::error::Error.
-        //anyhow::Error is compatible with std::error::Error.
 
         //TODO:I need record that open file error because filename has a whitespace i don't trim.
         let os_filename = Path::new(filename.trim()).as_os_str();

@@ -14,5 +14,8 @@
 //! 2. If the task is not set `max-running-time`, it will be automatically recycled when it finishes running.
 //! 3. The internal-task-handle, which holds the execution handle of the running task,
 //! gives lib the support to exit the task at any time.
+pub(crate) mod state;
 pub(crate) mod sweeper;
+
 pub mod task_handle;
+pub mod task_instance;

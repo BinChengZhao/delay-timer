@@ -110,7 +110,7 @@ impl RecyclingBins {
                     let recycle_unit = (&mut recycle_unit_heap).pop().map(|v| v.0).unwrap();
 
                     //handle send-error.
-                    self.send_timer_event(TimerEvent::CancelTask(
+                    self.send_timer_event(TimerEvent::TimeoutTask(
                         recycle_unit.task_id,
                         recycle_unit.record_id,
                     ))
@@ -132,7 +132,7 @@ impl RecyclingBins {
         self.timer_event_sender
             .send(event)
             .await
-            .unwrap_or_else(|e| println!("{}", e));
+            .unwrap_or_else(|e| error!(" `send_timer_event` : {}", e));
     }
 
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {

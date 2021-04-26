@@ -1,9 +1,5 @@
 //! Timer-core
 //! It is the core of the entire cycle scheduling task.
-use super::event_handle::SharedHeader;
-use super::runtime_trace::task_handle::DelayTaskHandlerBox;
-use super::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
-use super::task::Task;
 use crate::prelude::*;
 
 use crate::entity::get_timestamp;
@@ -106,28 +102,64 @@ impl SmolClock {
     }
 }
 
+/// The information generated when completing a task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinishTaskBody {
+    pub(crate) task_id: u64,
+    pub(crate) record_id: i64,
+    pub(crate) finish_time: u64,
+    pub(crate) finish_output: Option<FinishOutput>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// The output generated when the task is completed.
+pub enum FinishOutput {
+    /// The output generated when the process task is completed.
+    ProcessOutput(std::process::Output),
+    /// Exception output for a task that did not run successfully.
+    ExceptionOutput(String),
+}
+
 //warning: large size difference between variants
+/// Event for Timer Wheel Core.
 #[derive(Debug)]
 pub enum TimerEvent {
+    /// Stop the Timer.
     StopTimer,
+    /// Add a new `Task`.
     AddTask(Box<Task>),
+    /// Insert a new `Task`.
+    /// Maintain a state that is transparent to the user, such as the end of a task running instance.
+    InsertTask(Box<Task>, TaskInstancesChainMaintainer),
+    /// Update a Task in Timer .
+    UpdateTask(Box<Task>),
+    /// Remove a Task in Timer .
     RemoveTask(u64),
+    /// Cancel a Task running instance in Timer .
     CancelTask(u64, i64),
-    //TODO: Here it should be structured and no longer use tuples.
-    FinishTask(u64, i64, u64),
+    /// Cancel a timeout Task running instance in Timer .
+    TimeoutTask(u64, i64),
+    /// Finished a Task running instance in Timer .
+    FinishTask(FinishTaskBody),
+    /// Append a new instance of a running task .
     AppendTaskHandle(u64, DelayTaskHandlerBox),
+    /// Take the initiative to perform once Task.
+    AdvanceTask(u64),
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+/// delay-timer internal timer wheel core.
 pub struct Timer {
+    /// Event sender that provides events to `EventHandle` processing.
     pub(crate) timer_event_sender: TimerEventSender,
     status_report_sender: Option<AsyncSender<i32>>,
     pub(crate) shared_header: SharedHeader,
 }
 
-//In any case, the task is not executed in the Scheduler,
-//and task-Fn determines which runtime to put the internal task in when it is generated.
-//just provice api and struct ,less is more.
+// In any case, the task is not executed in the Scheduler,
+// and task-Fn determines which runtime to put the internal task in when it is generated.
+// just provice api and struct ,less is more.
 impl Timer {
+    /// Initialize a timer wheel core.
     pub fn new(timer_event_sender: TimerEventSender, shared_header: SharedHeader) -> Self {
         Timer {
             timer_event_sender,
@@ -142,8 +174,8 @@ impl Timer {
         self.status_report_sender = Some(sender);
     }
 
-    ///Offset the current slot by one when reading it,
-    ///so event_handle can be easily inserted into subsequent slots.
+    /// Offset the current slot by one when reading it,
+    /// so event_handle can be easily inserted into subsequent slots.
     pub(crate) fn next_position(&mut self) -> u64 {
         self.shared_header
             .second_hand
@@ -153,9 +185,9 @@ impl Timer {
             .unwrap_or_else(|e| e)
     }
 
-    ///Return a future can pool it for Schedule all cycles task.
+    /// Return a future can pool it for Schedule all cycles task.
     pub(crate) async fn async_schedule(&mut self) {
-        //if that overtime , i run it not block
+        // if that overtime , i run it not block
         let mut second_hand;
         let mut next_second_hand;
         let mut timestamp;
@@ -215,10 +247,11 @@ impl Timer {
         self.timer_event_sender
             .send(TimerEvent::AppendTaskHandle(task_id, tmp_task_handler_box))
             .await
-            .unwrap_or_else(|e| println!("{}", e));
+            .unwrap_or_else(|e| error!(" `send_timer_event`: {}", e));
     }
 
     #[inline(always)]
+    /// Maintain the running status of task.
     pub async fn maintain_task(
         &mut self,
         mut task: Task,

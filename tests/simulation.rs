@@ -14,6 +14,152 @@ use std::thread::{self, park_timeout};
 use std::time::Duration;
 
 use smol::Timer;
+
+#[test]
+fn test_instance_state() -> anyhow::Result<()> {
+    let delay_timer = DelayTimer::new();
+
+    let body = create_async_fn_body!({
+        Timer::after(Duration::from_millis(100)).await;
+    });
+
+    let task = TaskBuilder::default()
+        .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
+        .set_task_id(1)
+        .set_maximun_parallel_runable_num(3)
+        .spawn(body)?;
+    let task_instance_chain = delay_timer.insert_task(task)?;
+
+    // Get the first task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // The task was still running when the instance was first obtained.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // Unsolicited mission cancellation.
+    instance.cancel_with_wait()?;
+    assert_eq!(instance.get_state(), instance::CANCELLED);
+
+    // Get the second task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // Just got the instance when it was still running.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // The task execution is completed after about 110 millisecond.
+    park_timeout(Duration::from_millis(110));
+
+    // This should be the completed state.
+    assert_eq!(instance.get_state(), instance::COMPLETED);
+
+    Ok(())
+}
+
+#[test]
+fn test_instance_timeout_state() -> anyhow::Result<()> {
+    let delay_timer = DelayTimer::new();
+
+    let body = create_async_fn_body!({
+        Timer::after(Duration::from_secs(3)).await;
+    });
+
+    let task = TaskBuilder::default()
+        .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
+        .set_task_id(1)
+        .set_maximum_running_time(2)
+        .set_maximun_parallel_runable_num(3)
+        .spawn(body)?;
+    let task_instance_chain = delay_timer.insert_task(task)?;
+
+    // Get the first task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // The task was still running when the instance was first obtained.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // The task execution is timeout after about 2.001 second.
+    park_timeout(Duration::from_millis(2001));
+
+    // This should be the completed state.
+    assert_eq!(instance.get_state(), instance::TIMEOUT);
+
+    Ok(())
+}
+
+#[cfg(replace_shell_command)]
+#[test]
+fn test_shell_task_instance_timeout_state() -> anyhow::Result<()> {
+    let delay_timer = DelayTimer::new();
+
+    // Before doing this test, please make sure that your local machine can execute this command.
+    let shell_command = "php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt";
+    let body = unblock_process_task_fn(shell_command.into());
+
+    let task = TaskBuilder::default()
+        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_task_id(3)
+        .set_maximum_running_time(3)
+        .set_maximun_parallel_runable_num(1)
+        .spawn(body)?;
+
+    let task_instance_chain = delay_timer.insert_task(task)?;
+
+    // Get the first task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // The task was still running when the instance was first obtained.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // The task still running after about 2.001 second.
+    park_timeout(Duration::from_millis(2001));
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    // This should be the timeout state after about 4.001 second.
+    park_timeout(Duration::from_millis(2000));
+
+    assert_eq!(instance.get_state(), instance::TIMEOUT);
+
+    Ok(())
+}
+
+#[cfg(replace_shell_command)]
+#[test]
+fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
+    let mut delay_timer = DelayTimerBuilder::default().enable_status_report().build();
+    let status_reporter = delay_timer
+        .take_status_reporter()
+        .ok_or(anyhow!("Without `status_reporter`."))?;
+
+    // Before doing this test, please make sure that your local machine can execute this command.
+    let shell_command = "php -v";
+    let body = unblock_process_task_fn(shell_command.into());
+
+    let task = TaskBuilder::default()
+        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_task_id(3)
+        .set_maximum_running_time(3)
+        .set_maximun_parallel_runable_num(1)
+        .spawn(body)?;
+
+    let task_instance_chain = delay_timer.insert_task(task)?;
+
+    // Get the first task instance.
+    let instance = task_instance_chain.next_with_wait()?;
+
+    // The task was still running when the instance was first obtained.
+    assert_eq!(instance.get_state(), instance::RUNNING);
+
+    let _running_event = status_reporter.next_public_event_with_wait()?;
+    let complete_event = status_reporter.next_public_event_with_wait()?;
+
+    dbg!(complete_event);
+
+    // This should be the completed state.
+    assert!(instance.get_state() >= instance::COMPLETED);
+
+    Ok(())
+}
+
 #[test]
 fn go_works() {
     // Coordinates the inner-Runtime with the external(test-thread) clock.
@@ -21,7 +167,6 @@ fn go_works() {
     let mut schedule_itertor: ScheduleIteratorOwned<Local> = Schedule::from_str(expression)
         .unwrap()
         .upcoming_owned(Local);
-    // schedule_itertor.next();
 
     let mut next_exec_time;
     let mut current_time;

@@ -8,21 +8,17 @@
 //! 2. A communication center for internal and external workers.
 
 pub(crate) use super::super::entity::{SharedHeader, SharedTaskWheel};
-use super::runtime_trace::{
-    sweeper::{RecycleUnit, RecyclingBins},
-    task_handle::TaskTrace,
-};
+use super::runtime_trace::sweeper::{RecycleUnit, RecyclingBins};
+use super::runtime_trace::task_handle::TaskTrace;
 pub(crate) use super::timer_core::{TimerEvent, DEFAULT_TIMER_SLOT_COUNT};
 use super::{Slot, Task, TaskMark};
-
 use crate::prelude::*;
+
+use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::Arc;
+
 use anyhow::Result;
 use smol::channel::unbounded;
-use std::sync::{
-    atomic::Ordering::{Acquire, Release},
-    Arc,
-};
-use waitmap::WaitMap;
 
 cfg_status_report!(
     use std::convert::TryFrom;
@@ -166,6 +162,7 @@ impl EventHandle {
     }
 
     async fn handle_event(&mut self) {
+        // Turn on `feature` and have `status_report_sender` go this piece of logic.
         #[cfg(feature = "status-report")]
         if let Some(status_report_sender) = self.status_report_sender.take() {
             while let Ok(event) = self.timer_event_receiver.recv().await {
@@ -180,52 +177,63 @@ impl EventHandle {
             return;
         }
 
+        // Did not turn on `feature` or no `status_report_sender` go this piece of logic.
         while let Ok(event) = self.timer_event_receiver.recv().await {
             self.event_dispatch(event).await;
         }
     }
 
     pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) {
-        //#[cfg(features="status-report")]
-        //And event isn't `AddTask`, use channel sent(event) to report_channel.
-        //defined a new outside-event support user.
-
         match event {
             TimerEvent::StopTimer => {
                 self.shared_header.shared_motivation.store(false, Release);
                 return;
             }
             TimerEvent::AddTask(task) => {
-                let task_mark = self.add_task(*task);
+                let task_mark = self.add_task(task);
                 self.record_task_mark(task_mark);
             }
+
+            TimerEvent::InsertTask(task, task_instances_chain_maintainer) => {
+                let mut task_mark = self.add_task(task);
+                task_mark.set_task_instances_chain_maintainer(task_instances_chain_maintainer);
+
+                self.record_task_mark(task_mark);
+            }
+
+            TimerEvent::UpdateTask(task) => {
+                self.update_task(task).await;
+            }
+
+            TimerEvent::AdvanceTask(task_id) => {
+                self.advance_task(task_id).await;
+            }
+
             TimerEvent::RemoveTask(task_id) => {
                 self.remove_task(task_id).await;
-                self.shared_header.task_flag_map.cancel(&task_id);
+
+                self.shared_header.task_flag_map.remove(&task_id);
             }
             TimerEvent::CancelTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id);
+                self.cancel_task(task_id, record_id, state::instance::CANCELLED);
+            }
+
+            TimerEvent::TimeoutTask(task_id, record_id) => {
+                self.cancel_task(task_id, record_id, state::instance::TIMEOUT);
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
-                //if has deadline, set recycle_unit.
-                if let Some(deadline) = delay_task_handler_box.get_end_time() {
-                    let recycle_unit = RecycleUnit::new(
-                        deadline,
-                        delay_task_handler_box.get_task_id(),
-                        delay_task_handler_box.get_record_id(),
-                    );
-                    self.send_recycle_unit_sources_sender(recycle_unit).await;
-                }
-
-                self.task_trace.insert(task_id, delay_task_handler_box);
+                self.maintain_task_status(task_id, delay_task_handler_box)
+                    .await;
             }
 
-            TimerEvent::FinishTask(task_id, record_id, _finish_time) => {
+            TimerEvent::FinishTask(FinishTaskBody {
+                task_id, record_id, ..
+            }) => {
                 //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
                 // Provide a separate start time for the external, record_id time with a delay.
                 // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.
-                self.cancel_task(task_id, record_id);
+                self.finish_task(task_id, record_id);
             }
         }
     }
@@ -236,11 +244,11 @@ impl EventHandle {
             .sender
             .send(recycle_unit)
             .await
-            .unwrap_or_else(|e| println!("{}", e));
+            .unwrap_or_else(|e| error!("`send_recycle_unit_sources_sender`: {}", e));
     }
 
-    //add task to wheel_queue  slot
-    fn add_task(&mut self, mut task: Task) -> TaskMark {
+    // Add task to wheel_queue  slot
+    fn add_task(&mut self, mut task: Box<Task>) -> TaskMark {
         let second_hand = self.shared_header.second_hand.load(Acquire);
         let exec_time: u64 = task.get_next_exec_timestamp();
         let timestamp = self.shared_header.global_time.load(Acquire);
@@ -252,26 +260,71 @@ impl EventHandle {
 
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
 
-        //copu task_id
+        // copy task_id
         let task_id = task.task_id;
         self.shared_header
             .wheel_queue
             .get_mut(&slot_seed)
             .unwrap()
             .value_mut()
-            .add_task(task);
+            .add_task(*task);
 
-        TaskMark::new(task_id, slot_seed, 0)
+        let mut task_mart = TaskMark::default();
+        task_mart
+            .set_task_id(task_id)
+            .set_slot_mark(slot_seed)
+            .set_parallel_runable_num(0);
+
+        task_mart
     }
 
-    //for record task-mark.
+    // for record task-mark.
     pub(crate) fn record_task_mark(&mut self, task_mark: TaskMark) {
         self.shared_header
             .task_flag_map
             .insert(task_mark.task_id, task_mark);
     }
 
-    //for remove task.
+    // for update task.
+    pub(crate) async fn update_task(&mut self, task: Box<Task>) -> Option<Task> {
+        let task_mark = self.shared_header.task_flag_map.get(&task.task_id)?;
+
+        let slot_mark = task_mark.value().get_slot_mark();
+
+        self.shared_header
+            .wheel_queue
+            .get_mut(&slot_mark)
+            .unwrap()
+            .value_mut()
+            .update_task(*task)
+    }
+
+    // Take the initiative to perform once Task.
+    pub(crate) async fn advance_task(&mut self, task_id: u64) -> Option<Task> {
+        let task_mark = self.shared_header.task_flag_map.get(&task_id)?;
+
+        let slot_mark = task_mark.value().get_slot_mark();
+
+        let task = {
+            self.shared_header
+                .wheel_queue
+                .get_mut(&slot_mark)
+                .unwrap()
+                .value_mut()
+                .remove_task(task_id)?
+        };
+
+        let slot_seed = self.shared_header.second_hand.load(Acquire) + 1;
+
+        self.shared_header
+            .wheel_queue
+            .get_mut(&slot_seed)
+            .unwrap()
+            .value_mut()
+            .add_task(task)
+    }
+
+    // for remove task.
     pub(crate) async fn remove_task(&mut self, task_id: u64) -> Option<Task> {
         let task_mark = self.shared_header.task_flag_map.get(&task_id)?;
 
@@ -285,19 +338,72 @@ impl EventHandle {
             .remove_task(task_id)
     }
 
-    pub fn cancel_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
-        self.shared_header
-            .task_flag_map
-            .get_mut(&task_id)
-            .unwrap()
-            .value_mut()
-            .dec_parallel_runable_num();
+    pub(crate) fn cancel_task(
+        &mut self,
+        task_id: u64,
+        record_id: i64,
+        state: usize,
+    ) -> Option<Result<()>> {
+        let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+        let task_mark = task_mark_ref_mut.value_mut();
+
+        task_mark.dec_parallel_runable_num();
+
+        // Here the user can be notified that the task instance has disappeared via `Instance`.
+        task_mark.notify_cancel_finish(record_id, state);
 
         self.task_trace.quit_one_task_handler(task_id, record_id)
     }
 
+    pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+        let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+        let task_mark = task_mark_ref_mut.value_mut();
+
+        task_mark.dec_parallel_runable_num();
+
+        // Here the user can be notified that the task instance has disappeared via `Instance`.
+        task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED);
+
+        self.task_trace.quit_one_task_handler(task_id, record_id)
+    }
+
+    pub(crate) async fn maintain_task_status(
+        &mut self,
+        task_id: u64,
+        delay_task_handler_box: DelayTaskHandlerBox,
+    ) {
+        {
+            let mut task_mark = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+
+            let task_instances_chain_maintainer_option =
+                task_mark.value_mut().get_task_instances_chain_maintainer();
+
+            if let Some(task_instances_chain_maintainer) = task_instances_chain_maintainer_option {
+                let instance = Instance::default()
+                    .set_task_id(task_id)
+                    .set_record_id(delay_task_handler_box.get_record_id());
+
+                task_instances_chain_maintainer
+                    .push_instance(instance)
+                    .await;
+            }
+        }
+
+        // If has deadline, set recycle_unit.
+        if let Some(deadline) = delay_task_handler_box.get_end_time() {
+            let recycle_unit = RecycleUnit::new(
+                deadline,
+                delay_task_handler_box.get_task_id(),
+                delay_task_handler_box.get_record_id(),
+            );
+            self.send_recycle_unit_sources_sender(recycle_unit).await;
+        }
+
+        self.task_trace.insert(task_id, delay_task_handler_box);
+    }
+
     pub(crate) fn init_task_wheel(slots_numbers: u64) -> SharedTaskWheel {
-        let task_wheel = WaitMap::new();
+        let task_wheel = DashMap::new();
 
         for i in 0..slots_numbers {
             task_wheel.insert(i, Slot::new());
