@@ -1,3 +1,32 @@
+# Version 0.4.0 
+
+v0.4.0 New features:
+
+
+    1. Support dynamic modification of running tasks.
+    2. Support get handle `TaskInstancesChain` after insert task, and get running task instance `TaskInstance` dynamically.
+    
+      2.1. The task instance of a running task can be dynamically cancelled.
+      2.2. There are three types of cancellation: synchronous blocking cancellation, time-out-limited cancellation, and asynchronous cancellation.
+      2.3. Support reading the running status of running tasks.
+    
+    3. Support to get the output of internal asynchronous subtask process.
+
+Update dependency :
+
+    Replace waitmap -> dashmap .
+    Update cron_clock .
+
+Update examples:
+
+    Add, async-std & tokio use cases.
+    Add, dynamically cancel running task example case.
+
+Enriched documentation.
+ master (#11)  v0.4.0
+
+
+
 # Version 0.3.0 
 
 - Stable to stable-rustc compilation, with repair optimization.
