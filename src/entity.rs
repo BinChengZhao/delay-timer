@@ -27,7 +27,7 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
-use snowflake::SnowflakeIdBucket;
+use snowflake::{SnowflakeIdGenerator};
 
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
@@ -50,6 +50,7 @@ pub(crate) type SharedTaskWheel = Arc<DashMap<u64, Slot>>;
 // The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<DashMap<u64, TaskMark>>;
 
+// FIXME: Set `machine_id` and `node_id` to `SnowflakeIdGenerator` when initialized by default of DelayTimerBuilder.
 /// Builds DelayTimer with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
@@ -99,7 +100,8 @@ pub struct SharedHeader {
     // RuntimeInstance
     pub(crate) runtime_instance: RuntimeInstance,
     // Unique id generator.
-    pub(crate) snowflakeid_bucket: SnowflakeIdBucket,
+    // TODO: Arc<SnowflakeIdGenerator> or update machine_id node_id by Event.
+    pub(crate) snowflakeid_generator: SnowflakeIdGenerator,
 }
 
 impl fmt::Debug for SharedHeader {
@@ -109,7 +111,7 @@ impl fmt::Debug for SharedHeader {
             .field(&self.global_time)
             .field(&self.shared_motivation)
             .field(&self.runtime_instance)
-            .field(&self.snowflakeid_bucket)
+            .field(&self.snowflakeid_generator)
             .finish()
     }
 }
@@ -142,7 +144,7 @@ impl Default for SharedHeader {
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
         let runtime_instance = RuntimeInstance::default();
-        let snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
+        let snowflakeid_generator = SnowflakeIdGenerator::new(1, 1);
 
         SharedHeader {
             wheel_queue,
@@ -151,7 +153,7 @@ impl Default for SharedHeader {
             global_time,
             shared_motivation,
             runtime_instance,
-            snowflakeid_bucket,
+            snowflakeid_generator,
         }
     }
 }
@@ -300,6 +302,10 @@ impl DelayTimer {
     pub fn stop_delay_timer(&self) -> Result<()> {
         self.seed_timer_event(TimerEvent::StopTimer)
     }
+
+    // pub fn update_snowflakeid_generator_conf(){
+
+    // }
 
     /// Send a event to event-handle.
     fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
