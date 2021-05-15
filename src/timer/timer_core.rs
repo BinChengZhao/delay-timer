@@ -258,7 +258,12 @@ impl Timer {
         timestamp: u64,
         next_second_hand: u64,
     ) -> Option<()> {
-        let record_id: i64 = self.shared_header.snowflakeid_generator.real_time_generate();
+        let record_id: i64 = self
+            .shared_header
+            .id_generator
+            .lock()
+            .await
+            .real_time_generate();
         let task_id: u64 = task.task_id;
 
         if let Some(maximun_parallel_runable_num) = task.maximun_parallel_runable_num {

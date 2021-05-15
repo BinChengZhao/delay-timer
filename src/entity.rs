@@ -27,7 +27,7 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
-use snowflake::{SnowflakeIdGenerator};
+use snowflake::SnowflakeIdGenerator;
 
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
@@ -41,6 +41,8 @@ cfg_status_report!(
 
 // Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
+// Global IdGenerator.
+pub(crate) type SharedIdGenerator = Arc<AsyncMutex<SnowflakeIdGenerator>>;
 // Global sencond hand.
 pub(crate) type SencondHand = Arc<AtomicU64>;
 // Global Timestamp.
@@ -50,7 +52,6 @@ pub(crate) type SharedTaskWheel = Arc<DashMap<u64, Slot>>;
 // The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<DashMap<u64, TaskMark>>;
 
-// FIXME: Set `machine_id` and `node_id` to `SnowflakeIdGenerator` when initialized by default of DelayTimerBuilder.
 /// Builds DelayTimer with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
@@ -100,8 +101,7 @@ pub struct SharedHeader {
     // RuntimeInstance
     pub(crate) runtime_instance: RuntimeInstance,
     // Unique id generator.
-    // TODO: Arc<SnowflakeIdGenerator> or update machine_id node_id by Event.
-    pub(crate) snowflakeid_generator: SnowflakeIdGenerator,
+    pub(crate) id_generator: SharedIdGenerator,
 }
 
 impl fmt::Debug for SharedHeader {
@@ -111,7 +111,7 @@ impl fmt::Debug for SharedHeader {
             .field(&self.global_time)
             .field(&self.shared_motivation)
             .field(&self.runtime_instance)
-            .field(&self.snowflakeid_generator)
+            .field(&self.id_generator)
             .finish()
     }
 }
@@ -144,7 +144,7 @@ impl Default for SharedHeader {
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
         let runtime_instance = RuntimeInstance::default();
-        let snowflakeid_generator = SnowflakeIdGenerator::new(1, 1);
+        let id_generator = Arc::new(AsyncMutex::new(SnowflakeIdGenerator::new(1, 1)));
 
         SharedHeader {
             wheel_queue,
@@ -153,7 +153,7 @@ impl Default for SharedHeader {
             global_time,
             shared_motivation,
             runtime_instance,
-            snowflakeid_generator,
+            id_generator,
         }
     }
 }
@@ -303,9 +303,15 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::StopTimer)
     }
 
-    // pub fn update_snowflakeid_generator_conf(){
+    /// Set internal id-generator for `machine_id` and `node_id`.
+    /// Add a new api in the future to support passing a custom id generator.
+    /// The id-generator is mainly used for binding unique record ids to internal events, for user collection, and for tracking task dynamics.
+    pub fn update_id_generator_conf(&self, machine_id: i32, node_id: i32) {
+        let mut id_generator = block_on(self.shared_header.id_generator.lock());
 
-    // }
+        id_generator.machine_id = machine_id;
+        id_generator.node_id = node_id;
+    }
 
     /// Send a event to event-handle.
     fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
