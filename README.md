@@ -239,7 +239,7 @@ Licensed under either of
 
 ## To Do List
 - [x] Support tokio Ecology.
-- [ ] Disable unwrap related methods that will panic.
+- [x] Disable unwrap related methods that will panic.
 - [ ] Thread and running task quit when delayTimer drop.
 - [ ] neaten todo in code, replenish tests and benchmark.
 - [ ] batch-opration.

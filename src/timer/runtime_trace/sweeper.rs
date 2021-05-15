@@ -107,14 +107,14 @@ impl RecyclingBins {
                         break;
                     }
 
-                    let recycle_unit = (&mut recycle_unit_heap).pop().map(|v| v.0).unwrap();
-
-                    //handle send-error.
-                    self.send_timer_event(TimerEvent::TimeoutTask(
-                        recycle_unit.task_id,
-                        recycle_unit.record_id,
-                    ))
-                    .await;
+                    if let Some(recycle_unit) = (&mut recycle_unit_heap).pop().map(|v| v.0) {
+                        //handle send-error.
+                        self.send_timer_event(TimerEvent::TimeoutTask(
+                            recycle_unit.task_id,
+                            recycle_unit.record_id,
+                        ))
+                        .await;
+                    }
 
                 //send msg to event_handle.
                 } else {
@@ -168,7 +168,7 @@ impl RecyclingBins {
 mod tests {
 
     #[test]
-    fn test_task_valid() {
+    fn test_task_valid() -> AnyResult<()> {
         use super::{get_timestamp, RecycleUnit, RecyclingBins, TimerEvent};
         use smol::{
             block_on,
@@ -202,9 +202,7 @@ mod tests {
         let deadline = get_timestamp() + 5;
 
         for i in 1..10 {
-            recycle_unit_sender
-                .try_send(RecycleUnit::new(deadline, i, (i * i) as i64))
-                .unwrap();
+            recycle_unit_sender.try_send(RecycleUnit::new(deadline, i, (i * i) as i64))?;
         }
 
         park_timeout(Duration::new(2, 0));
@@ -217,5 +215,7 @@ mod tests {
         for _ in 1..10 {
             assert!(dbg!(timer_event_receiver.try_recv()).is_ok());
         }
+
+        Ok(())
     }
 }

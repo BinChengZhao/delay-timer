@@ -222,7 +222,7 @@ pub mod shell_command {
             }
 
             let mut parts = command.trim().split_whitespace();
-            let command = parts.next().unwrap();
+            let command = parts.next().ok_or_else(|| anyhow!("Without next part"))?;
             let args = parts;
 
             // Standard input to the current process.
@@ -246,9 +246,10 @@ pub mod shell_command {
             let mut output = Command::new(command);
             output.args(args).stdin(stdin);
 
+            // TODO: A separate pipe redirection for stderr.
             let process: Child;
-            let end_flag = if check_redirect_result.is_some() {
-                let stdout = check_redirect_result.unwrap()?;
+            let end_flag = if let Some(stdout_result) = check_redirect_result {
+                let stdout = stdout_result?;
                 process = output.stdout(stdout).spawn()?;
                 true
             } else {

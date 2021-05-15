@@ -207,26 +207,24 @@ impl Timer {
             let task_ids;
 
             {
-                let mut slot_mut = self
-                    .shared_header
-                    .wheel_queue
-                    .get_mut(&second_hand)
-                    .unwrap();
-
-                task_ids = slot_mut.value_mut().arrival_time_tasks();
+                if let Some(mut slot_mut) = self.shared_header.wheel_queue.get_mut(&second_hand) {
+                    task_ids = slot_mut.value_mut().arrival_time_tasks();
+                } else {
+                    error!("Missing data for wheel slot {}.", second_hand);
+                    continue;
+                }
             }
 
             for task_id in task_ids {
                 let task_option: Option<Task>;
 
                 {
-                    let mut slot_mut = self
-                        .shared_header
-                        .wheel_queue
-                        .get_mut(&second_hand)
-                        .unwrap();
-
-                    task_option = slot_mut.value_mut().remove_task(task_id);
+                    if let Some(mut slot_mut) = self.shared_header.wheel_queue.get_mut(&second_hand)
+                    {
+                        task_option = slot_mut.value_mut().remove_task(task_id);
+                    } else {
+                        task_option = None;
+                    }
                 }
 
                 if let Some(task) = task_option {

@@ -161,12 +161,11 @@ fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
 }
 
 #[test]
-fn go_works() {
+fn go_works() -> AnyResult<()> {
     // Coordinates the inner-Runtime with the external(test-thread) clock.
     let expression = "0/2 * * * * * *";
-    let mut schedule_itertor: ScheduleIteratorOwned<Local> = Schedule::from_str(expression)
-        .unwrap()
-        .upcoming_owned(Local);
+    let mut schedule_itertor: ScheduleIteratorOwned<Local> =
+        Schedule::from_str(expression)?.upcoming_owned(Local);
 
     let mut next_exec_time;
     let mut current_time;
@@ -184,9 +183,8 @@ fn go_works() {
     let task = TaskBuilder::default()
         .set_frequency(Frequency::CountDown(3, expression))
         .set_task_id(1)
-        .spawn(body)
-        .unwrap();
-    delay_timer.add_task(task).unwrap();
+        .spawn(body)?;
+    delay_timer.add_task(task)?;
 
     let mut i = 0;
 
@@ -198,16 +196,17 @@ fn go_works() {
         i = i + 1;
 
         // Coordinates the inner-Runtime with the external(test-thread) clock.(200_000 is a buffer.)
-        next_exec_time = dbg!(schedule_itertor.next().unwrap().timestamp_millis()) as u128 * 1000;
+        next_exec_time = dbg!(schedule_itertor.next()?.timestamp_millis()) as u128 * 1000;
         current_time = get_timestamp_micros();
         park_time = next_exec_time
             .checked_sub(current_time)
             .unwrap_or(1_000_000) as u64;
     }
+    Ok(())
 }
 
 #[test]
-fn test_maximun_parallel_runable_num() {
+fn test_maximun_parallel_runable_num() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicU64::new(0));
     let share_num_bunshin = share_num.clone();
@@ -223,9 +222,8 @@ fn test_maximun_parallel_runable_num() {
         .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
         .set_task_id(1)
         .set_maximun_parallel_runable_num(3)
-        .spawn(body)
-        .unwrap();
-    delay_timer.add_task(task).unwrap();
+        .spawn(body)?;
+    delay_timer.add_task(task)?;
 
     for i in 1..=6 {
         park_timeout(Duration::from_micros(1_000_000 * i));
@@ -233,10 +231,12 @@ fn test_maximun_parallel_runable_num() {
         //Testing, whether the mission is performing as expected.
         debug_assert!(dbg!(share_num.load(Acquire)) <= i);
     }
+
+    Ok(())
 }
 
 #[test]
-fn tests_countdown() {
+fn tests_countdown() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicI32::new(3));
     let share_num_bunshin = share_num.clone();
@@ -248,9 +248,8 @@ fn tests_countdown() {
     let task = TaskBuilder::default()
         .set_frequency(Frequency::CountDown(3, "0/2 * * * * * *"))
         .set_task_id(1)
-        .spawn(body)
-        .unwrap();
-    delay_timer.add_task(task).unwrap();
+        .spawn(body)?;
+    delay_timer.add_task(task)?;
 
     let mut i = 0;
 
@@ -264,9 +263,10 @@ fn tests_countdown() {
             break;
         }
     }
+    Ok(())
 }
 #[test]
-fn inspect_struct() {
+fn inspect_struct() -> AnyResult<()> {
     use tokio::runtime::Runtime;
 
     println!("Task size :{:?}", std::mem::size_of::<Task>());
@@ -280,9 +280,7 @@ fn inspect_struct() {
         std::mem::size_of::<cron_clock::ScheduleIteratorOwned<cron_clock::Utc>>()
     );
 
-    let mut s = cron_clock::Schedule::from_str("* * * * * * *")
-        .unwrap()
-        .upcoming_owned(cron_clock::Utc);
+    let mut s = cron_clock::Schedule::from_str("* * * * * * *")?.upcoming_owned(cron_clock::Utc);
 
     let mut s1 = s.clone();
 
@@ -292,4 +290,5 @@ fn inspect_struct() {
     let mut s2 = s1.clone();
     thread::sleep(Duration::from_secs(1));
     println!("{:?}, {:?}", s.next(), s2.next());
+    Ok(())
 }

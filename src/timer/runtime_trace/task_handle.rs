@@ -101,8 +101,7 @@ pub trait DelayTaskHandler: Send + Sync {
 pub struct SafeStructBoxedDelayTaskHandler(pub(crate) Box<dyn DelayTaskHandler>);
 impl Debug for SafeStructBoxedDelayTaskHandler {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        <&Self as Pointer>::fmt(&self, f).unwrap();
-        Ok(())
+        <&Self as Pointer>::fmt(&self, f)
     }
 }
 
