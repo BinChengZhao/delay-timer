@@ -8,12 +8,11 @@ use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
-use std::thread::AccessError;
 
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
 
-//TODO: Add doc.
+// Parsing cache for cron expressions, stored with thread-local storage.
 thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
 
 // TaskMark is used to maintain the status of running tasks.
@@ -129,6 +128,13 @@ pub enum Frequency<'a> {
     /// Type of countdown.
     CountDown(u32, &'a str),
 }
+
+impl<'a> Default for Frequency<'a> {
+    fn default() -> Frequency<'a> {
+        Frequency::Once("@minutely")
+    }
+}
+
 /// Iterator for task internal control of execution time.
 #[derive(Debug, Clone)]
 pub(crate) enum FrequencyInner {
@@ -241,7 +247,7 @@ impl DelayTimerScheduleIteratorOwned {
     fn analyze_cron_expression(
         time_zone: ScheduleIteratorTimeZone,
         cron_expression: &str,
-    ) -> AnyResult<DelayTimerScheduleIteratorOwned> {
+    ) -> Result<DelayTimerScheduleIteratorOwned, CronExpressionAnalyzeError> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
         let schedule_iterator_time_zone_query: ScheduleIteratorTimeZoneQuery =
             ScheduleIteratorTimeZoneQuery {
@@ -310,7 +316,7 @@ impl FrequencyInner {
 /// Cycle plan task builder.
 pub struct TaskBuilder<'a> {
     /// Repeat type.
-    frequency: Option<Frequency<'a>>,
+    frequency: Frequency<'a>,
 
     /// Task_id should unique.
     task_id: u64,
@@ -388,8 +394,7 @@ impl TaskContext {
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
 impl fmt::Debug for SafeStructBoxedFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <&Self as Pointer>::fmt(&self, f).unwrap();
-        Ok(())
+        <&Self as Pointer>::fmt(&self, f)
     }
 }
 
@@ -425,7 +430,7 @@ impl<'a> TaskBuilder<'a> {
     /// Set task Frequency.
     #[inline(always)]
     pub fn set_frequency(&mut self, frequency: Frequency<'a>) -> &mut Self {
-        self.frequency = Some(frequency);
+        self.frequency = frequency;
         self
     }
 
@@ -462,7 +467,7 @@ impl<'a> TaskBuilder<'a> {
             ),
         };
 
-        self.frequency = Some(frequency);
+        self.frequency = frequency;
         self
     }
 
@@ -502,15 +507,15 @@ impl<'a> TaskBuilder<'a> {
 
     /// Spawn a task.
     // TODO: Create new Error.
-    
-    pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
+
+    pub fn spawn<F>(self, body: F) -> Result<Task, CronExpressionAnalyzeError>
     where
         F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
         let frequency_inner;
 
         // The user inputs are pattern matched for different repetition types.
-        let (expression_str, repeat_type) = match self.frequency.unwrap() {
+        let (expression_str, repeat_type) = match self.frequency {
             Frequency::Once(expression_str) => (expression_str, RepeatType::Num(1)),
             Frequency::Repeated(expression_str) => (expression_str, RepeatType::Always),
             Frequency::CountDown(exec_count, expression_str) => {
@@ -554,16 +559,14 @@ impl<'a> TaskBuilder<'a> {
     /// So I can't go through Drop and handle these automatically.
     pub fn free(&mut self) {
         if self.build_by_candy_str {
-            if let Some(frequency) = self.frequency {
-                let s = match frequency {
-                    Frequency::Once(s) => s,
-                    Frequency::Repeated(s) => s,
-                    Frequency::CountDown(_, s) => s,
-                };
+            let s = match self.frequency {
+                Frequency::Once(s) => s,
+                Frequency::Repeated(s) => s,
+                Frequency::CountDown(_, s) => s,
+            };
 
-                unsafe {
-                    Box::from_raw(std::mem::transmute::<&str, *mut str>(s));
-                }
+            unsafe {
+                Box::from_raw(std::mem::transmute::<&str, *mut str>(s));
             }
         }
     }

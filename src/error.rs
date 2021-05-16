@@ -1,16 +1,14 @@
-use thiserror::Error;
+//! Public error of delay-timer..
 
+use crate::prelude::*;
+
+/// Error enumeration for Cron expression parsing.
 #[derive(Error, Debug)]
-pub enum DataStoreError {
-    #[error("data store disconnected")]
-    Disconnect(#[from] std::io::Error),
-    #[error("the data for key `{0}` is not available")]
-    Redaction(String),
-    #[error("invalid header (expected {expected:?}, found {found:?})")]
-    InvalidHeader {
-        expected: String,
-        found: String,
-    },
-    #[error("unknown data store error")]
-    Unknown,
+pub enum CronExpressionAnalyzeError {
+    /// Access to thread local storage failed.
+    #[error("Thread local storage access failed.")]
+    DisAccess(#[from] std::thread::AccessError),
+    /// Irregular cron expressions that cause parsing failures.
+    #[error("The cron expression was parsed incorrectly.")]
+    DisParse(#[from] cron_error::Error),
 }

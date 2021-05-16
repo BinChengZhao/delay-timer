@@ -252,11 +252,10 @@
 #[macro_use]
 pub mod macros;
 pub mod entity;
+pub mod error;
 pub mod prelude;
 pub mod timer;
 pub mod utils;
-pub mod error;
-
 
 pub use anyhow;
 pub use cron_clock;

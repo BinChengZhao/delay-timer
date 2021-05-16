@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
     delay_timer.remove_task(1)?;
 
     // No new tasks are accepted; running tasks are not affected.
-    delay_timer.stop_delay_timer()
+    Ok(delay_timer.stop_delay_timer()?)
 }
 
 fn build_task_async_print() -> Task {

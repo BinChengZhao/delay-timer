@@ -28,8 +28,10 @@ fn main() -> AnyResult<()> {
     // The Sync-Task run_flay.
     let mut run_flag = Arc::new(AtomicUsize::new(0));
     // cross thread share raw-pointer.
-    let run_flag_ref: SafePointer =
-        SafePointer(NonNull::new(&mut run_flag as *mut Arc<AtomicUsize>)?);
+    let run_flag_ref: SafePointer = SafePointer(
+        NonNull::new(&mut run_flag as *mut Arc<AtomicUsize>)
+            .ok_or_else(|| anyhow!("Can't init NonNull."))?,
+    );
 
     // Sync-Task body.
     let body = get_increase_fn(run_flag_ref);
@@ -63,6 +65,7 @@ fn main() -> AnyResult<()> {
     delay_timer.add_task(task)?;
 
     park();
+    Ok(())
 }
 
 fn get_increase_fn(

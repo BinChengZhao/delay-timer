@@ -59,7 +59,7 @@ pub fn generate_closure_template(
         let future_inner = async_template(get_timestamp() as i32, name.clone());
 
         let future = async move {
-            future_inner.await;
+            future_inner.await.ok();
             context.finishe_task(None).await;
         };
 
