@@ -40,6 +40,7 @@ concat-idents = "1.1.2"
 async-trait = "^0.1.48"
 event-listener = "^2.5.1"
 log = "^0.4.14"
+thiserror = "^1.0.24"
 
 
 # Optional

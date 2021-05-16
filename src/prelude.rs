@@ -26,8 +26,9 @@ pub use crate::utils::convenience::functions::{
     create_default_delay_task_handler, create_delay_task_handler, unblock_process_task_fn,
 };
 
+use thiserror::Error; 
 pub use anyhow::{anyhow, Result as AnyResult};
-pub use cron_clock::{self, FixedOffset, Local, TimeZone, Utc};
+pub use cron_clock::{self, error as cron_error, FixedOffset, Local, TimeZone, Utc};
 pub use smol::channel;
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;

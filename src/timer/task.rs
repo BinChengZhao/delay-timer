@@ -198,26 +198,20 @@ impl DelayTimerScheduleIteratorOwned {
             time_zone,
             ref cron_expression,
         }: ScheduleIteratorTimeZoneQuery,
-    ) -> DelayTimerScheduleIteratorOwned {
-        match time_zone {
+    ) -> Result<DelayTimerScheduleIteratorOwned, cron_error::Error> {
+        Ok(match time_zone {
             ScheduleIteratorTimeZone::Utc => DelayTimerScheduleIteratorOwned::Utc(
-                Schedule::from_str(cron_expression)
-                    .unwrap()
-                    .upcoming_owned(Utc),
+                Schedule::from_str(cron_expression)?.upcoming_owned(Utc),
             ),
             ScheduleIteratorTimeZone::Local => DelayTimerScheduleIteratorOwned::Local(
-                Schedule::from_str(cron_expression)
-                    .unwrap()
-                    .upcoming_owned(Local),
+                Schedule::from_str(cron_expression)?.upcoming_owned(Local),
             ),
             ScheduleIteratorTimeZone::FixedOffset(fixed_offset) => {
                 DelayTimerScheduleIteratorOwned::FixedOffset(
-                    Schedule::from_str(cron_expression)
-                        .unwrap()
-                        .upcoming_owned(fixed_offset),
+                    Schedule::from_str(cron_expression)?.upcoming_owned(fixed_offset),
                 )
             }
-        }
+        })
     }
 
     #[inline(always)]
@@ -247,7 +241,7 @@ impl DelayTimerScheduleIteratorOwned {
     fn analyze_cron_expression(
         time_zone: ScheduleIteratorTimeZone,
         cron_expression: &str,
-    ) -> Result<DelayTimerScheduleIteratorOwned, AccessError> {
+    ) -> AnyResult<DelayTimerScheduleIteratorOwned> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
         let schedule_iterator_time_zone_query: ScheduleIteratorTimeZoneQuery =
             ScheduleIteratorTimeZoneQuery {
@@ -255,7 +249,7 @@ impl DelayTimerScheduleIteratorOwned {
                 time_zone,
             };
 
-        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
+        let analyze_result = CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
             let mut lru_cache = expression_cache.borrow_mut();
             if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
                 let mut schedule_iterator_copy = schedule_iterator.clone();
@@ -263,13 +257,19 @@ impl DelayTimerScheduleIteratorOwned {
                 // Reset the internal base time to avoid expiration time during internal iterations.
                 schedule_iterator_copy.refresh_previous_datetime(time_zone);
 
-                return schedule_iterator_copy;
+                return Ok(schedule_iterator_copy);
             }
-            let task_schedule =
+
+            let new_result =
                 DelayTimerScheduleIteratorOwned::new(schedule_iterator_time_zone_query.clone());
-            lru_cache.put(schedule_iterator_time_zone_query, task_schedule.clone());
-            task_schedule
-        })
+
+            new_result.map(|task_schedule| {
+                lru_cache.put(schedule_iterator_time_zone_query, task_schedule.clone());
+                task_schedule
+            })
+        })?;
+
+        Ok(analyze_result?)
     }
 }
 
@@ -501,6 +501,8 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Spawn a task.
+    // TODO: Create new Error.
+    
     pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
     where
         F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
