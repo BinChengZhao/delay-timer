@@ -12,3 +12,20 @@ pub enum CronExpressionAnalyzeError {
     #[error("The cron expression was parsed incorrectly.")]
     DisParse(#[from] cron_error::Error),
 }
+
+/// Error enumeration for Handle Instance.
+#[derive(Error, Debug)]
+pub enum HandleInstanceError {
+    /// Missing event sender `timer_event_sender`.
+    #[error("Missing `timer_event_sender`.")]
+    MisEventSender,
+    #[error("Task instance channel exception.")]
+    /// Internal channel communication abnormality.
+    InternalChannelAnomalyT(#[from] channel::TryRecvError),
+    /// Internal channel communication abnormality.
+    #[error("Task instance channel exception.")]
+    InternalChannelAnomaly(#[from] channel::RecvError),
+    /// Running instance of the task is no longer maintained.
+    #[error("Running instance of the task is no longer maintained.")]
+    Expired,
+}

@@ -55,23 +55,23 @@ impl EventHandleBuilder {
         self
     }
 
-    pub(crate) fn build(self) -> EventHandle {
+    pub(crate) fn build(self) -> Option<EventHandle> {
         let task_trace = TaskTrace::default();
-        let sub_wokers = SubWorkers::new(self.timer_event_sender.unwrap());
+        let sub_wokers = SubWorkers::new(self.timer_event_sender?);
 
-        let timer_event_receiver = self.timer_event_receiver.unwrap();
-        let shared_header = self.shared_header.unwrap();
+        let timer_event_receiver = self.timer_event_receiver?;
+        let shared_header = self.shared_header?;
         #[cfg(feature = "status-report")]
         let status_report_sender = self.status_report_sender;
 
-        EventHandle {
+        Some(EventHandle {
             shared_header,
             task_trace,
             timer_event_receiver,
             sub_wokers,
             #[cfg(feature = "status-report")]
             status_report_sender,
-        }
+        })
     }
 }
 
@@ -272,12 +272,9 @@ impl EventHandle {
 
         // copy task_id
         let task_id = task.task_id;
-        self.shared_header
-            .wheel_queue
-            .get_mut(&slot_seed)
-            .unwrap()
-            .value_mut()
-            .add_task(*task);
+        if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_seed) {
+            slot.value_mut().add_task(*task);
+        }
 
         let mut task_mart = TaskMark::default();
         task_mart
@@ -301,12 +298,11 @@ impl EventHandle {
 
         let slot_mark = task_mark.value().get_slot_mark();
 
-        self.shared_header
-            .wheel_queue
-            .get_mut(&slot_mark)
-            .unwrap()
-            .value_mut()
-            .update_task(*task)
+        if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_mark) {
+            return slot.value_mut().update_task(*task);
+        }
+
+        None
     }
 
     // Take the initiative to perform once Task.
@@ -316,22 +312,19 @@ impl EventHandle {
         let slot_mark = task_mark.value().get_slot_mark();
 
         let task = {
-            self.shared_header
-                .wheel_queue
-                .get_mut(&slot_mark)
-                .unwrap()
-                .value_mut()
-                .remove_task(task_id)?
+            if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_mark) {
+                slot.value_mut().remove_task(task_id)?
+            } else {
+                return None;
+            }
         };
 
         let slot_seed = self.shared_header.second_hand.load(Acquire) + 1;
 
-        self.shared_header
-            .wheel_queue
-            .get_mut(&slot_seed)
-            .unwrap()
-            .value_mut()
-            .add_task(task)
+        if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_seed) {
+            return slot.value_mut().add_task(task);
+        }
+        None
     }
 
     // for remove task.
@@ -340,12 +333,11 @@ impl EventHandle {
 
         let slot_mark = task_mark.value().get_slot_mark();
 
-        self.shared_header
-            .wheel_queue
-            .get_mut(&slot_mark)
-            .unwrap()
-            .value_mut()
-            .remove_task(task_id)
+        if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_mark) {
+            return slot.value_mut().remove_task(task_id);
+        }
+
+        None
     }
 
     pub(crate) fn cancel_task(
@@ -354,27 +346,40 @@ impl EventHandle {
         record_id: i64,
         state: usize,
     ) -> Option<Result<()>> {
-        let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
-        let task_mark = task_mark_ref_mut.value_mut();
+        if let Some(mut task_mark_ref_mut) = self.shared_header.task_flag_map.get_mut(&task_id) {
+            let task_mark = task_mark_ref_mut.value_mut();
 
-        task_mark.dec_parallel_runable_num();
+            task_mark.dec_parallel_runable_num();
 
-        // Here the user can be notified that the task instance has disappeared via `Instance`.
-        task_mark.notify_cancel_finish(record_id, state);
+            // Here the user can be notified that the task instance has disappeared via `Instance`.
+            task_mark.notify_cancel_finish(record_id, state);
 
-        self.task_trace.quit_one_task_handler(task_id, record_id)
+            return self.task_trace.quit_one_task_handler(task_id, record_id);
+        }
+        Some(Err(anyhow!(
+            "Without the `task_mark_ref_mut` for task_id :{}, record_id : {}, state : {}",
+            task_id,
+            record_id,
+            state
+        )))
     }
 
     pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
-        let mut task_mark_ref_mut = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
-        let task_mark = task_mark_ref_mut.value_mut();
+        if let Some(mut task_mark_ref_mut) = self.shared_header.task_flag_map.get_mut(&task_id) {
+            let task_mark = task_mark_ref_mut.value_mut();
 
-        task_mark.dec_parallel_runable_num();
+            task_mark.dec_parallel_runable_num();
 
-        // Here the user can be notified that the task instance has disappeared via `Instance`.
-        task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED);
+            // Here the user can be notified that the task instance has disappeared via `Instance`.
+            task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED);
 
-        self.task_trace.quit_one_task_handler(task_id, record_id)
+            return self.task_trace.quit_one_task_handler(task_id, record_id);
+        }
+        Some(Err(anyhow!(
+            "Without the `task_mark_ref_mut` for task_id :{}, record_id : {}",
+            task_id,
+            record_id
+        )))
     }
 
     pub(crate) async fn maintain_task_status(
@@ -383,19 +388,23 @@ impl EventHandle {
         delay_task_handler_box: DelayTaskHandlerBox,
     ) {
         {
-            let mut task_mark = self.shared_header.task_flag_map.get_mut(&task_id).unwrap();
+            if let Some(mut task_mark) = self.shared_header.task_flag_map.get_mut(&task_id) {
+                let task_instances_chain_maintainer_option =
+                    task_mark.value_mut().get_task_instances_chain_maintainer();
 
-            let task_instances_chain_maintainer_option =
-                task_mark.value_mut().get_task_instances_chain_maintainer();
+                if let Some(task_instances_chain_maintainer) =
+                    task_instances_chain_maintainer_option
+                {
+                    let instance = Instance::default()
+                        .set_task_id(task_id)
+                        .set_record_id(delay_task_handler_box.get_record_id());
 
-            if let Some(task_instances_chain_maintainer) = task_instances_chain_maintainer_option {
-                let instance = Instance::default()
-                    .set_task_id(task_id)
-                    .set_record_id(delay_task_handler_box.get_record_id());
-
-                task_instances_chain_maintainer
-                    .push_instance(instance)
-                    .await;
+                    task_instances_chain_maintainer
+                        .push_instance(instance)
+                        .await;
+                }
+            } else {
+                error!("Missing task_mark for task_id : {}", task_id)
             }
         }
 

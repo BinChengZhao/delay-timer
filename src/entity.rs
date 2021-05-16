@@ -165,12 +165,13 @@ impl Default for DelayTimer {
 impl DelayTimerBuilder {
     /// Build DelayTimer.
     pub fn build(mut self) -> DelayTimer {
-        self.lauch();
+        self.lauch()
+            .expect("delay-timer The base task failed to launch.");
         self.init_delay_timer()
     }
 
     // Start the DelayTimer.
-    fn lauch(&mut self) {
+    fn lauch(&mut self) -> AnyResult<()> {
         let mut event_handle_builder = EventHandleBuilder::default();
         event_handle_builder
             .timer_event_receiver(self.get_timer_event_receiver())
@@ -182,7 +183,9 @@ impl DelayTimerBuilder {
             event_handle_builder.status_report_sender(self.get_status_report_sender());
         }
 
-        let event_handle = event_handle_builder.build();
+        let event_handle = event_handle_builder
+            .build()
+            .ok_or_else(|| anyhow!("Missing base component, can't initialize."))?;
 
         let timer = Timer::new(self.get_timer_event_sender(), self.shared_header.clone());
 
@@ -191,6 +194,8 @@ impl DelayTimerBuilder {
             #[cfg(feature = "tokio-support")]
             RuntimeKind::Tokio => self.assign_task_by_tokio(timer, event_handle),
         };
+
+        Ok(())
     }
 
     fn assign_task(&self, timer: Timer, event_handle: EventHandle) {
