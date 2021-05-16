@@ -17,18 +17,18 @@ pub struct StatusReporter {
 impl StatusReporter {
 
     /// Non-blocking get `PublicEvent` via `StatusReporter`.
-    pub fn next_public_event(&self) -> AnyResult<PublicEvent> {
+    pub fn next_public_event(&self) -> Result<PublicEvent, channel::TryRecvError> {
         let event = self.inner.try_recv()?;
         Ok(event)
     }
 
     /// Blocking get `PublicEvent` via `StatusReporter`.
-    pub fn next_public_event_with_wait(&self) -> AnyResult<PublicEvent> {
-        Ok(block_on(self.inner.recv())?)
+    pub fn next_public_event_with_wait(&self) -> Result<PublicEvent, channel::RecvError> {
+        block_on(self.inner.recv())
     }
 
     /// Async get `PublicEvent` via `StatusReporter`.
-    pub async fn next_public_event_with_async_wait(&self) -> AnyResult<PublicEvent> {
+    pub async fn next_public_event_with_async_wait(&self) -> Result<PublicEvent, channel::RecvError> {
         Ok(self.inner.recv().await?)
     }
 

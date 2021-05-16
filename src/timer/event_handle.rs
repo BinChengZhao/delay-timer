@@ -190,15 +190,21 @@ impl EventHandle {
                 return;
             }
             TimerEvent::AddTask(task) => {
-                let task_mark = self.add_task(task);
-                self.record_task_mark(task_mark);
+                self.add_task(task)
+                    .map(|task_mark| self.record_task_mark(task_mark))
+                    .map_err(|e| error!("{}", e))
+                    .ok();
             }
 
             TimerEvent::InsertTask(task, task_instances_chain_maintainer) => {
-                let mut task_mark = self.add_task(task);
-                task_mark.set_task_instances_chain_maintainer(task_instances_chain_maintainer);
-
-                self.record_task_mark(task_mark);
+                self.add_task(task)
+                    .map(|mut task_mark| {
+                        task_mark
+                            .set_task_instances_chain_maintainer(task_instances_chain_maintainer);
+                        self.record_task_mark(task_mark);
+                    })
+                    .map_err(|e| error!("{}", e))
+                    .ok();
             }
 
             TimerEvent::UpdateTask(task) => {
@@ -248,9 +254,13 @@ impl EventHandle {
     }
 
     // Add task to wheel_queue  slot
-    fn add_task(&mut self, mut task: Box<Task>) -> TaskMark {
+    fn add_task(&mut self, mut task: Box<Task>) -> AnyResult<TaskMark> {
         let second_hand = self.shared_header.second_hand.load(Acquire);
-        let exec_time: u64 = task.get_next_exec_timestamp();
+
+        let exec_time: u64 = task
+            .get_next_exec_timestamp()
+            .ok_or_else(|| anyhow!("can't get_next_exec_timestamp in {}", &task.task_id))?;
+
         let timestamp = self.shared_header.global_time.load(Acquire);
         let time_seed: u64 = exec_time
             .checked_sub(timestamp)
@@ -275,7 +285,7 @@ impl EventHandle {
             .set_slot_mark(slot_seed)
             .set_parallel_runable_num(0);
 
-        task_mart
+        Ok(task_mart)
     }
 
     // for record task-mark.

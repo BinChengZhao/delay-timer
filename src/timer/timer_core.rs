@@ -229,7 +229,10 @@ impl Timer {
 
                 if let Some(task) = task_option {
                     next_second_hand = (second_hand + 1) % DEFAULT_TIMER_SLOT_COUNT;
-                    self.maintain_task(task, timestamp, next_second_hand).await;
+                    self.maintain_task(task, timestamp, next_second_hand)
+                        .await
+                        .map_err(|e| error!("{}", e))
+                        .ok();
                 }
             }
 
@@ -255,7 +258,7 @@ impl Timer {
         mut task: Task,
         timestamp: u64,
         next_second_hand: u64,
-    ) -> Option<()> {
+    ) -> AnyResult<()> {
         let record_id: i64 = self
             .shared_header
             .id_generator
@@ -268,7 +271,13 @@ impl Timer {
             let parallel_runable_num: u64;
 
             {
-                let task_flag_map = self.shared_header.task_flag_map.get(&task_id)?;
+                let task_flag_map =
+                    self.shared_header
+                        .task_flag_map
+                        .get(&task_id)
+                        .ok_or_else(|| {
+                            anyhow!("Can't get task_flag_map for task : {}", task.task_id)
+                        })?;
                 parallel_runable_num = task_flag_map.value().get_parallel_runable_num();
             }
 
@@ -299,7 +308,7 @@ impl Timer {
 
         let task_valid = task.down_count_and_set_vaild();
         if !task_valid {
-            return Some(());
+            return Ok(());
         }
 
         self.handle_task(task, timestamp, next_second_hand, true)
@@ -314,11 +323,13 @@ impl Timer {
         timestamp: u64,
         next_second_hand: u64,
         update_runable_num: bool,
-    ) -> Option<()> {
+    ) -> AnyResult<()> {
         let task_id: u64 = task.task_id;
 
         // Next execute timestamp.
-        let task_excute_timestamp = task.get_next_exec_timestamp();
+        let task_excute_timestamp = task
+            .get_next_exec_timestamp()
+            .ok_or_else(|| anyhow!("can't get_next_exec_timestamp in task :{}", task.task_id))?;
 
         // Time difference + next second hand % DEFAULT_TIMER_SLOT_COUNT
         let step = task_excute_timestamp.checked_sub(timestamp).unwrap_or(1) + next_second_hand;
@@ -327,19 +338,28 @@ impl Timer {
         let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
 
         {
-            let mut slot_mut = self.shared_header.wheel_queue.get_mut(&slot_seed)?;
+            let mut slot_mut = self
+                .shared_header
+                .wheel_queue
+                .get_mut(&slot_seed)
+                .ok_or_else(|| anyhow!("can't slot_mut for slot :{}", slot_seed))?;
 
             slot_mut.value_mut().add_task(task);
         }
 
         {
-            let mut task_flag_map = self.shared_header.task_flag_map.get_mut(&task_id)?;
+            let mut task_flag_map = self
+                .shared_header
+                .task_flag_map
+                .get_mut(&task_id)
+                .ok_or_else(|| anyhow!("can't get task_flag_map for task :{}", task_id))?;
+
             task_flag_map.value_mut().set_slot_mark(slot_seed);
             if update_runable_num {
                 task_flag_map.value_mut().inc_parallel_runable_num();
             }
         }
-        Some(())
+        Ok(())
     }
 }
 

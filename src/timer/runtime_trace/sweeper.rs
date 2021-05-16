@@ -166,6 +166,8 @@ impl RecyclingBins {
 }
 
 mod tests {
+    #[allow(unused_imports)]
+    use anyhow::Result as AnyResult;
 
     #[test]
     fn test_task_valid() -> AnyResult<()> {

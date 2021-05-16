@@ -235,11 +235,11 @@ impl DelayTimerScheduleIteratorOwned {
     }
 
     #[inline(always)]
-    pub(crate) fn next(&mut self) -> i64 {
+    pub(crate) fn next(&mut self) -> Option<i64> {
         match self {
-            Self::Utc(ref mut iterator) => iterator.next().unwrap().timestamp(),
-            Self::Local(ref mut iterator) => iterator.next().unwrap().timestamp(),
-            Self::FixedOffset(ref mut iterator) => iterator.next().unwrap().timestamp(),
+            Self::Utc(ref mut iterator) => iterator.next().map(|e| e.timestamp()),
+            Self::Local(ref mut iterator) => iterator.next().map(|e| e.timestamp()),
+            Self::FixedOffset(ref mut iterator) => iterator.next().map(|e| e.timestamp()),
         }
     }
 
@@ -283,8 +283,7 @@ impl FrequencyInner {
         }
     }
 
-    fn next_alarm_timestamp(&mut self) -> i64 {
-        //TODO:handle error
+    fn next_alarm_timestamp(&mut self) -> Option<i64> {
         match self {
             FrequencyInner::CountDown(_, ref mut clock) => clock.next(),
             FrequencyInner::Repeated(ref mut clock) => clock.next(),
@@ -381,7 +380,7 @@ impl TaskContext {
                     finish_output,
                 }))
                 .await
-                .unwrap();
+                .unwrap_or_else(|e| error!("{}", e));
         }
     }
 }
@@ -646,43 +645,43 @@ impl Task {
         self.valid
     }
 
-    ///get_next_exec_timestamp
+    /// get_next_exec_timestamp
     #[inline(always)]
-    pub fn get_next_exec_timestamp(&mut self) -> u64 {
-        self.frequency.next_alarm_timestamp() as u64
+    pub fn get_next_exec_timestamp(&mut self) -> Option<u64> {
+        self.frequency.next_alarm_timestamp().map(|i| i as u64)
     }
 }
 
 mod tests {
+    #[allow(unused_imports)]
+    use anyhow::Result as AnyResult;
 
     #[test]
-    fn test_task_valid() {
+    fn test_task_valid() -> AnyResult<()> {
         use super::{Frequency, Task, TaskBuilder};
         use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder
-            .spawn(|_context| create_default_delay_task_handler())
-            .unwrap();
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
         assert!(!task.down_count_and_set_vaild());
+
+        Ok(())
     }
 
     #[test]
-    fn test_is_can_running() {
+    fn test_is_can_running() -> AnyResult<()> {
         use super::{Frequency, Task, TaskBuilder};
         use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder
-            .spawn(|_context| create_default_delay_task_handler())
-            .unwrap();
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
 
         assert!(task.is_can_running());
 
@@ -690,21 +689,21 @@ mod tests {
         assert!(!task.is_can_running());
 
         assert!(task.check_arrived());
+
+        Ok(())
     }
 
     // struct CandyCron
 
     #[test]
-    fn test_candy_cron() {
+    fn test_candy_cron() -> AnyResult<()> {
         use super::{CandyCron, CandyFrequency, Task, TaskBuilder};
         use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         //The third run returns to an invalid state.
         task_builder.set_frequency_by_candy(CandyFrequency::CountDown(5, CandyCron::Minutely));
-        let mut task: Task = task_builder
-            .spawn(|_context| create_default_delay_task_handler())
-            .unwrap();
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
 
         assert!(task.is_can_running());
 
@@ -712,10 +711,11 @@ mod tests {
         assert!(!task.is_can_running());
 
         assert!(task.check_arrived());
+        Ok(())
     }
 
     #[test]
-    fn test_analyze_cron_expression() {
+    fn test_analyze_cron_expression() -> AnyResult<()> {
         use super::{DelayTimerScheduleIteratorOwned, ScheduleIteratorTimeZone};
         use std::thread::sleep;
         use std::time::Duration;
@@ -723,8 +723,7 @@ mod tests {
         let mut schedule_iterator_first = DelayTimerScheduleIteratorOwned::analyze_cron_expression(
             ScheduleIteratorTimeZone::Utc,
             "0/3 * * * * * *",
-        )
-        .unwrap();
+        )?;
 
         sleep(Duration::from_secs(5));
 
@@ -732,13 +731,14 @@ mod tests {
             DelayTimerScheduleIteratorOwned::analyze_cron_expression(
                 ScheduleIteratorTimeZone::Utc,
                 "0/3 * * * * * *",
-            )
-            .unwrap();
+            )?;
 
         // Two different starting values should not be the same.
         assert_ne!(
             schedule_iterator_first.next(),
             schedule_iterator_second.next()
         );
+
+        Ok(())
     }
 }
