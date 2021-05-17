@@ -1,11 +1,11 @@
 extern crate autocfg;
 
 use autocfg::emit;
-use rustc_version::{version, version_meta, Channel, Version};
+use rustc_version::{version, version_meta, Channel, Result, Version};
 
-fn main() {
+fn main() -> Result<()> {
     // Set cfg flags depending on release channel
-    match version_meta().unwrap().channel {
+    match version_meta()?.channel {
         Channel::Stable => {
             println!("cargo:rustc-cfg=RUSTC_IS_STABLE");
         }
@@ -22,11 +22,12 @@ fn main() {
     }
 
     // Check for a minimum version
-    if version().unwrap() >= Version::parse("1.51.0").unwrap() {
+    if version()? >= Version::parse("1.51.0")? {
         println!("cargo:rustc-cfg=SPLIT_INCLUSIVE_COMPATIBLE");
     }
 
     // (optional) We don't need to rerun for anything external.
     // In order to see the compilation parameters at `cargo check --verbose` time, keep it.
     autocfg::rerun_path("build.rs");
+    Ok(())
 }

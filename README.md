@@ -39,7 +39,7 @@ fn main() -> Result<()> {
 
     // Develop a print job that runs in an asynchronous cycle.
     // A chain of task instances.
-    let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+    let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 
     // Get the running instance of task 1.
     let task_instance = task_instance_chain.next_with_wait()?;
@@ -56,7 +56,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_task_async_print() -> Task {
+fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = create_async_fn_body!({
@@ -72,7 +72,6 @@ fn build_task_async_print() -> Task {
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
         .set_maximun_parallel_runable_num(2)
         .spawn(body)
-        .unwrap()
 }
 
  ```
@@ -96,7 +95,7 @@ async fn main() -> Result<()> {
     let delay_timer = DelayTimerBuilder::default().build();
 
     // Develop a print job that runs in an asynchronous cycle.
-    let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+    let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 
     // Get the running instance of task 1.
     let task_instance = task_instance_chain.next_with_async_wait().await?;
@@ -112,7 +111,7 @@ async fn main() -> Result<()> {
     delay_timer.stop_delay_timer()
 }
 
-fn build_task_async_print() -> Task {
+fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = create_async_fn_body!({
@@ -128,7 +127,6 @@ fn build_task_async_print() -> Task {
         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
         .set_maximun_parallel_runable_num(2)
         .spawn(body)
-        .unwrap()
 }
 
 
@@ -161,8 +159,7 @@ fn build_task_async_print() -> Task {
      .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
      .set_task_id(1)
      .set_maximun_parallel_runable_num(3)
-     .spawn(body)
-     .unwrap();
+     .spawn(body)?;
 
  delay_timer.add_task(task);
 
@@ -176,7 +173,7 @@ fn build_task_async_print() -> Task {
  use delay_timer::prelude::*;
  use hyper::{Client, Uri};
 
-fn build_task_customized_async_task() -> Task {
+fn build_task_customized_async_task() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = generate_closure_template("delay_timer is easy to use. .".into());
@@ -185,7 +182,6 @@ fn build_task_customized_async_task() -> Task {
         .set_task_id(5)
         .set_maximum_running_time(5)
         .spawn(body)
-        .unwrap()
 }
 
 pub fn generate_closure_template(

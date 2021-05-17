@@ -254,7 +254,7 @@ impl TaskInstancesChain {
 
         self.timer_event_sender
             .clone()
-            .ok_or( HandleInstanceError::MisEventSender)
+            .ok_or(HandleInstanceError::MisEventSender)
     }
 }
 

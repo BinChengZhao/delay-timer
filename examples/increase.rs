@@ -101,8 +101,9 @@ fn get_wake_fn(
 
 fn get_async_fn() -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
     create_async_fn_body!({
-        let mut res = surf::get("https://httpbin.org/get").await.unwrap();
-        let body_str = res.body_string().await.unwrap();
-        println!("{}", body_str);
+        if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
+            let body_str = res.body_string().await.unwrap_or_default();
+            println!("{}", body_str);
+        }
     })
 }

@@ -4,6 +4,14 @@ use crate::prelude::*;
 
 /// Error enumeration for Cron expression parsing.
 #[derive(Error, Debug)]
+pub enum TaskError {
+    /// Error variant for Cron expression parsing.
+    #[error("Cron expression analysis error.")]
+    CronExpressionAnalyzeError(#[from] CronExpressionAnalyzeError),
+}
+
+/// Error enumeration for Cron expression parsing.
+#[derive(Error, Debug)]
 pub enum CronExpressionAnalyzeError {
     /// Access to thread local storage failed.
     #[error("Thread local storage access failed.")]

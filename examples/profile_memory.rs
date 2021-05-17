@@ -12,7 +12,7 @@ struct RequstBody {
 impl RequstBody {
     fn fake_request_body() -> Self {
         let string_buf = [16u16, 16u16, 16u16].repeat(10000);
-        let cron_expression = String::from_utf16(&string_buf).unwrap();
+        let cron_expression = String::from_utf16(&string_buf).unwrap_or_default();
         Self {
             cron_expression,
             ..Default::default()
@@ -45,7 +45,9 @@ fn main() {
     sleep(Duration::from_secs(25));
 
     for _ in 0..capacity {
-        task_builder_vec.pop().unwrap().free();
+        if let Some(mut task_builder) = task_builder_vec.pop() {
+            task_builder.free();
+        }
     }
 
     drop(task_builder_vec);

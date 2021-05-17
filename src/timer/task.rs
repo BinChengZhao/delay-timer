@@ -506,9 +506,7 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Spawn a task.
-    // TODO: Create new Error.
-
-    pub fn spawn<F>(self, body: F) -> Result<Task, CronExpressionAnalyzeError>
+    pub fn spawn<F>(self, body: F) -> Result<Task, TaskError>
     where
         F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {

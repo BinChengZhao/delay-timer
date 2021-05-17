@@ -22,7 +22,7 @@ fn sync_cancel() -> Result<()> {
     let delay_timer = DelayTimerBuilder::default().build();
 
     // A chain of task instances.
-    let instance_chain = delay_timer.insert_task(build_task_async_print())?;
+    let instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 
     // Get the next task instance and cancel it immediately after getting it.
     instance_chain.next_with_wait()?.cancel_with_wait()?;
@@ -33,7 +33,7 @@ fn sync_cancel() -> Result<()> {
 /// In Asynchronous Context.
 fn async_cancel() -> Result<()> {
     // Customize a tokio runtime.
-    let tokio_rt = Arc::new(Runtime::new().unwrap());
+    let tokio_rt = Arc::new(Runtime::new()?);
 
     // Build an DelayTimer that uses the Customize a tokio runtime.
     let delay_timer = DelayTimerBuilder::default()
@@ -42,11 +42,11 @@ fn async_cancel() -> Result<()> {
 
     tokio_rt.block_on(async {
         // A chain of print-task instances.
-        let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+        let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 
         // A chain of shell-task instances.
         let shell_task_instance_chain =
-            delay_timer.insert_task(build_task_async_execute_process())?;
+            delay_timer.insert_task(build_task_async_execute_process()?)?;
 
         // Get the next print-task instance and cancel it immediately after getting it.
         let cancel_print_task_instance = async {
@@ -72,7 +72,7 @@ fn async_cancel() -> Result<()> {
     })
 }
 
-fn build_task_async_print() -> Task {
+fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = create_async_fn_body!({
@@ -88,10 +88,9 @@ fn build_task_async_print() -> Task {
         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
         .set_maximun_parallel_runable_num(2)
         .spawn(body)
-        .unwrap()
 }
 
-fn build_task_async_execute_process() -> Task {
+fn build_task_async_execute_process() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = tokio_unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
@@ -101,5 +100,4 @@ fn build_task_async_execute_process() -> Task {
         .set_maximum_running_time(10)
         .set_maximun_parallel_runable_num(1)
         .spawn(body)
-        .unwrap()
 }
