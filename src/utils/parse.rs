@@ -48,6 +48,11 @@ pub mod shell_command {
                     self
                 }
 
+                fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self {
+                    self.stderr(cfg);
+                    self
+                }
+
                 fn spawn(&mut self) -> AnyResult<$child> {
                     Ok(self.spawn()?)
                 }
@@ -73,6 +78,9 @@ pub mod shell_command {
 
         /// Configuration for the child process's standard output (stdout) handle.
         fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
+
+        /// Configuration for the child process's standard error (stderr) handle.
+        fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Self;
 
         /// Executes the command as a child process, returning a handle to it.
         fn spawn(&mut self) -> AnyResult<Child>;
@@ -244,9 +252,8 @@ pub mod shell_command {
             }
 
             let mut output = Command::new(command);
-            output.args(args).stdin(stdin);
+            output.args(args).stdin(stdin).stderr(Stdio::piped());
 
-            // TODO: A separate pipe redirection for stderr.
             let process: Child;
             let end_flag = if let Some(stdout_result) = check_redirect_result {
                 let stdout = stdout_result?;
@@ -265,6 +272,7 @@ pub mod shell_command {
                 //     // there should be a default file to record it.
                 //     stdout = Stdio::inherit();
                 // };
+
                 process = output.stdout(stdout).spawn()?;
                 false
             };
