@@ -4,6 +4,7 @@ use crate::prelude::*;
 
 /// Error enumeration for Cron expression parsing.
 #[derive(Error, Debug)]
+// TODO: Added implementation of Trait for PartialEq, Eq, Clone, etc.
 pub enum TaskError {
     /// Error variant for Cron expression parsing.
     #[error("Cron expression analysis error.")]
@@ -22,7 +23,7 @@ pub enum CronExpressionAnalyzeError {
 }
 
 /// Error enumeration for Handle Instance.
-#[derive(Error, Debug)]
+#[derive(Error, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum HandleInstanceError {
     /// Missing event sender `timer_event_sender`.
     #[error("Missing `timer_event_sender`.")]
