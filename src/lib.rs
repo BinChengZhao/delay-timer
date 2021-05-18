@@ -54,7 +54,7 @@
 //!     Ok(())
 //! }
 //!
-//! fn build_task_async_print() -> Task {
+//! fn build_task_async_print() -> Result<Task, TaskError> {
 //!     let mut task_builder = TaskBuilder::default();
 //!
 //!     let body = create_async_fn_body!({
@@ -70,7 +70,6 @@
 //!         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
 //!         .set_maximun_parallel_runable_num(2)
 //!         .spawn(body)
-//!         .unwrap()
 //! }
 //!
 //! ```
@@ -111,7 +110,7 @@
 //!     delay_timer.stop_delay_timer()
 //! }
 //!
-//! fn build_task_async_print() -> Task {
+//! fn build_task_async_print() -> Result<Task, TaskError> {
 //!     let mut task_builder = TaskBuilder::default();
 //!
 //!     let body = create_async_fn_body!({
@@ -127,7 +126,6 @@
 //!         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
 //!         .set_maximun_parallel_runable_num(2)
 //!         .spawn(body)
-//!         .unwrap()
 //! }
 //!
 //!
@@ -163,10 +161,9 @@
 //!     .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
 //!     .set_task_id(1)
 //!     .set_maximun_parallel_runable_num(3)
-//!     .spawn(body)
-//!     .unwrap();
+//!     .spawn(body)?;
 //!
-//! delay_timer.add_task(task).unwrap();
+//! delay_timer.add_task(task).ok();
 //!
 //! ```
 //!
@@ -192,7 +189,7 @@
 //!
 //!
 //!
-//! fn build_task(mut task_builder: TaskBuilder) -> Task {
+//! fn build_task(mut task_builder: TaskBuilder) -> Result<Task, TaskError> {
 //!     let body = generate_closure_template(String::from("dynamic"));
 //!
 //!     task_builder
@@ -200,7 +197,6 @@
 //!         .set_task_id(2)
 //!         .set_maximum_running_time(5)
 //!         .spawn(body)
-//!         .unwrap()
 //! }
 //!
 //! pub fn generate_closure_template(
@@ -218,15 +214,15 @@
 //!     }
 //! }
 //!
-//! pub async fn async_template(id: i32, name: String) {
+//! pub async fn async_template(id: i32, name: String) -> AnyResult<()> {
 //!     let client = Client::new();
 //!
 //!     let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
-//!     let uri: Uri = url.parse().unwrap();
-//!     let res = client.get(uri).await.unwrap();
+//!     let uri: Uri = url.parse()?;
+//!     let res = client.get(uri).await?;
 //!     println!("Response: {}", res.status());
 //!     // Concatenate the body stream into a single buffer...
-//!     let buf = hyper::body::to_bytes(res).await.unwrap();
+//!     let buf = hyper::body::to_bytes(res).await?;
 //!     println!("body: {:?}", buf);
 //! }
 //!
@@ -252,9 +248,11 @@
 #[macro_use]
 pub mod macros;
 pub mod entity;
+pub mod error;
 pub mod prelude;
 pub mod timer;
 pub mod utils;
 
 pub use anyhow;
 pub use cron_clock;
+pub use snowflake;

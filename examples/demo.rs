@@ -11,16 +11,16 @@ fn main() -> Result<()> {
     let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
 
     // Develop a print job that runs in an asynchronous cycle.
-    let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+    let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 
     // Develop an http request task that runs in an asynchronous cycle.
-    delay_timer.add_task(build_task_async_request())?;
+    delay_timer.add_task(build_task_async_request()?)?;
 
     // Develop a php script task that runs in an asynchronous cycle.
-    delay_timer.add_task(build_task_async_execute_process())?;
+    delay_timer.add_task(build_task_async_execute_process()?)?;
 
     // Develop a task that runs in an asynchronous cycle (using a custom asynchronous template).
-    delay_timer.add_task(build_task_customized_async_task())?;
+    delay_timer.add_task(build_task_customized_async_task()?)?;
 
     // Get the running instance of task 1.
     let task_instance = task_instance_chain.next_with_wait()?;
@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     delay_timer.remove_task(1)?;
 
     // Develop a task that runs in an asynchronous cycle to wake up the current thread.
-    delay_timer.add_task(build_wake_task())?;
+    delay_timer.add_task(build_wake_task()?)?;
 
     park();
 
@@ -42,7 +42,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_task_async_print() -> Task {
+fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = create_async_fn_body!({
@@ -58,18 +58,18 @@ fn build_task_async_print() -> Task {
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
         .set_maximun_parallel_runable_num(2)
         .spawn(body)
-        .unwrap()
 }
 
-fn build_task_async_request() -> Task {
+fn build_task_async_request() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = create_async_fn_body!({
-        let mut res = surf::get("https://httpbin.org/get").await.unwrap();
-        dbg!(res.body_string().await.unwrap());
+        if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
+            dbg!(res.body_string().await.unwrap_or_default());
 
-        Timer::after(Duration::from_secs(3)).await;
-        dbg!("Task2 is done.");
+            Timer::after(Duration::from_secs(3)).await;
+            dbg!("Task2 is done.");
+        }
     });
 
     task_builder
@@ -77,10 +77,9 @@ fn build_task_async_request() -> Task {
         .set_task_id(2)
         .set_maximum_running_time(5)
         .spawn(body)
-        .unwrap()
 }
 
-fn build_task_async_execute_process() -> Task {
+fn build_task_async_execute_process() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
@@ -89,10 +88,9 @@ fn build_task_async_execute_process() -> Task {
         .set_task_id(3)
         .set_maximum_running_time(5)
         .spawn(body)
-        .unwrap()
 }
 
-fn build_task_customized_async_task() -> Task {
+fn build_task_customized_async_task() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = generate_closure_template("delay_timer is easy to use. .".into());
@@ -101,7 +99,6 @@ fn build_task_customized_async_task() -> Task {
         .set_task_id(5)
         .set_maximum_running_time(5)
         .spawn(body)
-        .unwrap()
 }
 
 pub fn generate_closure_template(
@@ -111,22 +108,21 @@ pub fn generate_closure_template(
         let future_inner = async_template(get_timestamp() as i32, name.clone());
 
         let future = async move {
-            future_inner.await.unwrap();
+            future_inner.await;
             context.finishe_task(None).await;
         };
         create_delay_task_handler(async_spawn(future))
     }
 }
 
-pub async fn async_template(id: i32, name: String) -> Result<()> {
+pub async fn async_template(id: i32, name: String) {
     let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
-    let mut res = surf::get(url).await.unwrap();
-    dbg!(res.body_string().await.unwrap());
-
-    Ok(())
+    if let Ok(mut res) = surf::get(url).await {
+        dbg!(res.body_string().await.unwrap_or_default());
+    }
 }
 
-fn build_wake_task() -> Task {
+fn build_wake_task() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let thread: Thread = current();
@@ -141,7 +137,6 @@ fn build_wake_task() -> Task {
         .set_task_id(700)
         .set_maximum_running_time(50)
         .spawn(body)
-        .unwrap()
 }
 
 // Custom cron-expression syntax sugar mapping.

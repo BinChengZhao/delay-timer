@@ -24,10 +24,9 @@ use std::sync::Arc;
 use std::thread::Builder;
 use std::time::SystemTime;
 
-use anyhow::{Context, Result};
 use futures::executor::block_on;
 use smol::channel::unbounded;
-use snowflake::SnowflakeIdBucket;
+use snowflake::SnowflakeIdGenerator;
 
 cfg_tokio_support!(
     use tokio::runtime::{Builder as TokioBuilder, Runtime};
@@ -36,11 +35,12 @@ cfg_tokio_support!(
 
 cfg_status_report!(
     use crate::utils::status_report::StatusReporter;
-    use anyhow::anyhow;
 );
 
 // Set it. Motivation to move forward.
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
+// Global IdGenerator.
+pub(crate) type SharedIdGenerator = Arc<AsyncMutex<SnowflakeIdGenerator>>;
 // Global sencond hand.
 pub(crate) type SencondHand = Arc<AtomicU64>;
 // Global Timestamp.
@@ -99,7 +99,7 @@ pub struct SharedHeader {
     // RuntimeInstance
     pub(crate) runtime_instance: RuntimeInstance,
     // Unique id generator.
-    pub(crate) snowflakeid_bucket: SnowflakeIdBucket,
+    pub(crate) id_generator: SharedIdGenerator,
 }
 
 impl fmt::Debug for SharedHeader {
@@ -109,7 +109,7 @@ impl fmt::Debug for SharedHeader {
             .field(&self.global_time)
             .field(&self.shared_motivation)
             .field(&self.runtime_instance)
-            .field(&self.snowflakeid_bucket)
+            .field(&self.id_generator)
             .finish()
     }
 }
@@ -142,7 +142,7 @@ impl Default for SharedHeader {
         let global_time = Arc::new(AtomicU64::new(get_timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
         let runtime_instance = RuntimeInstance::default();
-        let snowflakeid_bucket = SnowflakeIdBucket::new(1, 1);
+        let id_generator = Arc::new(AsyncMutex::new(SnowflakeIdGenerator::new(1, 1)));
 
         SharedHeader {
             wheel_queue,
@@ -151,7 +151,7 @@ impl Default for SharedHeader {
             global_time,
             shared_motivation,
             runtime_instance,
-            snowflakeid_bucket,
+            id_generator,
         }
     }
 }
@@ -165,12 +165,13 @@ impl Default for DelayTimer {
 impl DelayTimerBuilder {
     /// Build DelayTimer.
     pub fn build(mut self) -> DelayTimer {
-        self.lauch();
+        self.lauch()
+            .expect("delay-timer The base task failed to launch.");
         self.init_delay_timer()
     }
 
     // Start the DelayTimer.
-    fn lauch(&mut self) {
+    fn lauch(&mut self) -> AnyResult<()> {
         let mut event_handle_builder = EventHandleBuilder::default();
         event_handle_builder
             .timer_event_receiver(self.get_timer_event_receiver())
@@ -182,7 +183,9 @@ impl DelayTimerBuilder {
             event_handle_builder.status_report_sender(self.get_status_report_sender());
         }
 
-        let event_handle = event_handle_builder.build();
+        let event_handle = event_handle_builder
+            .build()
+            .ok_or_else(|| anyhow!("Missing base component, can't initialize."))?;
 
         let timer = Timer::new(self.get_timer_event_sender(), self.shared_header.clone());
 
@@ -191,6 +194,8 @@ impl DelayTimerBuilder {
             #[cfg(feature = "tokio-support")]
             RuntimeKind::Tokio => self.assign_task_by_tokio(timer, event_handle),
         };
+
+        Ok(())
     }
 
     fn assign_task(&self, timer: Timer, event_handle: EventHandle) {
@@ -262,13 +267,16 @@ impl DelayTimer {
     }
 
     /// Add a task in timer_core by event-channel.
-    pub fn add_task(&self, task: Task) -> Result<()> {
+    pub fn add_task(&self, task: Task) -> Result<(), channel::TrySendError<TimerEvent>> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
     /// Add a task in timer_core by event-channel.
     /// But it will return a handle that can constantly take out new instances of the task.
-    pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain> {
+    pub fn insert_task(
+        &self,
+        task: Task,
+    ) -> Result<TaskInstancesChain, channel::TrySendError<TimerEvent>> {
         let (mut task_instances_chain, task_instances_chain_maintainer) =
             task_instance_chain_pair();
         task_instances_chain.timer_event_sender = Some(self.timer_event_sender.clone());
@@ -281,31 +289,43 @@ impl DelayTimer {
     }
 
     /// Update a task in timer_core by event-channel.
-    pub fn update_task(&self, task: Task) -> Result<()> {
+    pub fn update_task(&self, task: Task) -> Result<(), channel::TrySendError<TimerEvent>> {
         self.seed_timer_event(TimerEvent::UpdateTask(Box::new(task)))
     }
 
     /// Remove a task in timer_core by event-channel.
-    pub fn remove_task(&self, task_id: u64) -> Result<()> {
+    pub fn remove_task(&self, task_id: u64) -> Result<(), channel::TrySendError<TimerEvent>> {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
     /// Cancel a task in timer_core by event-channel.
     /// `Cancel` is for instances derived from the task running up.
-    pub fn cancel_task(&self, task_id: u64, record_id: i64) -> Result<()> {
+    pub fn cancel_task(
+        &self,
+        task_id: u64,
+        record_id: i64,
+    ) -> Result<(), channel::TrySendError<TimerEvent>> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 
     /// Stop DelayTimer, running tasks are not affected.
-    pub fn stop_delay_timer(&self) -> Result<()> {
+    pub fn stop_delay_timer(&self) -> Result<(), channel::TrySendError<TimerEvent>> {
         self.seed_timer_event(TimerEvent::StopTimer)
     }
 
+    /// Set internal id-generator for `machine_id` and `node_id`.
+    /// Add a new api in the future to support passing a custom id generator.
+    /// The id-generator is mainly used for binding unique record ids to internal events, for user collection, and for tracking task dynamics.
+    pub fn update_id_generator_conf(&self, machine_id: i32, node_id: i32) {
+        let mut id_generator = block_on(self.shared_header.id_generator.lock());
+
+        id_generator.machine_id = machine_id;
+        id_generator.node_id = node_id;
+    }
+
     /// Send a event to event-handle.
-    fn seed_timer_event(&self, event: TimerEvent) -> Result<()> {
-        self.timer_event_sender
-            .try_send(event)
-            .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+    fn seed_timer_event(&self, event: TimerEvent) -> Result<(), channel::TrySendError<TimerEvent>> {
+        self.timer_event_sender.try_send(event)
     }
 }
 
@@ -425,12 +445,13 @@ cfg_status_report!(
         }
 
         /// Access to public events through DelayTimer.
-        pub fn get_public_event(&self) -> anyhow::Result<PublicEvent> {
-            if let Some(status_reporter) = self.status_reporter.as_ref() {
-                return status_reporter.next_public_event();
+        pub fn get_public_event(&self) -> Result<PublicEvent, channel::TryRecvError> {
+
+            if let Some(status_reporter_ref) = self.status_reporter.as_ref(){
+               return status_reporter_ref.next_public_event();
             }
 
-            Err(anyhow!("Have no status-reporter."))
+            Err(channel::TryRecvError::Closed)
         }
     }
 

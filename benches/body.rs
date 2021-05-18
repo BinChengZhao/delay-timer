@@ -42,16 +42,24 @@ fn bench_maintain_task(b: &mut Bencher) {
 
     // `task_builder.spawn(body)` is about 1500 ns .
     // So maintain_task takes (result of bench - task_spawn)ns.  about 1000ns.
-    b.iter(|| block_on(timer.maintain_task(task_builder.spawn(body).unwrap(), 1, 1)));
+    b.iter(|| {
+        block_on({
+            async {
+                if let Ok(task) = task_builder.spawn(body) {
+                    timer.maintain_task(task, 1, 1).await.ok();
+                }
+            }
+        })
+    });
 }
 
 #[bench]
 fn bench_try_wait(b: &mut Bencher) {
     use std::process::Command;
 
-    let mut child = Command::new("ps").spawn().unwrap();
-
-    b.iter(|| child.try_wait());
+    if let Ok(mut child) = Command::new("ps").spawn() {
+        b.iter(|| child.try_wait());
+    }
 }
 
 #[bench]

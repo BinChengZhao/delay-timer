@@ -205,7 +205,7 @@ impl TaskInstancesChainMaintainer {
 }
 impl TaskInstancesChain {
     /// Non-blocking get the next task instance.
-    pub fn next(&self) -> AnyResult<TaskInstance> {
+    pub fn next(&self) -> Result<TaskInstance, HandleInstanceError> {
         let timer_event_sender = self.get_timer_event_sender()?;
 
         Ok(self
@@ -218,7 +218,7 @@ impl TaskInstancesChain {
     }
 
     /// Blocking get the next task instance.
-    pub fn next_with_wait(&self) -> AnyResult<TaskInstance> {
+    pub fn next_with_wait(&self) -> Result<TaskInstance, HandleInstanceError> {
         let timer_event_sender = self.get_timer_event_sender()?;
 
         let instance = block_on(self.inner_receiver.recv())?;
@@ -230,7 +230,7 @@ impl TaskInstancesChain {
     }
 
     /// Async-await get the next task instance.
-    pub async fn next_with_async_wait(&self) -> AnyResult<TaskInstance> {
+    pub async fn next_with_async_wait(&self) -> Result<TaskInstance, HandleInstanceError> {
         let timer_event_sender = self.get_timer_event_sender()?;
 
         let instance = self.inner_receiver.recv().await?;
@@ -247,16 +247,14 @@ impl TaskInstancesChain {
         self.inner_state.load(Ordering::Acquire)
     }
 
-    fn get_timer_event_sender(&self) -> AnyResult<Sender<TimerEvent>> {
+    fn get_timer_event_sender(&self) -> Result<Sender<TimerEvent>, HandleInstanceError> {
         if self.get_state() == state::instance_chain::ABANDONED {
-            return Err(anyhow!(
-                "Running instance of the task is no longer maintained."
-            ));
+            return Err(HandleInstanceError::Expired);
         }
 
         self.timer_event_sender
             .clone()
-            .ok_or_else(|| anyhow!("without `timer_event_sender`."))
+            .ok_or(HandleInstanceError::MisEventSender)
     }
 }
 

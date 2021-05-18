@@ -8,12 +8,11 @@ use std::fmt;
 use std::fmt::Pointer;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
-use std::thread::AccessError;
 
 use cron_clock::{Schedule, ScheduleIteratorOwned, Utc};
 use lru::LruCache;
 
-//TODO: Add doc.
+// Parsing cache for cron expressions, stored with thread-local storage.
 thread_local!(static CRON_EXPRESSION_CACHE: RefCell<LruCache<ScheduleIteratorTimeZoneQuery, DelayTimerScheduleIteratorOwned>> = RefCell::new(LruCache::new(256)));
 
 // TaskMark is used to maintain the status of running tasks.
@@ -129,6 +128,13 @@ pub enum Frequency<'a> {
     /// Type of countdown.
     CountDown(u32, &'a str),
 }
+
+impl<'a> Default for Frequency<'a> {
+    fn default() -> Frequency<'a> {
+        Frequency::Once("@minutely")
+    }
+}
+
 /// Iterator for task internal control of execution time.
 #[derive(Debug, Clone)]
 pub(crate) enum FrequencyInner {
@@ -198,26 +204,20 @@ impl DelayTimerScheduleIteratorOwned {
             time_zone,
             ref cron_expression,
         }: ScheduleIteratorTimeZoneQuery,
-    ) -> DelayTimerScheduleIteratorOwned {
-        match time_zone {
+    ) -> Result<DelayTimerScheduleIteratorOwned, cron_error::Error> {
+        Ok(match time_zone {
             ScheduleIteratorTimeZone::Utc => DelayTimerScheduleIteratorOwned::Utc(
-                Schedule::from_str(cron_expression)
-                    .unwrap()
-                    .upcoming_owned(Utc),
+                Schedule::from_str(cron_expression)?.upcoming_owned(Utc),
             ),
             ScheduleIteratorTimeZone::Local => DelayTimerScheduleIteratorOwned::Local(
-                Schedule::from_str(cron_expression)
-                    .unwrap()
-                    .upcoming_owned(Local),
+                Schedule::from_str(cron_expression)?.upcoming_owned(Local),
             ),
             ScheduleIteratorTimeZone::FixedOffset(fixed_offset) => {
                 DelayTimerScheduleIteratorOwned::FixedOffset(
-                    Schedule::from_str(cron_expression)
-                        .unwrap()
-                        .upcoming_owned(fixed_offset),
+                    Schedule::from_str(cron_expression)?.upcoming_owned(fixed_offset),
                 )
             }
-        }
+        })
     }
 
     #[inline(always)]
@@ -235,11 +235,11 @@ impl DelayTimerScheduleIteratorOwned {
     }
 
     #[inline(always)]
-    pub(crate) fn next(&mut self) -> i64 {
+    pub(crate) fn next(&mut self) -> Option<i64> {
         match self {
-            Self::Utc(ref mut iterator) => iterator.next().unwrap().timestamp(),
-            Self::Local(ref mut iterator) => iterator.next().unwrap().timestamp(),
-            Self::FixedOffset(ref mut iterator) => iterator.next().unwrap().timestamp(),
+            Self::Utc(ref mut iterator) => iterator.next().map(|e| e.timestamp()),
+            Self::Local(ref mut iterator) => iterator.next().map(|e| e.timestamp()),
+            Self::FixedOffset(ref mut iterator) => iterator.next().map(|e| e.timestamp()),
         }
     }
 
@@ -247,7 +247,7 @@ impl DelayTimerScheduleIteratorOwned {
     fn analyze_cron_expression(
         time_zone: ScheduleIteratorTimeZone,
         cron_expression: &str,
-    ) -> Result<DelayTimerScheduleIteratorOwned, AccessError> {
+    ) -> Result<DelayTimerScheduleIteratorOwned, CronExpressionAnalyzeError> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
         let schedule_iterator_time_zone_query: ScheduleIteratorTimeZoneQuery =
             ScheduleIteratorTimeZoneQuery {
@@ -255,7 +255,7 @@ impl DelayTimerScheduleIteratorOwned {
                 time_zone,
             };
 
-        CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
+        let analyze_result = CRON_EXPRESSION_CACHE.try_with(|expression_cache| {
             let mut lru_cache = expression_cache.borrow_mut();
             if let Some(schedule_iterator) = lru_cache.get(&schedule_iterator_time_zone_query) {
                 let mut schedule_iterator_copy = schedule_iterator.clone();
@@ -263,13 +263,19 @@ impl DelayTimerScheduleIteratorOwned {
                 // Reset the internal base time to avoid expiration time during internal iterations.
                 schedule_iterator_copy.refresh_previous_datetime(time_zone);
 
-                return schedule_iterator_copy;
+                return Ok(schedule_iterator_copy);
             }
-            let task_schedule =
+
+            let new_result =
                 DelayTimerScheduleIteratorOwned::new(schedule_iterator_time_zone_query.clone());
-            lru_cache.put(schedule_iterator_time_zone_query, task_schedule.clone());
-            task_schedule
-        })
+
+            new_result.map(|task_schedule| {
+                lru_cache.put(schedule_iterator_time_zone_query, task_schedule.clone());
+                task_schedule
+            })
+        })?;
+
+        Ok(analyze_result?)
     }
 }
 
@@ -283,8 +289,7 @@ impl FrequencyInner {
         }
     }
 
-    fn next_alarm_timestamp(&mut self) -> i64 {
-        //TODO:handle error
+    fn next_alarm_timestamp(&mut self) -> Option<i64> {
         match self {
             FrequencyInner::CountDown(_, ref mut clock) => clock.next(),
             FrequencyInner::Repeated(ref mut clock) => clock.next(),
@@ -311,7 +316,7 @@ impl FrequencyInner {
 /// Cycle plan task builder.
 pub struct TaskBuilder<'a> {
     /// Repeat type.
-    frequency: Option<Frequency<'a>>,
+    frequency: Frequency<'a>,
 
     /// Task_id should unique.
     task_id: u64,
@@ -381,7 +386,7 @@ impl TaskContext {
                     finish_output,
                 }))
                 .await
-                .unwrap();
+                .unwrap_or_else(|e| error!("{}", e));
         }
     }
 }
@@ -389,8 +394,7 @@ impl TaskContext {
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
 impl fmt::Debug for SafeStructBoxedFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <&Self as Pointer>::fmt(&self, f).unwrap();
-        Ok(())
+        <&Self as Pointer>::fmt(&self, f)
     }
 }
 
@@ -426,7 +430,7 @@ impl<'a> TaskBuilder<'a> {
     /// Set task Frequency.
     #[inline(always)]
     pub fn set_frequency(&mut self, frequency: Frequency<'a>) -> &mut Self {
-        self.frequency = Some(frequency);
+        self.frequency = frequency;
         self
     }
 
@@ -463,7 +467,7 @@ impl<'a> TaskBuilder<'a> {
             ),
         };
 
-        self.frequency = Some(frequency);
+        self.frequency = frequency;
         self
     }
 
@@ -502,14 +506,14 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Spawn a task.
-    pub fn spawn<F>(self, body: F) -> Result<Task, AccessError>
+    pub fn spawn<F>(self, body: F) -> Result<Task, TaskError>
     where
         F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
     {
         let frequency_inner;
 
         // The user inputs are pattern matched for different repetition types.
-        let (expression_str, repeat_type) = match self.frequency.unwrap() {
+        let (expression_str, repeat_type) = match self.frequency {
             Frequency::Once(expression_str) => (expression_str, RepeatType::Num(1)),
             Frequency::Repeated(expression_str) => (expression_str, RepeatType::Always),
             Frequency::CountDown(exec_count, expression_str) => {
@@ -553,16 +557,14 @@ impl<'a> TaskBuilder<'a> {
     /// So I can't go through Drop and handle these automatically.
     pub fn free(&mut self) {
         if self.build_by_candy_str {
-            if let Some(frequency) = self.frequency {
-                let s = match frequency {
-                    Frequency::Once(s) => s,
-                    Frequency::Repeated(s) => s,
-                    Frequency::CountDown(_, s) => s,
-                };
+            let s = match self.frequency {
+                Frequency::Once(s) => s,
+                Frequency::Repeated(s) => s,
+                Frequency::CountDown(_, s) => s,
+            };
 
-                unsafe {
-                    Box::from_raw(std::mem::transmute::<&str, *mut str>(s));
-                }
+            unsafe {
+                Box::from_raw(std::mem::transmute::<&str, *mut str>(s));
             }
         }
     }
@@ -646,43 +648,43 @@ impl Task {
         self.valid
     }
 
-    ///get_next_exec_timestamp
+    /// get_next_exec_timestamp
     #[inline(always)]
-    pub fn get_next_exec_timestamp(&mut self) -> u64 {
-        self.frequency.next_alarm_timestamp() as u64
+    pub fn get_next_exec_timestamp(&mut self) -> Option<u64> {
+        self.frequency.next_alarm_timestamp().map(|i| i as u64)
     }
 }
 
 mod tests {
+    #[allow(unused_imports)]
+    use anyhow::Result as AnyResult;
 
     #[test]
-    fn test_task_valid() {
+    fn test_task_valid() -> AnyResult<()> {
         use super::{Frequency, Task, TaskBuilder};
         use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder
-            .spawn(|_context| create_default_delay_task_handler())
-            .unwrap();
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
         assert!(!task.down_count_and_set_vaild());
+
+        Ok(())
     }
 
     #[test]
-    fn test_is_can_running() {
+    fn test_is_can_running() -> AnyResult<()> {
         use super::{Frequency, Task, TaskBuilder};
         use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         //The third run returns to an invalid state.
         task_builder.set_frequency(Frequency::CountDown(3, "* * * * * * *"));
-        let mut task: Task = task_builder
-            .spawn(|_context| create_default_delay_task_handler())
-            .unwrap();
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
 
         assert!(task.is_can_running());
 
@@ -690,21 +692,21 @@ mod tests {
         assert!(!task.is_can_running());
 
         assert!(task.check_arrived());
+
+        Ok(())
     }
 
     // struct CandyCron
 
     #[test]
-    fn test_candy_cron() {
+    fn test_candy_cron() -> AnyResult<()> {
         use super::{CandyCron, CandyFrequency, Task, TaskBuilder};
         use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         //The third run returns to an invalid state.
         task_builder.set_frequency_by_candy(CandyFrequency::CountDown(5, CandyCron::Minutely));
-        let mut task: Task = task_builder
-            .spawn(|_context| create_default_delay_task_handler())
-            .unwrap();
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
 
         assert!(task.is_can_running());
 
@@ -712,10 +714,11 @@ mod tests {
         assert!(!task.is_can_running());
 
         assert!(task.check_arrived());
+        Ok(())
     }
 
     #[test]
-    fn test_analyze_cron_expression() {
+    fn test_analyze_cron_expression() -> AnyResult<()> {
         use super::{DelayTimerScheduleIteratorOwned, ScheduleIteratorTimeZone};
         use std::thread::sleep;
         use std::time::Duration;
@@ -723,8 +726,7 @@ mod tests {
         let mut schedule_iterator_first = DelayTimerScheduleIteratorOwned::analyze_cron_expression(
             ScheduleIteratorTimeZone::Utc,
             "0/3 * * * * * *",
-        )
-        .unwrap();
+        )?;
 
         sleep(Duration::from_secs(5));
 
@@ -732,13 +734,14 @@ mod tests {
             DelayTimerScheduleIteratorOwned::analyze_cron_expression(
                 ScheduleIteratorTimeZone::Utc,
                 "0/3 * * * * * *",
-            )
-            .unwrap();
+            )?;
 
         // Two different starting values should not be the same.
         assert_ne!(
             schedule_iterator_first.next(),
             schedule_iterator_second.next()
         );
+
+        Ok(())
     }
 }

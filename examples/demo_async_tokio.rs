@@ -15,10 +15,10 @@ async fn main() -> Result<()> {
     let delay_timer = DelayTimerBuilder::default().build();
 
     // Develop a print job that runs in an asynchronous cycle.
-    let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+    let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 
     // Develop a php script shell-task that runs in an asynchronous cycle.
-    let shell_task_instance_chain = delay_timer.insert_task(build_task_async_execute_process())?;
+    let shell_task_instance_chain = delay_timer.insert_task(build_task_async_execute_process()?)?;
 
     // Get the running instance of task 1.
     let task_instance = task_instance_chain.next_with_async_wait().await?;
@@ -38,10 +38,10 @@ async fn main() -> Result<()> {
     delay_timer.remove_task(1)?;
 
     // No new tasks are accepted; running tasks are not affected.
-    delay_timer.stop_delay_timer()
+    Ok(delay_timer.stop_delay_timer()?)
 }
 
-fn build_task_async_print() -> Task {
+fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = create_async_fn_body!({
@@ -57,10 +57,9 @@ fn build_task_async_print() -> Task {
         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
         .set_maximun_parallel_runable_num(2)
         .spawn(body)
-        .unwrap()
 }
 
-fn build_task_async_execute_process() -> Task {
+fn build_task_async_execute_process() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
@@ -70,5 +69,4 @@ fn build_task_async_execute_process() -> Task {
         .set_maximum_running_time(10)
         .set_maximun_parallel_runable_num(1)
         .spawn(body)
-        .unwrap()
 }

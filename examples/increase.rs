@@ -22,14 +22,16 @@ impl Deref for SafePointer {
 
 // Remember close terminal can speed up because of
 // printnl! block process if stand-pipe if full.
-fn main() {
+fn main() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
 
     // The Sync-Task run_flay.
     let mut run_flag = Arc::new(AtomicUsize::new(0));
     // cross thread share raw-pointer.
-    let run_flag_ref: SafePointer =
-        SafePointer(NonNull::new(&mut run_flag as *mut Arc<AtomicUsize>).unwrap());
+    let run_flag_ref: SafePointer = SafePointer(
+        NonNull::new(&mut run_flag as *mut Arc<AtomicUsize>)
+            .ok_or_else(|| anyhow!("Can't init NonNull."))?,
+    );
 
     // Sync-Task body.
     let body = get_increase_fn(run_flag_ref);
@@ -46,24 +48,24 @@ fn main() {
         .set_maximum_running_time(90);
 
     for i in 0..1000 {
-        let task = task_builder.set_task_id(i).spawn(body).unwrap();
-        delay_timer.add_task(task).unwrap();
+        let task = task_builder.set_task_id(i).spawn(body)?;
+        delay_timer.add_task(task)?;
     }
 
     task_builder.set_frequency(Frequency::CountDown(1, "58 * * * * * *"));
     for i in 1000..1300 {
-        let task = task_builder.set_task_id(i).spawn(async_body).unwrap();
-        delay_timer.add_task(task).unwrap();
+        let task = task_builder.set_task_id(i).spawn(async_body)?;
+        delay_timer.add_task(task)?;
     }
 
     let task = task_builder
         .set_task_id(8888)
         .set_frequency(Frequency::CountDown(1, "@minutely"))
-        .spawn(end_body)
-        .unwrap();
-    delay_timer.add_task(task).unwrap();
+        .spawn(end_body)?;
+    delay_timer.add_task(task)?;
 
     park();
+    Ok(())
 }
 
 fn get_increase_fn(
@@ -99,8 +101,9 @@ fn get_wake_fn(
 
 fn get_async_fn() -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
     create_async_fn_body!({
-        let mut res = surf::get("https://httpbin.org/get").await.unwrap();
-        let body_str = res.body_string().await.unwrap();
-        println!("{}", body_str);
+        if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
+            let body_str = res.body_string().await.unwrap_or_default();
+            println!("{}", body_str);
+        }
     })
 }

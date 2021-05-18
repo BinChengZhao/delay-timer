@@ -1,3 +1,26 @@
+# Version 0.5.0 
+
+v0.5.0 New features:
+
+
+    1. Remove all unwrap() calls.
+    
+    2. Redefined the errors exposed to the outside (encapsulated by thiserror) as libs to never expose `anyhow::Error` to the outside.
+    
+      2.1. Set separate `TaskError`. for `Task`-related operations.
+      2.2. Set separate `HandleInstanceError`. for `Task-Instance`-related operations.
+    
+    
+    3. Optimized shell command parsing function, set exclusive pipeline for derived subprocesses -stderr.
+
+
+Update dependency :
+    Add, `thiserror`.
+
+
+Enriched documentation.
+
+
 # Version 0.4.0 
 
 v0.4.0 New features:

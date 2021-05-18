@@ -11,6 +11,7 @@
 //! The prelude may grow over time as additional items see ubiquitous use.
 
 pub use crate::entity::{get_timestamp, get_timestamp_micros, DelayTimer, DelayTimerBuilder};
+pub use crate::error::*;
 pub use crate::macros::*;
 pub use crate::timer::runtime_trace::state::instance;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
@@ -27,10 +28,12 @@ pub use crate::utils::convenience::functions::{
 };
 
 pub use anyhow::{anyhow, Result as AnyResult};
-pub use cron_clock::{self, FixedOffset, Local, TimeZone, Utc};
+pub use cron_clock::{self, error as cron_error, FixedOffset, Local, TimeZone, Utc};
+pub use smol::channel;
 pub use smol::future as future_lite;
 pub use smol::spawn as async_spawn;
 pub use smol::unblock as unblock_spawn;
+pub use thiserror::Error;
 
 /// State of the task run instance.
 pub type InstanceState = usize;
