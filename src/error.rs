@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 
-/// Error enumeration for Cron expression parsing.
+/// Error enumeration for `Task`-related operations.
 #[derive(Error, Debug)]
 // TODO: Added implementation of Trait for PartialEq, Eq, Clone, etc.
 pub enum TaskError {
