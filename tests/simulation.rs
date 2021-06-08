@@ -1,4 +1,3 @@
-use delay_timer::cron_clock::{Schedule, ScheduleIteratorOwned};
 use delay_timer::prelude::*;
 
 use std::str::FromStr;
@@ -164,12 +163,7 @@ fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
 fn go_works() -> AnyResult<()> {
     // Coordinates the inner-Runtime with the external(test-thread) clock.
     let expression = "0/2 * * * * * *";
-    let mut schedule_itertor: ScheduleIteratorOwned<Local> =
-        Schedule::from_str(expression)?.upcoming_owned(Local);
-
-    let mut next_exec_time;
-    let mut current_time;
-    let mut park_time = 2_000_000u64;
+    let park_time = 2_100_000u64;
 
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicUsize::new(0));
@@ -186,28 +180,49 @@ fn go_works() -> AnyResult<()> {
         .spawn(body)?;
     delay_timer.add_task(task)?;
 
-    let mut i = 0;
-
-    for _ in 0..3 {
-        debug_assert_eq!(i, share_num.load(Acquire));
-        park_timeout(Duration::from_micros(park_time + 1_000_000));
-
+    for _ in 0..5 {
         //Testing, whether the mission is performing as expected.
-        i = i + 1;
+        dbg!(share_num.load(Acquire));
+        park_timeout(Duration::from_micros(park_time));
+    }
 
-        // Coordinates the inner-Runtime with the external(test-thread) clock.(200_000 is a buffer.)
-        next_exec_time = dbg!(schedule_itertor
-            .next()
-            .ok_or(anyhow!("Without next element."))?
-            .timestamp_millis()) as u128
-            * 1000;
-        current_time = get_timestamp_micros();
-        park_time = next_exec_time
-            .checked_sub(current_time)
-            .unwrap_or(1_000_000) as u64;
+    assert_eq!(share_num.load(Acquire), 3);
+    Ok(())
+}
+
+#[test]
+fn test_advance() -> AnyResult<()> {
+    // The task is executed in the next hour.
+    let expression = "@yearly";
+    let task_id = 1;
+
+    let delay_timer = DelayTimer::new();
+    let share_num = Arc::new(AtomicUsize::new(0));
+    let share_num_bunshin = share_num.clone();
+
+    let body = move |_| {
+        share_num_bunshin.fetch_add(1, Release);
+        create_default_delay_task_handler()
+    };
+
+    let task = TaskBuilder::default()
+        .set_frequency(Frequency::CountDown(3, expression))
+        .set_task_id(task_id)
+        .spawn(body)?;
+
+    delay_timer.add_task(task)?;
+
+    for i in 0..3 {
+        assert_eq!(dbg!(share_num.load(Acquire)), i);
+        // Go ahead.
+        delay_timer.advance_task(task_id)?;
+
+        // Waiting for scheduling and execution.
+        park_timeout(Duration::from_secs(2));
     }
     Ok(())
 }
+
 
 #[test]
 fn test_maximun_parallel_runable_num() -> AnyResult<()> {

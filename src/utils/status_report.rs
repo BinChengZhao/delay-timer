@@ -59,6 +59,23 @@ pub enum PublicFinishOutput {
 
 impl PublicFinishTaskBody{
 
+    /// Get the TaskInstance task-id.
+    pub fn get_task_id(&self) -> u64{
+        self.task_id
+    }
+
+
+    /// Get the TaskInstance record-id.
+    pub fn get_record_id(&self) -> i64{
+        self.record_id
+    }
+
+
+    /// Get the TaskInstance finish-time.
+    pub fn get_finish_time(&self) -> u64{
+        self.finish_time
+    }
+
     /// Get the output on internal completion.
     pub fn get_finish_output(&mut self) -> Option<PublicFinishOutput>{
         self.finish_output.take()

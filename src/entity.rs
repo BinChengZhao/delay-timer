@@ -295,6 +295,11 @@ impl DelayTimer {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
     }
 
+    /// Advance a task in timer_core by event-channel.
+    pub fn advance_task(&self, task_id: u64) -> Result<(), TaskError> {
+        self.seed_timer_event(TimerEvent::AdvanceTask(task_id))
+    }
+
     /// Cancel a task in timer_core by event-channel.
     /// `Cancel` is for instances derived from the task running up.
     pub fn cancel_task(&self, task_id: u64, record_id: i64) -> Result<(), TaskError> {
