@@ -1,6 +1,6 @@
 [package]
 name = "delay_timer"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"

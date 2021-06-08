@@ -5,7 +5,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result as AnyResult};
 use event_listener::Event;
 use future_lite::block_on;
 use smol::channel::{unbounded, Receiver, Sender};
@@ -77,7 +76,6 @@ pub struct TaskInstancesChain {
 /// For inner maintain to Running-Task's instance.
 #[derive(Debug)]
 pub struct TaskInstancesChainMaintainer {
-    //TODO: Maybe needed be Arc<AsyncRwLock<InstanceListInner>>.
     pub(crate) inner_sender: Sender<Instance>,
     pub(crate) inner_state: Arc<AtomicUsize>,
     pub(crate) inner_list: LinkedList<Instance>,
@@ -146,7 +144,7 @@ impl TaskInstance {
 
     /// Cancel the currently running task instance and block the thread to wait.
     #[inline(always)]
-    pub fn cancel_with_wait(&self) -> AnyResult<InstanceState> {
+    pub fn cancel_with_wait(&self) -> Result<InstanceState, TaskInstanceError> {
         self.cancel()?;
 
         self.instance.header.event.listen().wait();
@@ -156,7 +154,10 @@ impl TaskInstance {
     /// Cancel the currently running task instance and block the thread to wait
     /// for an expected amount of time.
     #[inline(always)]
-    pub fn cancel_with_wait_timeout(&self, timeout: Duration) -> AnyResult<InstanceState> {
+    pub fn cancel_with_wait_timeout(
+        &self,
+        timeout: Duration,
+    ) -> Result<InstanceState, TaskInstanceError> {
         self.cancel()?;
 
         self.instance
@@ -165,12 +166,12 @@ impl TaskInstance {
             .listen()
             .wait_timeout(timeout)
             .then(|| self.get_state())
-            .ok_or_else(|| anyhow!("Waiting for cancellation timeout"))
+            .ok_or(TaskInstanceError::DisCancelTimeOut)
     }
 
     /// Cancel the currently running task instance and async-await it.
     #[inline(always)]
-    pub async fn cancel_with_async_wait(&self) -> AnyResult<InstanceState> {
+    pub async fn cancel_with_async_wait(&self) -> Result<InstanceState, TaskInstanceError> {
         self.cancel()?;
 
         self.instance.header.event.listen().await;
@@ -178,19 +179,15 @@ impl TaskInstance {
     }
 
     #[inline(always)]
-    fn cancel(&self) -> AnyResult<()> {
+    fn cancel(&self) -> Result<(), TaskInstanceError> {
         if self.get_state() != state::instance::RUNNING {
-            return Err(anyhow!(
-                "The task has been (completed or canceled) and cannot be cancelled."
-            ));
+            return Err(TaskInstanceError::DisCancel);
         }
 
-        self.timer_event_sender
-            .try_send(TimerEvent::CancelTask(
-                self.instance.task_id,
-                self.instance.record_id,
-            ))
-            .with_context(|| "Failed Send Event from seed_timer_event".to_string())
+        Ok(self.timer_event_sender.try_send(TimerEvent::CancelTask(
+            self.instance.task_id,
+            self.instance.record_id,
+        ))?)
     }
 }
 
@@ -205,7 +202,7 @@ impl TaskInstancesChainMaintainer {
 }
 impl TaskInstancesChain {
     /// Non-blocking get the next task instance.
-    pub fn next(&self) -> Result<TaskInstance, HandleInstanceError> {
+    pub fn next(&self) -> Result<TaskInstance, TaskInstanceError> {
         let timer_event_sender = self.get_timer_event_sender()?;
 
         Ok(self
@@ -218,7 +215,7 @@ impl TaskInstancesChain {
     }
 
     /// Blocking get the next task instance.
-    pub fn next_with_wait(&self) -> Result<TaskInstance, HandleInstanceError> {
+    pub fn next_with_wait(&self) -> Result<TaskInstance, TaskInstanceError> {
         let timer_event_sender = self.get_timer_event_sender()?;
 
         let instance = block_on(self.inner_receiver.recv())?;
@@ -230,7 +227,7 @@ impl TaskInstancesChain {
     }
 
     /// Async-await get the next task instance.
-    pub async fn next_with_async_wait(&self) -> Result<TaskInstance, HandleInstanceError> {
+    pub async fn next_with_async_wait(&self) -> Result<TaskInstance, TaskInstanceError> {
         let timer_event_sender = self.get_timer_event_sender()?;
 
         let instance = self.inner_receiver.recv().await?;
@@ -247,14 +244,14 @@ impl TaskInstancesChain {
         self.inner_state.load(Ordering::Acquire)
     }
 
-    fn get_timer_event_sender(&self) -> Result<Sender<TimerEvent>, HandleInstanceError> {
+    fn get_timer_event_sender(&self) -> Result<Sender<TimerEvent>, TaskInstanceError> {
         if self.get_state() == state::instance_chain::ABANDONED {
-            return Err(HandleInstanceError::Expired);
+            return Err(TaskInstanceError::Expired);
         }
 
         self.timer_event_sender
             .clone()
-            .ok_or(HandleInstanceError::MisEventSender)
+            .ok_or(TaskInstanceError::MisEventSender)
     }
 }
 
