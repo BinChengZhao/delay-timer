@@ -619,7 +619,7 @@ impl Task {
     }
 
     #[inline(always)]
-    pub(crate) fn clear_cylinder_line(&mut self){
+    pub(crate) fn clear_cylinder_line(&mut self) {
         self.cylinder_line = 0;
     }
 

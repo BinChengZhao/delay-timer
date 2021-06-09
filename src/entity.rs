@@ -449,7 +449,7 @@ cfg_status_report!(
                return Ok(status_reporter_ref.next_public_event()?);
             }
 
-            Err(channel::TryRecvError::Closed)?
+            Err(channel::TryRecvError::Closed.into())
         }
     }
 

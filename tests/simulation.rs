@@ -193,7 +193,7 @@ fn go_works() -> AnyResult<()> {
 #[test]
 fn test_advance() -> AnyResult<()> {
     // The task is executed in the next hour.
-    let expression = "@yearly";
+    let expression = "@hourly";
     let task_id = 1;
 
     let delay_timer = DelayTimer::new();
@@ -218,11 +218,10 @@ fn test_advance() -> AnyResult<()> {
         delay_timer.advance_task(task_id)?;
 
         // Waiting for scheduling and execution.
-        park_timeout(Duration::from_secs(2));
+        park_timeout(Duration::from_secs_f32(2.1));
     }
     Ok(())
 }
-
 
 #[test]
 fn test_maximun_parallel_runable_num() -> AnyResult<()> {

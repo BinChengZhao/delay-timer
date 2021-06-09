@@ -1,3 +1,14 @@
+# Version 0.6.0 
+
+v0.6.0 New features:
+
+
+    1. Grouping errors associated with Task and TaskInstance and implementing the standard Error-Trait.
+    
+    2. Add `advance_task`-api to support users to manually trigger the execution of tasks..
+    
+    3. Add `get_*` api to `PublicFinishTaskBody` to support getting task_id or record_id or finish_time.
+
 # Version 0.5.0 
 
 v0.5.0 New features:

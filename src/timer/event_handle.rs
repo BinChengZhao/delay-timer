@@ -68,9 +68,9 @@ impl EventHandleBuilder {
             shared_header,
             task_trace,
             timer_event_receiver,
-            sub_wokers,
             #[cfg(feature = "status-report")]
             status_report_sender,
+            sub_wokers,
         })
     }
 }
