@@ -1,3 +1,14 @@
+# Version 0.6.0 
+
+v0.6.0 New features:
+
+
+    1. Grouping errors associated with Task and TaskInstance and implementing the standard Error-Trait.
+    
+    2. Add `advance_task`-api to support users to manually trigger the execution of tasks..
+    
+    3. Add `get_*` api to `PublicFinishTaskBody` to support getting task_id or record_id or finish_time.
+
 # Version 0.5.0 
 
 v0.5.0 New features:
@@ -8,7 +19,7 @@ v0.5.0 New features:
     2. Redefined the errors exposed to the outside (encapsulated by `thiserror`) as libs to never expose `anyhow::Error` to the outside.
     
       2.1. Set separate `TaskError`. for `Task`-related operations.
-      2.2. Set separate `HandleInstanceError`. for `Task-Instance`-related operations.
+      2.2. Set separate `TaskInstanceError`. for `Task-Instance`-related operations.
     
     
     3. Optimized shell command parsing function, set exclusive pipeline for derived subprocesses -stderr.

@@ -68,9 +68,9 @@ impl EventHandleBuilder {
             shared_header,
             task_trace,
             timer_event_receiver,
-            sub_wokers,
             #[cfg(feature = "status-report")]
             status_report_sender,
+            sub_wokers,
         })
     }
 }
@@ -311,13 +311,14 @@ impl EventHandle {
 
         let slot_mark = task_mark.value().get_slot_mark();
 
-        let task = {
+        let mut task = {
             if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_mark) {
                 slot.value_mut().remove_task(task_id)?
             } else {
                 return None;
             }
         };
+        task.clear_cylinder_line();
 
         let slot_seed = self.shared_header.second_hand.load(Acquire) + 1;
 

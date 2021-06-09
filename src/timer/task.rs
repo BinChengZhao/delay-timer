@@ -619,6 +619,11 @@ impl Task {
     }
 
     #[inline(always)]
+    pub(crate) fn clear_cylinder_line(&mut self) {
+        self.cylinder_line = 0;
+    }
+
+    #[inline(always)]
     /// check if task has arrived.
     pub fn check_arrived(&mut self) -> bool {
         if self.cylinder_line == 0 {

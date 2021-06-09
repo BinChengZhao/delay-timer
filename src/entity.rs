@@ -267,16 +267,13 @@ impl DelayTimer {
     }
 
     /// Add a task in timer_core by event-channel.
-    pub fn add_task(&self, task: Task) -> Result<(), channel::TrySendError<TimerEvent>> {
+    pub fn add_task(&self, task: Task) -> Result<(), TaskError> {
         self.seed_timer_event(TimerEvent::AddTask(Box::new(task)))
     }
 
     /// Add a task in timer_core by event-channel.
     /// But it will return a handle that can constantly take out new instances of the task.
-    pub fn insert_task(
-        &self,
-        task: Task,
-    ) -> Result<TaskInstancesChain, channel::TrySendError<TimerEvent>> {
+    pub fn insert_task(&self, task: Task) -> Result<TaskInstancesChain, TaskError> {
         let (mut task_instances_chain, task_instances_chain_maintainer) =
             task_instance_chain_pair();
         task_instances_chain.timer_event_sender = Some(self.timer_event_sender.clone());
@@ -289,27 +286,28 @@ impl DelayTimer {
     }
 
     /// Update a task in timer_core by event-channel.
-    pub fn update_task(&self, task: Task) -> Result<(), channel::TrySendError<TimerEvent>> {
+    pub fn update_task(&self, task: Task) -> Result<(), TaskError> {
         self.seed_timer_event(TimerEvent::UpdateTask(Box::new(task)))
     }
 
     /// Remove a task in timer_core by event-channel.
-    pub fn remove_task(&self, task_id: u64) -> Result<(), channel::TrySendError<TimerEvent>> {
+    pub fn remove_task(&self, task_id: u64) -> Result<(), TaskError> {
         self.seed_timer_event(TimerEvent::RemoveTask(task_id))
+    }
+
+    /// Advance a task in timer_core by event-channel.
+    pub fn advance_task(&self, task_id: u64) -> Result<(), TaskError> {
+        self.seed_timer_event(TimerEvent::AdvanceTask(task_id))
     }
 
     /// Cancel a task in timer_core by event-channel.
     /// `Cancel` is for instances derived from the task running up.
-    pub fn cancel_task(
-        &self,
-        task_id: u64,
-        record_id: i64,
-    ) -> Result<(), channel::TrySendError<TimerEvent>> {
+    pub fn cancel_task(&self, task_id: u64, record_id: i64) -> Result<(), TaskError> {
         self.seed_timer_event(TimerEvent::CancelTask(task_id, record_id))
     }
 
     /// Stop DelayTimer, running tasks are not affected.
-    pub fn stop_delay_timer(&self) -> Result<(), channel::TrySendError<TimerEvent>> {
+    pub fn stop_delay_timer(&self) -> Result<(), TaskError> {
         self.seed_timer_event(TimerEvent::StopTimer)
     }
 
@@ -324,8 +322,8 @@ impl DelayTimer {
     }
 
     /// Send a event to event-handle.
-    fn seed_timer_event(&self, event: TimerEvent) -> Result<(), channel::TrySendError<TimerEvent>> {
-        self.timer_event_sender.try_send(event)
+    fn seed_timer_event(&self, event: TimerEvent) -> Result<(), TaskError> {
+        Ok(self.timer_event_sender.try_send(event)?)
     }
 }
 
@@ -445,13 +443,13 @@ cfg_status_report!(
         }
 
         /// Access to public events through DelayTimer.
-        pub fn get_public_event(&self) -> Result<PublicEvent, channel::TryRecvError> {
+        pub fn get_public_event(&self) -> Result<PublicEvent, TaskError> {
 
             if let Some(status_reporter_ref) = self.status_reporter.as_ref(){
-               return status_reporter_ref.next_public_event();
+               return Ok(status_reporter_ref.next_public_event()?);
             }
 
-            Err(channel::TryRecvError::Closed)
+            Err(channel::TryRecvError::Closed.into())
         }
     }
 
