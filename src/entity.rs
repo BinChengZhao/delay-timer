@@ -200,6 +200,8 @@ impl DelayTimerBuilder {
 
     fn assign_task(&self, timer: Timer, event_handle: EventHandle) {
         self.run_async_schedule(timer);
+
+        // A lot of work. cpu run full.
         self.run_event_handle(event_handle);
     }
 

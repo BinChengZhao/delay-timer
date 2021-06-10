@@ -61,7 +61,7 @@ pub(crate) struct RecyclingBins {
     recycle_unit_heap: AsyncMutex<BinaryHeap<Reverse<RecycleUnit>>>,
 
     /// use it to recieve source-data build recycle-unit.
-    recycle_unit_sources: AsyncMutex<AsyncReceiver<RecycleUnit>>,
+    recycle_unit_sources: AsyncReceiver<RecycleUnit>,
 
     /// notify timeout-event to event-handler for cancel that.
     timer_event_sender: TimerEventSender,
@@ -103,7 +103,6 @@ impl RecyclingBins {
                 if let Some(recycle_flag) = (&recycle_unit_heap).peek().map(|r| r.0.deadline <= now)
                 {
                     if !recycle_flag {
-                        drop(recycle_unit_heap);
                         break;
                     }
 
@@ -118,11 +117,11 @@ impl RecyclingBins {
 
                 //send msg to event_handle.
                 } else {
-                    drop(recycle_unit_heap);
                     break;
                 }
             }
 
+            drop(recycle_unit_heap);
             yield_now().await;
             //drop lock.
         }
@@ -140,22 +139,30 @@ impl RecyclingBins {
             'forLayer: for _ in 0..200 {
                 let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
 
-                match self.recycle_unit_sources.lock().await.try_recv() {
+                // Maybe there always run. always try.
+                // TODO: Although it blocks when there is no data (saving cpu resources),
+                // But the lock resources (recycle_unit_heap) are never released.
+                // May deadlock.
+                match self.recycle_unit_sources.recv().await {
                     Ok(recycle_unit) => {
                         (&mut recycle_unit_heap).push(Reverse(recycle_unit));
                     }
 
-                    Err(e) => match e {
-                        Empty => {
-                            drop(recycle_unit_heap);
-                            break 'forLayer;
-                        }
+                    Err(_) => {
+                        // Err(e) => match e {
 
-                        Closed => {
-                            drop(recycle_unit_heap);
-                            break 'loopLayer;
-                        }
-                    },
+                        // Empty => {
+                        //     drop(recycle_unit_heap);
+                        //     break 'forLayer;
+                        // }
+
+                        // Closed => {
+                        //     drop(recycle_unit_heap);
+                        //     break 'loopLayer;
+                        // }
+                        drop(recycle_unit_heap);
+                        break 'loopLayer;
+                    }
                 }
             }
 
