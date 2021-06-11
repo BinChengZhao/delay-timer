@@ -121,7 +121,7 @@ pub(crate) struct RuntimeInstance {
     pub(crate) inner: Option<Arc<Runtime>>,
     pub(crate) kind: RuntimeKind,
 }
-#[derive(Clone, Debug, Copy)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum RuntimeKind {
     Smol,
     #[cfg(feature = "tokio-support")]
@@ -201,7 +201,6 @@ impl DelayTimerBuilder {
     fn assign_task(&self, timer: Timer, event_handle: EventHandle) {
         self.run_async_schedule(timer);
 
-        // A lot of work. cpu run full.
         self.run_event_handle(event_handle);
     }
 
@@ -210,6 +209,7 @@ impl DelayTimerBuilder {
             .name("async_schedule".into())
             .spawn(move || {
                 smol::block_on(async {
+                    info!(" `async_schedule` start.");
                     timer.async_schedule().await;
                 })
             })
@@ -221,6 +221,7 @@ impl DelayTimerBuilder {
             .name("event_handle".into())
             .spawn(move || {
                 block_on(async {
+                    info!(" `event_handle` start.");
                     event_handle.lauch().await;
                 })
             })

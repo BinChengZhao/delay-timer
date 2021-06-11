@@ -76,8 +76,8 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     // The task was still running when the instance was first obtained.
     assert_eq!(instance.get_state(), instance::RUNNING);
 
-    // The task execution is timeout after about 2.001 second.
-    park_timeout(Duration::from_millis(2001));
+    // The task execution is timeout after about 2.1 second.
+    park_timeout(Duration::from_secs_f64(2.1));
 
     // This should be the completed state.
     assert_eq!(instance.get_state(), instance::TIMEOUT);
@@ -109,8 +109,8 @@ fn test_shell_task_instance_timeout_state() -> anyhow::Result<()> {
     // The task was still running when the instance was first obtained.
     assert_eq!(instance.get_state(), instance::RUNNING);
 
-    // The task still running after about 2.001 second.
-    park_timeout(Duration::from_millis(2001));
+    // The task still running after about 2.1 second.
+    park_timeout(Duration::from_secs_f64(2.1));
     assert_eq!(instance.get_state(), instance::RUNNING);
 
     // This should be the timeout state after about 4.001 second.

@@ -11,8 +11,6 @@ use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd, Reverse};
 use std::collections::BinaryHeap;
 use std::sync::Arc;
 
-use smol::channel::TryRecvError::*;
-
 #[derive(Default, Eq, Debug, Copy, Clone)]
 /// recycle unit.
 pub(crate) struct RecycleUnit {
@@ -57,7 +55,7 @@ impl PartialEq for RecycleUnit {
 #[derive(Debug)]
 ///RecyclingBins is resource recycler, excute timeout task-handle.
 pub(crate) struct RecyclingBins {
-    ///storage all task-handle in there.
+    /// storage all task-handle in there.
     recycle_unit_heap: AsyncMutex<BinaryHeap<Reverse<RecycleUnit>>>,
 
     /// use it to recieve source-data build recycle-unit.
@@ -65,6 +63,9 @@ pub(crate) struct RecyclingBins {
 
     /// notify timeout-event to event-handler for cancel that.
     timer_event_sender: TimerEventSender,
+
+    /// The runtime kind.
+    runtime_kind: RuntimeKind,
 }
 
 impl RecyclingBins {
@@ -72,37 +73,41 @@ impl RecyclingBins {
     pub(crate) fn new(
         recycle_unit_sources: AsyncReceiver<RecycleUnit>,
         timer_event_sender: TimerEventSender,
+        runtime_kind: RuntimeKind,
     ) -> Self {
         let recycle_unit_heap: AsyncMutex<BinaryHeap<Reverse<RecycleUnit>>> =
             AsyncMutex::new(BinaryHeap::new());
-        let recycle_unit_sources = AsyncMutex::new(recycle_unit_sources);
+        let recycle_unit_sources = recycle_unit_sources;
 
         RecyclingBins {
             recycle_unit_heap,
             recycle_unit_sources,
             timer_event_sender,
+            runtime_kind,
         }
     }
 
     /// alternate run fn between recycle and  add_recycle_unit.
     pub(crate) async fn recycle(self: Arc<Self>) {
-        //get now timestamp
+        // get now timestamp
 
-        //peek inside RecyclingBins has anyone meet contitions.
+        // peek inside RecyclingBins has anyone meet contitions.
 
-        //pop one of recycle_unit_heap, execute it.
+        // pop one of recycle_unit_heap, execute it.
 
         loop {
             let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
 
             let now: u64 = get_timestamp();
+            let mut duration: Option<Duration> = None;
             for _ in 0..200 {
-                // recv from channel, if no item in channel
-                // drop lock.
-
                 if let Some(recycle_flag) = (&recycle_unit_heap).peek().map(|r| r.0.deadline <= now)
                 {
                     if !recycle_flag {
+                        duration = (&recycle_unit_heap)
+                            .peek()
+                            .map(|r| r.0.deadline - now)
+                            .map(Duration::from_secs);
                         break;
                     }
 
@@ -121,9 +126,9 @@ impl RecyclingBins {
                 }
             }
 
-            drop(recycle_unit_heap);
-            yield_now().await;
             //drop lock.
+            drop(recycle_unit_heap);
+            self.yield_for_while(duration).await;
         }
     }
 
@@ -136,31 +141,18 @@ impl RecyclingBins {
 
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {
         'loopLayer: loop {
-            'forLayer: for _ in 0..200 {
-                let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
-
+            for _ in 0..200 {
                 // Maybe there always run. always try.
                 // TODO: Although it blocks when there is no data (saving cpu resources),
                 // But the lock resources (recycle_unit_heap) are never released.
                 // May deadlock.
                 match self.recycle_unit_sources.recv().await {
                     Ok(recycle_unit) => {
+                        let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
                         (&mut recycle_unit_heap).push(Reverse(recycle_unit));
                     }
 
                     Err(_) => {
-                        // Err(e) => match e {
-
-                        // Empty => {
-                        //     drop(recycle_unit_heap);
-                        //     break 'forLayer;
-                        // }
-
-                        // Closed => {
-                        //     drop(recycle_unit_heap);
-                        //     break 'loopLayer;
-                        // }
-                        drop(recycle_unit_heap);
                         break 'loopLayer;
                     }
                 }
@@ -168,6 +160,19 @@ impl RecyclingBins {
 
             yield_now().await;
             // out of scope , recycle_unit_heap is auto-drop;
+        }
+    }
+
+    pub(crate) async fn yield_for_while(&self, duration: Option<Duration>) {
+        let duration = duration.unwrap_or_else(|| Duration::from_secs(3));
+        match self.runtime_kind {
+            RuntimeKind::Smol => {
+                Timer::after(duration).await;
+            }
+            #[cfg(feature = "tokio-support")]
+            RuntimeKind::Tokio => {
+                sleep_by_tokio(duration).await;
+            }
         }
     }
 }
@@ -178,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_task_valid() -> AnyResult<()> {
-        use super::{get_timestamp, RecycleUnit, RecyclingBins, TimerEvent};
+        use super::{get_timestamp, RecycleUnit, RecyclingBins, RuntimeKind, TimerEvent};
         use smol::{
             block_on,
             channel::{unbounded, TryRecvError},
@@ -196,8 +201,9 @@ mod tests {
         let recycling_bins = Arc::new(RecyclingBins::new(
             recycle_unit_receiver,
             timer_event_sender,
+            RuntimeKind::Smol,
         ));
-        //TODO:optimize.
+
         thread_spawn(move || {
             block_on(async {
                 recycling_bins
