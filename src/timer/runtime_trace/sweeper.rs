@@ -142,10 +142,6 @@ impl RecyclingBins {
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {
         'loopLayer: loop {
             for _ in 0..200 {
-                // Maybe there always run. always try.
-                // TODO: Although it blocks when there is no data (saving cpu resources),
-                // But the lock resources (recycle_unit_heap) are never released.
-                // May deadlock.
                 match self.recycle_unit_sources.recv().await {
                     Ok(recycle_unit) => {
                         let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
