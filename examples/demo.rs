@@ -10,29 +10,29 @@ use surf;
 fn main() -> Result<()> {
     let delay_timer = DelayTimerBuilder::default().enable_status_report().build();
 
-    // // Develop a print job that runs in an asynchronous cycle.
-    // let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
+    // Develop a print job that runs in an asynchronous cycle.
+    let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 
-    // // Develop an http request task that runs in an asynchronous cycle.
-    // delay_timer.add_task(build_task_async_request()?)?;
+    // Develop an http request task that runs in an asynchronous cycle.
+    delay_timer.add_task(build_task_async_request()?)?;
 
-    // // Develop a php script task that runs in an asynchronous cycle.
-    // delay_timer.add_task(build_task_async_execute_process()?)?;
+    // Develop a php script task that runs in an asynchronous cycle.
+    delay_timer.add_task(build_task_async_execute_process()?)?;
 
-    // // Develop a task that runs in an asynchronous cycle (using a custom asynchronous template).
-    // delay_timer.add_task(build_task_customized_async_task()?)?;
+    // Develop a task that runs in an asynchronous cycle (using a custom asynchronous template).
+    delay_timer.add_task(build_task_customized_async_task()?)?;
 
-    // // Get the running instance of task 1.
-    // let task_instance = task_instance_chain.next_with_wait()?;
+    // Get the running instance of task 1.
+    let task_instance = task_instance_chain.next_with_wait()?;
 
-    // // Cancel running task instances.
-    // task_instance.cancel_with_wait()?;
+    // Cancel running task instances.
+    task_instance.cancel_with_wait()?;
 
-    // // Remove task which id is 1.
-    // delay_timer.remove_task(1)?;
+    // Remove task which id is 1.
+    delay_timer.remove_task(1)?;
 
-    // // Develop a task that runs in an asynchronous cycle to wake up the current thread.
-    // delay_timer.add_task(build_wake_task()?)?;
+    // Develop a task that runs in an asynchronous cycle to wake up the current thread.
+    delay_timer.add_task(build_wake_task()?)?;
 
     park();
 

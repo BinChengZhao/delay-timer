@@ -225,7 +225,7 @@ mod tests {
         if let Err(e) = timer_event_receiver.try_recv() {
             assert_eq!(e, TryRecvError::Empty);
         }
-        park_timeout(Duration::new(3, 3_000_000));
+        park_timeout(Duration::from_secs(4));
 
         for _ in 1..10 {
             assert!(dbg!(timer_event_receiver.try_recv()).is_ok());
