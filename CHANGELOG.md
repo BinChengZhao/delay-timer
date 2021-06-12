@@ -1,3 +1,10 @@
+# Version 0.6.1
+
+v0.6.1 New features:
+
+
+    1. Optimize `sweeper` performance and recycle expired tasks more efficiently.
+
 # Version 0.6.0 
 
 v0.6.0 New features:

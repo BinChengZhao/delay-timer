@@ -37,7 +37,7 @@
 //!
 //!     // Develop a print job that runs in an asynchronous cycle.
 //!     // A chain of task instances.
-//!     let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+//!     let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 //!
 //!     // Get the running instance of task 1.
 //!     let task_instance = task_instance_chain.next_with_wait()?;
@@ -94,7 +94,7 @@
 //!     let delay_timer = DelayTimerBuilder::default().build();
 //!
 //!     // Develop a print job that runs in an asynchronous cycle.
-//!     let task_instance_chain = delay_timer.insert_task(build_task_async_print())?;
+//!     let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
 //!
 //!     // Get the running instance of task 1.
 //!     let task_instance = task_instance_chain.next_with_async_wait().await?;
@@ -107,7 +107,7 @@
 //!     delay_timer.remove_task(1)?;
 //!
 //!     // No new tasks are accepted; running tasks are not affected.
-//!     delay_timer.stop_delay_timer()
+//!     Ok(delay_timer.stop_delay_timer()?)
 //! }
 //!
 //! fn build_task_async_print() -> Result<Task, TaskError> {
@@ -161,7 +161,7 @@
 //!     .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
 //!     .set_task_id(1)
 //!     .set_maximun_parallel_runable_num(3)
-//!     .spawn(body)?;
+//!     .spawn(body).expect("");
 //!
 //! delay_timer.add_task(task).ok();
 //!
@@ -224,6 +224,7 @@
 //!     // Concatenate the body stream into a single buffer...
 //!     let buf = hyper::body::to_bytes(res).await?;
 //!     println!("body: {:?}", buf);
+//!     Ok(())
 //! }
 //!
 //! enum AuspiciousTime {

@@ -1,6 +1,6 @@
 [package]
 name = "delay_timer"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
@@ -8,7 +8,7 @@ documentation = "https://docs.rs/delay_timer"
 readme = "README.md"
 homepage = "https://github.com/BinChengZhao/delay-timer"
 description = "Time-manager of delayed tasks. Like crontab, but synchronous asynchronous tasks are possible, and dynamic add/cancel/remove is supported."
-keywords = [ "cron", "schedule", "timer", "crontab", "delay" ]
+keywords = [ "cron", "scheduler", "timer", "crontab", "delay" ]
 license = "Apache-2.0 OR MIT"
 categories = ["development-tools", "data-structures", "asynchronous", "data-structures", "accessibility"]
 build = "build/build.rs"

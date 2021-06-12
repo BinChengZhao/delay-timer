@@ -57,10 +57,14 @@ impl EventHandleBuilder {
 
     pub(crate) fn build(self) -> Option<EventHandle> {
         let task_trace = TaskTrace::default();
-        let sub_wokers = SubWorkers::new(self.timer_event_sender?);
+        let shared_header = self.shared_header?;
+
+        let sub_wokers = SubWorkers::new(
+            self.timer_event_sender?,
+            shared_header.runtime_instance.kind,
+        );
 
         let timer_event_receiver = self.timer_event_receiver?;
-        let shared_header = self.shared_header?;
         #[cfg(feature = "status-report")]
         let status_report_sender = self.status_report_sender;
 
@@ -446,8 +450,8 @@ impl EventHandleBuilder {
 );
 
 impl SubWorkers {
-    fn new(timer_event_sender: TimerEventSender) -> Self {
-        let recycling_bin_woker = RecyclingBinWorker::new(timer_event_sender);
+    fn new(timer_event_sender: TimerEventSender, runtime_kind: RuntimeKind) -> Self {
+        let recycling_bin_woker = RecyclingBinWorker::new(timer_event_sender, runtime_kind);
 
         SubWorkers {
             recycling_bin_woker,
@@ -456,13 +460,14 @@ impl SubWorkers {
 }
 
 impl RecyclingBinWorker {
-    fn new(timer_event_sender: TimerEventSender) -> Self {
+    fn new(timer_event_sender: TimerEventSender, runtime_kind: RuntimeKind) -> Self {
         let (recycle_unit_sources_sender, recycle_unit_sources_reciver) =
             unbounded::<RecycleUnit>();
 
         let inner = Arc::new(RecyclingBins::new(
             recycle_unit_sources_reciver,
             timer_event_sender,
+            runtime_kind,
         ));
 
         RecyclingBinWorker {

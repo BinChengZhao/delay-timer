@@ -47,11 +47,12 @@ pub(crate) use crate::timer::runtime_trace::task_instance::TaskInstancesChainMai
 
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList, ChildUnify};
 pub(crate) use dashmap::DashMap;
-#[allow(unused_imports)]
 pub(crate) use log::{error, info};
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
+pub(crate) use smol::Timer;
+pub(crate) use std::time::Duration;
 
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
