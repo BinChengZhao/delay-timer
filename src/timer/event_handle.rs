@@ -228,6 +228,14 @@ impl EventHandle {
                 self.cancel_task(task_id, record_id, state::instance::CANCELLED);
             }
 
+            // TODO: When receive a timeout event from the `sweeper`, it is possible that the task has been completed.
+            // So can't just call cancel.
+
+            // Two options fix it.
+            // 1. `sweeper` Remove the recycling unit when the task is finished or cancelled.
+            // 2. A public event is sent to the outside after the internal processing of the completed event at the time of event assignment.
+
+
             TimerEvent::TimeoutTask(task_id, record_id) => {
                 self.cancel_task(task_id, record_id, state::instance::TIMEOUT);
             }
