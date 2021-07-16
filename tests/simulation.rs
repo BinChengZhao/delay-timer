@@ -46,7 +46,7 @@ fn test_instance_state() -> anyhow::Result<()> {
     assert_eq!(instance.get_state(), instance::RUNNING);
 
     // The task execution is completed.
-    park_timeout(Duration::from_millis(200));
+    park_timeout(Duration::from_secs(1));
 
     // This should be the completed state.
     assert_eq!(instance.get_state(), instance::COMPLETED);

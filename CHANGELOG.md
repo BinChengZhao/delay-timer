@@ -37,7 +37,7 @@ v0.5.0 New features:
 
     1. Remove all unwrap() calls.
     
-    2. Redefined the errors exposed to the outside (encapsulated by thiserror) as libs to never expose `anyhow::Error` to the outside.
+    2. Redefined the errors exposed to the outside (encapsulated by `thiserror`) as libs to never expose `anyhow::Error` to the outside.
     
       2.1. Set separate `TaskError`. for `Task`-related operations.
       2.2. Set separate `TaskInstanceError`. for `Task-Instance`-related operations.
