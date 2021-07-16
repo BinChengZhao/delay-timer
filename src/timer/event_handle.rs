@@ -333,9 +333,9 @@ impl EventHandle {
 
         let mut task = {
             if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_mark) {
-                slot.value_mut()
-                    .remove_task(task_id)
-                    .ok_or_else(|| anyhow!("Fn : `advance_task`, No task found (task-id: {} )", task_id))?
+                slot.value_mut().remove_task(task_id).ok_or_else(|| {
+                    anyhow!("Fn : `advance_task`, No task found (task-id: {} )", task_id)
+                })?
             } else {
                 return Err(anyhow!(
                     "Fn : `advance_task`, No task found (task-id: {} )",
@@ -392,8 +392,10 @@ impl EventHandle {
             // If the operation object does not exist in the middle, it should return early.
             self.task_trace.quit_one_task_handler(task_id, record_id)?;
 
-            // Here the user can be notified that the task instance has disappeared via `Instance`.
-            task_mark.notify_cancel_finish(record_id, state)?;
+            if task_mark.task_instances_chain_maintainer.is_some() {
+                // Here the user can be notified that the task instance has disappeared via `Instance`.
+                task_mark.notify_cancel_finish(record_id, state)?;
+            }
 
             task_mark.dec_parallel_runnable_num();
 
@@ -412,8 +414,10 @@ impl EventHandle {
             let task_mark = task_mark_ref_mut.value_mut();
             self.task_trace.quit_one_task_handler(task_id, record_id)?;
 
-            // Here the user can be notified that the task instance has disappeared via `Instance`.
-            task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED)?;
+            if task_mark.task_instances_chain_maintainer.is_some() {
+                // Here the user can be notified that the task instance has disappeared via `Instance`.
+                task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED)?;
+            }
 
             task_mark.dec_parallel_runnable_num();
 

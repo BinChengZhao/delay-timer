@@ -73,7 +73,6 @@ impl TaskTrace {
 
     #[cfg(not(RUSTC_IS_NIGHTLY))]
     pub(crate) fn quit_one_task_handler(&mut self, task_id: u64, record_id: i64) -> Result<()> {
-        
         let task_handler_list = self.inner.get_mut(&task_id).ok_or_else(|| {
             anyhow!(
                 "Fn : `quit_one_task_handler`, No task-handler-list found (task-id: {} )",
