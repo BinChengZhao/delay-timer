@@ -1,3 +1,17 @@
+# Version 0.7.0
+
+v0.7.0 New features:
+
+    1. Fix the bugs before V0.6.1, When receive a timeout event from the `sweeper`, it is possible that the task has been completed.
+    So can't just call cancel.
+
+      Two options fix it.
+        1. `sweeper` Remove the recycling unit when the task is finished or cancelled.(Because rust's `BinaryHeap` does not support removing specific elements, this scheme is not used.)
+
+        2. The public event is sent only after the internal event has been processed and succeeded. (Adopted.)
+  
+    2. Adjust api names (runnable -> runnable, maximun -> maximum).
+
 # Version 0.6.1
 
 v0.6.1 New features:

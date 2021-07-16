@@ -70,7 +70,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
     task_builder
         .set_task_id(1)
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
-        .set_maximun_parallel_runable_num(2)
+        .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }
 
@@ -125,7 +125,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
     task_builder
         .set_task_id(1)
         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
-        .set_maximun_parallel_runable_num(2)
+        .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }
 
@@ -158,7 +158,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
  let task = TaskBuilder::default()
      .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
      .set_task_id(1)
-     .set_maximun_parallel_runable_num(3)
+     .set_maximum_parallel_runnable_num(3)
      .spawn(body)?;
 
  delay_timer.add_task(task);

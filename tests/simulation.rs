@@ -25,7 +25,7 @@ fn test_instance_state() -> anyhow::Result<()> {
     let task = TaskBuilder::default()
         .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
         .set_task_id(1)
-        .set_maximun_parallel_runable_num(3)
+        .set_maximum_parallel_runnable_num(3)
         .spawn(body)?;
     let task_instance_chain = delay_timer.insert_task(task)?;
 
@@ -46,7 +46,7 @@ fn test_instance_state() -> anyhow::Result<()> {
     assert_eq!(instance.get_state(), instance::RUNNING);
 
     // The task execution is completed.
-    park_timeout(Duration::from_millis(500));
+    park_timeout(Duration::from_secs(1));
 
     // This should be the completed state.
     assert_eq!(instance.get_state(), instance::COMPLETED);
@@ -66,7 +66,7 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
         .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
         .set_task_id(1)
         .set_maximum_running_time(2)
-        .set_maximun_parallel_runable_num(3)
+        .set_maximum_parallel_runnable_num(3)
         .spawn(body)?;
     let task_instance_chain = delay_timer.insert_task(task)?;
 
@@ -98,7 +98,7 @@ fn test_shell_task_instance_timeout_state() -> anyhow::Result<()> {
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
         .set_task_id(3)
         .set_maximum_running_time(3)
-        .set_maximun_parallel_runable_num(1)
+        .set_maximum_parallel_runnable_num(1)
         .spawn(body)?;
 
     let task_instance_chain = delay_timer.insert_task(task)?;
@@ -137,7 +137,7 @@ fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
         .set_task_id(3)
         .set_maximum_running_time(3)
-        .set_maximun_parallel_runable_num(1)
+        .set_maximum_parallel_runnable_num(1)
         .spawn(body)?;
 
     let task_instance_chain = delay_timer.insert_task(task)?;
@@ -224,7 +224,7 @@ fn test_advance() -> AnyResult<()> {
 }
 
 #[test]
-fn test_maximun_parallel_runable_num() -> AnyResult<()> {
+fn test_maximum_parallel_runnable_num() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicU64::new(0));
     let share_num_bunshin = share_num.clone();
@@ -239,7 +239,7 @@ fn test_maximun_parallel_runable_num() -> AnyResult<()> {
     let task = TaskBuilder::default()
         .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
         .set_task_id(1)
-        .set_maximun_parallel_runable_num(3)
+        .set_maximum_parallel_runnable_num(3)
         .spawn(body)?;
     delay_timer.add_task(task)?;
 

@@ -170,71 +170,78 @@ impl EventHandle {
         #[cfg(feature = "status-report")]
         if let Some(status_report_sender) = self.status_report_sender.take() {
             while let Ok(event) = self.timer_event_receiver.recv().await {
-                if let Ok(public_event) = PublicEvent::try_from(&event) {
+                let public_event_result = PublicEvent::try_from(&event);
+
+                let dispatch_result = self.event_dispatch(event).await;
+
+                if let Ok(public_event) = dispatch_result
+                    .map_err(|e| {
+                        error!("{}", &e);
+                        e
+                    })
+                    .and(public_event_result)
+                {
                     status_report_sender
                         .send(public_event)
                         .await
                         .unwrap_or_else(|e| print!("{}", e));
                 }
-                self.event_dispatch(event).await;
             }
             return;
         }
 
         // Did not turn on `feature` or no `status_report_sender` go this piece of logic.
         while let Ok(event) = self.timer_event_receiver.recv().await {
-            self.event_dispatch(event).await;
+            self.event_dispatch(event)
+                .await
+                .map_err(|e| error!("{}", e))
+                .ok();
         }
     }
 
-    pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) {
+    pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) -> Result<()> {
         match event {
             TimerEvent::StopTimer => {
                 self.shared_header.shared_motivation.store(false, Release);
-                return;
-            }
-            TimerEvent::AddTask(task) => {
-                self.add_task(task)
-                    .map(|task_mark| self.record_task_mark(task_mark))
-                    .map_err(|e| error!("{}", e))
-                    .ok();
+                Ok(())
             }
 
+            TimerEvent::AddTask(task) => self
+                .add_task(task)
+                .map(|task_mark| self.record_task_mark(task_mark)),
+
             TimerEvent::InsertTask(task, task_instances_chain_maintainer) => {
-                self.add_task(task)
-                    .map(|mut task_mark| {
-                        task_mark
-                            .set_task_instances_chain_maintainer(task_instances_chain_maintainer);
-                        self.record_task_mark(task_mark);
-                    })
-                    .map_err(|e| error!("{}", e))
-                    .ok();
+                self.add_task(task).map(|mut task_mark| {
+                    task_mark.set_task_instances_chain_maintainer(task_instances_chain_maintainer);
+                    self.record_task_mark(task_mark);
+                })
             }
 
             TimerEvent::UpdateTask(task) => {
                 self.update_task(task).await;
+                Ok(())
             }
 
-            TimerEvent::AdvanceTask(task_id) => {
-                self.advance_task(task_id).await;
-            }
+            TimerEvent::AdvanceTask(task_id) => self.advance_task(task_id).await,
 
             TimerEvent::RemoveTask(task_id) => {
-                self.remove_task(task_id).await;
+                let remove_result = self.remove_task(task_id).await;
 
                 self.shared_header.task_flag_map.remove(&task_id);
+                remove_result
             }
             TimerEvent::CancelTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id, state::instance::CANCELLED);
+                self.cancel_task(task_id, record_id, state::instance::CANCELLED)
             }
 
             TimerEvent::TimeoutTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id, state::instance::TIMEOUT);
+                self.cancel_task(task_id, record_id, state::instance::TIMEOUT)
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
                 self.maintain_task_status(task_id, delay_task_handler_box)
                     .await;
+                Ok(())
             }
 
             TimerEvent::FinishTask(FinishTaskBody {
@@ -243,7 +250,7 @@ impl EventHandle {
                 //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
                 // Provide a separate start time for the external, record_id time with a delay.
                 // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.
-                self.finish_task(task_id, record_id);
+                self.finish_task(task_id, record_id)
             }
         }
     }
@@ -284,7 +291,7 @@ impl EventHandle {
         task_mart
             .set_task_id(task_id)
             .set_slot_mark(slot_seed)
-            .set_parallel_runable_num(0);
+            .set_parallel_runnable_num(0);
 
         Ok(task_mart)
     }
@@ -310,16 +317,30 @@ impl EventHandle {
     }
 
     // Take the initiative to perform once Task.
-    pub(crate) async fn advance_task(&mut self, task_id: u64) -> Option<Task> {
-        let task_mark = self.shared_header.task_flag_map.get(&task_id)?;
+    pub(crate) async fn advance_task(&mut self, task_id: u64) -> Result<()> {
+        let task_mark = self
+            .shared_header
+            .task_flag_map
+            .get(&task_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Fn : `advance_task`, No task-mark found (task-id: {} )",
+                    task_id
+                )
+            })?;
 
         let slot_mark = task_mark.value().get_slot_mark();
 
         let mut task = {
             if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_mark) {
-                slot.value_mut().remove_task(task_id)?
+                slot.value_mut()
+                    .remove_task(task_id)
+                    .ok_or_else(|| anyhow!("Fn : `advance_task`, No task found (task-id: {} )", task_id))?
             } else {
-                return None;
+                return Err(anyhow!(
+                    "Fn : `advance_task`, No task found (task-id: {} )",
+                    task_id
+                ));
             }
         };
         task.clear_cylinder_line();
@@ -327,64 +348,82 @@ impl EventHandle {
         let slot_seed = self.shared_header.second_hand.load(Acquire) + 1;
 
         if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_seed) {
-            return slot.value_mut().add_task(task);
+            slot.value_mut().add_task(task);
+            return Ok(());
         }
-        None
+
+        Err(anyhow!(
+            "Fn : `advance_task`, No slot found (slot: {} )",
+            slot_seed
+        ))
     }
 
     // for remove task.
-    pub(crate) async fn remove_task(&mut self, task_id: u64) -> Option<Task> {
-        let task_mark = self.shared_header.task_flag_map.get(&task_id)?;
+    pub(crate) async fn remove_task(&mut self, task_id: u64) -> Result<()> {
+        let task_mark = self
+            .shared_header
+            .task_flag_map
+            .get(&task_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    " Fn : `remove_task`,  No task-mark found (task-id: {} )",
+                    task_id
+                )
+            })?;
 
         let slot_mark = task_mark.value().get_slot_mark();
 
         if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_mark) {
-            return slot.value_mut().remove_task(task_id);
+            slot.value_mut().remove_task(task_id);
+            return Ok(());
         }
 
-        None
+        Err(anyhow!(
+            "Fn : `remove_task`, No slot found (slot: {} )",
+            slot_mark
+        ))
     }
 
-    pub(crate) fn cancel_task(
-        &mut self,
-        task_id: u64,
-        record_id: i64,
-        state: usize,
-    ) -> Option<Result<()>> {
+    pub(crate) fn cancel_task(&mut self, task_id: u64, record_id: i64, state: usize) -> Result<()> {
         if let Some(mut task_mark_ref_mut) = self.shared_header.task_flag_map.get_mut(&task_id) {
             let task_mark = task_mark_ref_mut.value_mut();
 
-            task_mark.dec_parallel_runable_num();
+            // The cancellation operation is executed first, and then the outside world is notified of the cancellation event.
+            // If the operation object does not exist in the middle, it should return early.
+            self.task_trace.quit_one_task_handler(task_id, record_id)?;
 
             // Here the user can be notified that the task instance has disappeared via `Instance`.
-            task_mark.notify_cancel_finish(record_id, state);
+            task_mark.notify_cancel_finish(record_id, state)?;
 
-            return self.task_trace.quit_one_task_handler(task_id, record_id);
+            task_mark.dec_parallel_runnable_num();
+
+            return Ok(());
         }
-        Some(Err(anyhow!(
-            "Without the `task_mark_ref_mut` for task_id :{}, record_id : {}, state : {}",
+        Err(anyhow!(
+            "Fn : `cancel_task`, Without the `task_mark_ref_mut` for task_id :{}, record_id : {}, state : {}",
             task_id,
             record_id,
             state
-        )))
+        ))
     }
 
-    pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Option<Result<()>> {
+    pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Result<()> {
         if let Some(mut task_mark_ref_mut) = self.shared_header.task_flag_map.get_mut(&task_id) {
             let task_mark = task_mark_ref_mut.value_mut();
-
-            task_mark.dec_parallel_runable_num();
+            self.task_trace.quit_one_task_handler(task_id, record_id)?;
 
             // Here the user can be notified that the task instance has disappeared via `Instance`.
-            task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED);
+            task_mark.notify_cancel_finish(record_id, state::instance::COMPLETED)?;
 
-            return self.task_trace.quit_one_task_handler(task_id, record_id);
+            task_mark.dec_parallel_runnable_num();
+
+            return Ok(());
         }
-        Some(Err(anyhow!(
-            "Without the `task_mark_ref_mut` for task_id :{}, record_id : {}",
+        Err(anyhow!(
+            "Fn : `finish_task`, Without the `task_mark_ref_mut` for task_id :{}, record_id : {}",
             task_id,
             record_id
-        )))
+        ))
     }
 
     pub(crate) async fn maintain_task_status(
