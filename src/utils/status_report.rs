@@ -120,7 +120,7 @@ pub enum PublicEvent {
 }
 
 impl TryFrom<&TimerEvent> for PublicEvent {
-    type Error = &'static str;
+    type Error = anyhow::Error;
 
     fn try_from(timer_event: &TimerEvent) -> Result<Self, Self::Error> {
         match timer_event {
@@ -137,7 +137,7 @@ impl TryFrom<&TimerEvent> for PublicEvent {
                 Ok(PublicEvent::TimeoutTask(*task_id, *record_id))
             }
 
-            _ => Err("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!"),
+            _ => Err(anyhow!("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!")),
         }
     }
 }

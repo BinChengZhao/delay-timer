@@ -72,20 +72,38 @@ impl TaskTrace {
     }
 
     #[cfg(not(RUSTC_IS_NIGHTLY))]
-    pub(crate) fn quit_one_task_handler(
-        &mut self,
-        task_id: u64,
-        record_id: i64,
-    ) -> Option<Result<()>> {
-        let task_handler_list = self.inner.get_mut(&task_id)?;
+    pub(crate) fn quit_one_task_handler(&mut self, task_id: u64, record_id: i64) -> Result<()> {
+        
+        let task_handler_list = self.inner.get_mut(&task_id).ok_or_else(|| {
+            anyhow!(
+                "Fn : `quit_one_task_handler`, No task-handler-list found (task-id: {} )",
+                task_id
+            )
+        })?;
         let index = task_handler_list
             .iter()
-            .position(|d| d.record_id == record_id)?;
+            .position(|d| d.record_id == record_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Fn : `quit_one_task_handler`, No task-handle-index found (task-id: {} , record-id: {})",
+                    task_id,
+                    record_id
+                )
+            })?;
 
         let mut has_remove_element_list = task_handler_list.split_off(index);
-        let mut remove_element = has_remove_element_list.pop_front()?;
+
+        let mut remove_element = has_remove_element_list.pop_front().ok_or_else(|| {
+            anyhow!(
+                "No task-handle found in list (task-id: {} , record-id: {})",
+                task_id,
+                record_id
+            )
+        })?;
+
         task_handler_list.append(&mut has_remove_element_list);
-        Some(remove_element.quit())
+
+        remove_element.quit()
     }
 }
 

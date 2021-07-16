@@ -267,8 +267,8 @@ impl Timer {
             .real_time_generate();
         let task_id: u64 = task.task_id;
 
-        if let Some(maximun_parallel_runable_num) = task.maximun_parallel_runable_num {
-            let parallel_runable_num: u64;
+        if let Some(maximum_parallel_runnable_num) = task.maximum_parallel_runnable_num {
+            let parallel_runnable_num: u64;
 
             {
                 let task_flag_map =
@@ -278,12 +278,12 @@ impl Timer {
                         .ok_or_else(|| {
                             anyhow!("Can't get task_flag_map for task : {}", task.task_id)
                         })?;
-                parallel_runable_num = task_flag_map.value().get_parallel_runable_num();
+                parallel_runnable_num = task_flag_map.value().get_parallel_runnable_num();
             }
 
-            //if runable_task.parallel_runable_num >= task.maximun_parallel_runable_num doesn't run it.
+            //if runnable_task.parallel_runnable_num >= task.maximum_parallel_runnable_num doesn't run it.
 
-            if parallel_runable_num >= maximun_parallel_runable_num {
+            if parallel_runnable_num >= maximum_parallel_runnable_num {
                 return self.handle_task(task, timestamp, next_second_hand, false);
             }
         }
@@ -322,7 +322,7 @@ impl Timer {
         mut task: Task,
         timestamp: u64,
         next_second_hand: u64,
-        update_runable_num: bool,
+        update_runnable_num: bool,
     ) -> AnyResult<()> {
         let task_id: u64 = task.task_id;
 
@@ -355,8 +355,8 @@ impl Timer {
                 .ok_or_else(|| anyhow!("can't get task_flag_map for task :{}", task_id))?;
 
             task_flag_map.value_mut().set_slot_mark(slot_seed);
-            if update_runable_num {
-                task_flag_map.value_mut().inc_parallel_runable_num();
+            if update_runnable_num {
+                task_flag_map.value_mut().inc_parallel_runnable_num();
             }
         }
         Ok(())

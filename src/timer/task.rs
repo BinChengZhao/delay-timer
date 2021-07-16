@@ -23,7 +23,7 @@ pub(crate) struct TaskMark {
     // The wheel slot where the task is located.
     slot_mark: u64,
     // Number of tasks running in parallel.
-    parallel_runable_num: u64,
+    parallel_runnable_num: u64,
     /// Chain of task run instances.
     /// For inner maintain to Running-Task's instance.
     pub(crate) task_instances_chain_maintainer: Option<TaskInstancesChainMaintainer>,
@@ -48,24 +48,27 @@ impl TaskMark {
     }
 
     #[inline(always)]
-    pub(crate) fn get_parallel_runable_num(&self) -> u64 {
-        self.parallel_runable_num
+    pub(crate) fn get_parallel_runnable_num(&self) -> u64 {
+        self.parallel_runnable_num
     }
 
     #[inline(always)]
-    pub(crate) fn set_parallel_runable_num(&mut self, parallel_runable_num: u64) -> &mut Self {
-        self.parallel_runable_num = parallel_runable_num;
+    pub(crate) fn set_parallel_runnable_num(&mut self, parallel_runnable_num: u64) -> &mut Self {
+        self.parallel_runnable_num = parallel_runnable_num;
         self
     }
 
     #[inline(always)]
-    pub(crate) fn inc_parallel_runable_num(&mut self) {
-        self.parallel_runable_num += 1;
+    pub(crate) fn inc_parallel_runnable_num(&mut self) {
+        self.parallel_runnable_num += 1;
     }
 
     #[inline(always)]
-    pub(crate) fn dec_parallel_runable_num(&mut self) {
-        self.parallel_runable_num = self.parallel_runable_num.checked_sub(1).unwrap_or_default();
+    pub(crate) fn dec_parallel_runnable_num(&mut self) {
+        self.parallel_runnable_num = self
+            .parallel_runnable_num
+            .checked_sub(1)
+            .unwrap_or_default();
     }
 
     #[inline(always)]
@@ -96,25 +99,34 @@ impl TaskMark {
         &mut self,
         record_id: i64,
         state: usize,
-    ) -> Option<Instance> {
-        let task_instances_chain_maintainer = self.get_task_instances_chain_maintainer()?;
+    ) -> AnyResult<Instance> {
+        let task_instances_chain_maintainer = self.get_task_instances_chain_maintainer().ok_or_else(|| {
+            anyhow!(
+                "Fn : `notify_cancel_finish`, No task-instances-chain-maintainer found (record-id: {} )",
+                record_id
+            )
+        })?;
 
         let index = task_instances_chain_maintainer
             .inner_list
             .iter()
-            .position(|d| d.get_record_id() == record_id)?;
+            .position(|d| d.get_record_id() == record_id)
+            .ok_or_else(|| anyhow!("No task-handle-index found ( record-id: {} )", record_id))?;
 
         let mut has_remove_instance_list =
             task_instances_chain_maintainer.inner_list.split_off(index);
-        let remove_instance = has_remove_instance_list.pop_front();
+
+        let remove_instance = has_remove_instance_list
+            .pop_front()
+            .ok_or_else(|| anyhow!("No task-handle found in list ( record-id: {} )", record_id))?;
+
         task_instances_chain_maintainer
             .inner_list
             .append(&mut has_remove_instance_list);
 
-        if let Some(i) = remove_instance.as_ref() {
-            i.notify_cancel_finish(state)
-        }
-        remove_instance
+        remove_instance.notify_cancel_finish(state);
+
+        Ok(remove_instance)
     }
 }
 
@@ -325,8 +337,8 @@ pub struct TaskBuilder<'a> {
     /// it can be use to deadline (excution-time + maximum_running_time).
     maximum_running_time: Option<u64>,
 
-    /// Maximum parallel runable num (optional).
-    maximun_parallel_runable_num: Option<u64>,
+    /// Maximum parallel runnable num (optional).
+    maximum_parallel_runnable_num: Option<u64>,
 
     /// If it is built by set_frequency_by_candy, set the tag separately.
     build_by_candy_str: bool,
@@ -414,8 +426,8 @@ pub struct Task {
     /// Validity.
     /// Any `Task` can set `valid` for that stop.
     valid: bool,
-    /// Maximum parallel runable num (optional).
-    pub(crate) maximun_parallel_runable_num: Option<u64>,
+    /// Maximum parallel runnable num (optional).
+    pub(crate) maximum_parallel_runnable_num: Option<u64>,
 }
 
 //bak type BoxFn
@@ -487,11 +499,11 @@ impl<'a> TaskBuilder<'a> {
 
     /// Set a task with the maximum number of parallel runs (optional).
     #[inline(always)]
-    pub fn set_maximun_parallel_runable_num(
+    pub fn set_maximum_parallel_runnable_num(
         &mut self,
-        maximun_parallel_runable_num: u64,
+        maximum_parallel_runnable_num: u64,
     ) -> &mut Self {
-        self.maximun_parallel_runable_num = Some(maximun_parallel_runable_num);
+        self.maximum_parallel_runnable_num = Some(maximum_parallel_runnable_num);
         self
     }
 
@@ -541,7 +553,7 @@ impl<'a> TaskBuilder<'a> {
             maximum_running_time: self.maximum_running_time,
             cylinder_line: 0,
             valid: true,
-            maximun_parallel_runable_num: self.maximun_parallel_runable_num,
+            maximum_parallel_runnable_num: self.maximum_parallel_runnable_num,
         })
     }
 
@@ -638,7 +650,7 @@ impl Task {
         self.cylinder_line == 0
     }
 
-    /// check if task has runable status.
+    /// check if task has runnable status.
     #[inline(always)]
     pub fn is_can_running(&self) -> bool {
         if self.is_valid() {

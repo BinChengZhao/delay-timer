@@ -56,7 +56,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
     task_builder
         .set_task_id(1)
         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
-        .set_maximun_parallel_runable_num(2)
+        .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }
 
