@@ -102,8 +102,8 @@ impl TaskMark {
     ) -> AnyResult<Instance> {
         let task_instances_chain_maintainer = self.get_task_instances_chain_maintainer().ok_or_else(|| {
             anyhow!(
-                "Fn : `notify_cancel_finish`, No task-instances-chain-maintainer found (record-id: {} )",
-                record_id
+                "Fn : `notify_cancel_finish`, No task-instances-chain-maintainer found (record-id: {} , state : {} )",
+                record_id, state
             )
         })?;
 
