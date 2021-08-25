@@ -386,9 +386,11 @@ impl EventHandle {
 
     // The `INITIATIVE` mark indicates whether the cancellation was initiated by an outside party.
 
+    // `INITIATIVE` = true
     // External initiative to cancel the action,
     // If the cancellation fails then the error log record needs to be kept.
 
+    // `INITIATIVE` = false
     // Passive cancellation at runtime (e.g., timeout) indicates that
     // The task instance has completed or has been actively cancelled,
     // And no error logging is required.
@@ -404,8 +406,15 @@ impl EventHandle {
             // The cancellation operation is executed first, and then the outside world is notified of the cancellation event.
             // If the operation object does not exist in the middle, it should return early.
 
-            // TODO: `INITIATIVE` shoule effect here. 
-            self.task_trace.quit_one_task_handler(task_id, record_id)?;
+            let quit_result = self.task_trace.quit_one_task_handler(task_id, record_id);
+
+            if quit_result.is_err() {
+                if INITIATIVE {
+                    quit_result?;
+                } else {
+                    return Ok(());
+                }
+            }
 
             if task_mark.task_instances_chain_maintainer.is_some() {
                 // Here the user can be notified that the task instance has disappeared via `Instance`.
@@ -414,10 +423,6 @@ impl EventHandle {
 
             task_mark.dec_parallel_runnable_num();
 
-            return Ok(());
-        }
-
-        if INITIATIVE == false {
             return Ok(());
         }
 
