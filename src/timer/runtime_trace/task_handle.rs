@@ -42,24 +42,28 @@ impl TaskTrace {
 
     #[cfg(RUSTC_IS_NIGHTLY)]
     pub(crate) fn quit_one_task_handler(&mut self, task_id: u64, record_id: i64) -> Result<()> {
-        let task_handler_list = self
-            .inner
-            .get_mut(&task_id)
-            .ok_or_else(|| anyhow!("No task-handle found (task-id: {})", task_id))?;
-
+        let task_handler_list = self.inner.get_mut(&task_id).ok_or_else(|| {
+            anyhow!(
+                "Fn : `quit_one_task_handler`, No task-handler-list found (task-id: {}, record-id: {} )",
+                task_id, record_id
+            )
+        })?;
+      
         let mut list_mut_cursor = task_handler_list.cursor_front_mut();
 
         let mut task_handler_box_ref: &mut DelayTaskHandlerBox;
         loop {
-            task_handler_box_ref = list_mut_cursor
-                .current()
-                .ok_or_else(|| anyhow!("No task-handle found in list (task-id: {})", task_id))?;
+            task_handler_box_ref = list_mut_cursor.current().ok_or_else(|| {
+                anyhow!(
+                    "Fn : `quit_one_task_handler`, No task_handler_box_ref found (task-id: {}, record-id: {} )",
+                    task_id, record_id
+                )
+            })?;
 
             if task_handler_box_ref.record_id > record_id {
                 return Err(anyhow!(
-                    "No task-handle-index found in list (task-id: {} , record-id: {})",
-                    task_id,
-                    record_id
+                    "Fn : `quit_one_task_handler`, No task_handler found (task-id: {}, record-id: {} )",
+                    task_id, record_id
                 ));
             }
 
@@ -74,13 +78,9 @@ impl TaskTrace {
         list_mut_cursor
             .remove_current()
             .map(|mut task_handler_box| task_handler_box.quit())
-            .ok_or_else(|| {
-                anyhow!(
-                    "No task-handle found in list (task-id: {} , record-id: {})",
-                    task_id,
-                    record_id
-                )
-            })?
+            .transpose()?;
+
+        Ok(())
     }
 
     #[cfg(not(RUSTC_IS_NIGHTLY))]
