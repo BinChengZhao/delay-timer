@@ -48,8 +48,8 @@ impl TaskTrace {
                 task_id, record_id
             )
         })?;
-
-        let mut list_mut_cursor = task_handler_list.cursor_back_mut();
+      
+        let mut list_mut_cursor = task_handler_list.cursor_front_mut();
 
         let mut task_handler_box_ref: &mut DelayTaskHandlerBox;
         loop {
@@ -74,7 +74,7 @@ impl TaskTrace {
             list_mut_cursor.move_next();
         }
 
-        //remove current task_handler_box.
+        // remove current task_handler_box.
         list_mut_cursor
             .remove_current()
             .map(|mut task_handler_box| task_handler_box.quit())

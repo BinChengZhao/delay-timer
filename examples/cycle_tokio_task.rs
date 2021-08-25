@@ -8,7 +8,9 @@ use std::thread::{current, park, Thread};
 
 fn main() -> Result<()> {
     // Build an DelayTimer that uses the default configuration of the Tokio runtime internally.
-    let delay_timer = DelayTimerBuilder::default().tokio_runtime(None).build();
+    let delay_timer = DelayTimerBuilder::default()
+        .tokio_runtime_by_default()
+        .build();
 
     // Develop a task that runs in an asynchronous cycle (using a custom asynchronous template).
     delay_timer.add_task(build_task_customized_async_task()?)?;

@@ -145,6 +145,7 @@ impl RecyclingBins {
                 match self.recycle_unit_sources.recv().await {
                     Ok(recycle_unit) => {
                         let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
+
                         (&mut recycle_unit_heap).push(Reverse(recycle_unit));
                     }
 

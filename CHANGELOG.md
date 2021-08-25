@@ -1,3 +1,17 @@
+# Version 0.8.0
+
+v0.8.0 New features:
+
+    1. Optimized the api for custom tokio runtime, better api definition, better experience.
+
+      Api changes.
+        1.  Added: `tokio_runtime_by_default` & `tokio_runtime_by_custom` & `tokio_runtime_shared_by_custom` .
+
+        2. Private: `tokio_runtime`.
+  
+    2. Optimized the method of canceling task instances, no error log is recorded when canceling a task failure after timeout.
+
+    3. Fix the compile error about `quit_one_task_handler` under nightly version.
 # Version 0.7.0
 
 v0.7.0 New features:
