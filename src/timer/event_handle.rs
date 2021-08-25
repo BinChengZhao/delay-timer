@@ -148,8 +148,8 @@ impl EventHandle {
         }
     );
 
-    //handle all event.
-    //TODO:Add TestUnit.
+    // handle all event.
+    // TODO: Add TestUnit.
     pub(crate) async fn lauch(&mut self) {
         self.init_sub_workers();
         self.handle_event().await;
@@ -231,11 +231,11 @@ impl EventHandle {
                 remove_result
             }
             TimerEvent::CancelTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id, state::instance::CANCELLED)
+                self.cancel_task::<true>(task_id, record_id, state::instance::CANCELLED)
             }
 
             TimerEvent::TimeoutTask(task_id, record_id) => {
-                self.cancel_task(task_id, record_id, state::instance::TIMEOUT)
+                self.cancel_task::<false>(task_id, record_id, state::instance::TIMEOUT)
             }
 
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
@@ -384,12 +384,27 @@ impl EventHandle {
         ))
     }
 
-    pub(crate) fn cancel_task(&mut self, task_id: u64, record_id: i64, state: usize) -> Result<()> {
+    // The `INITIATIVE` mark indicates whether the cancellation was initiated by an outside party.
+
+    // External initiative to cancel the action,
+    // If the cancellation fails then the error log record needs to be kept.
+
+    // Passive cancellation at runtime (e.g., timeout) indicates that
+    // The task instance has completed or has been actively cancelled,
+    // And no error logging is required.
+    pub(crate) fn cancel_task<const INITIATIVE: bool>(
+        &mut self,
+        task_id: u64,
+        record_id: i64,
+        state: usize,
+    ) -> Result<()> {
         if let Some(mut task_mark_ref_mut) = self.shared_header.task_flag_map.get_mut(&task_id) {
             let task_mark = task_mark_ref_mut.value_mut();
 
             // The cancellation operation is executed first, and then the outside world is notified of the cancellation event.
             // If the operation object does not exist in the middle, it should return early.
+
+            // TODO: `INITIATIVE` shoule effect here. 
             self.task_trace.quit_one_task_handler(task_id, record_id)?;
 
             if task_mark.task_instances_chain_maintainer.is_some() {
@@ -401,6 +416,11 @@ impl EventHandle {
 
             return Ok(());
         }
+
+        if INITIATIVE == false {
+            return Ok(());
+        }
+
         Err(anyhow!(
             "Fn : `cancel_task`, Without the `task_mark_ref_mut` for task_id :{}, record_id : {}, state : {}",
             task_id,

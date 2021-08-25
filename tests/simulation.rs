@@ -1,19 +1,16 @@
 use delay_timer::prelude::*;
 
 use std::str::FromStr;
-use std::sync::atomic::{
-    AtomicUsize,
-    Ordering::{Acquire, Release},
-};
-use std::sync::{
-    atomic::{AtomicI32, AtomicU64},
-    Arc,
-};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::atomic::{AtomicI32, AtomicU64};
+use std::sync::Arc;
 use std::thread::{self, park_timeout};
 use std::time::Duration;
 
 use smol::Timer;
 
+// TODO: Please turn on `--features=full` before test.
 #[test]
 fn test_instance_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
@@ -59,7 +56,9 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
     let body = create_async_fn_body!({
+        println!("test_instance_timeout_state");
         Timer::after(Duration::from_secs(3)).await;
+        println!("test_instance_timeout_state end.");
     });
 
     let task = TaskBuilder::default()
@@ -76,8 +75,8 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     // The task was still running when the instance was first obtained.
     assert_eq!(instance.get_state(), instance::RUNNING);
 
-    // The task execution is timeout after about 2.1 second.
-    park_timeout(Duration::from_secs_f64(2.1));
+    // The task execution is timeout after about 3 second.
+    park_timeout(Duration::from_secs(3));
 
     // This should be the completed state.
     assert_eq!(instance.get_state(), instance::TIMEOUT);

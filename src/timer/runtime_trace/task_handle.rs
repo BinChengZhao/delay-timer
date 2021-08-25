@@ -41,21 +41,26 @@ impl TaskTrace {
     //TODO: One stable cfg-flag， One nightly cfg-flag .
 
     #[cfg(RUSTC_IS_NIGHTLY)]
-    pub(crate) fn quit_one_task_handler(
-        &mut self,
-        task_id: u64,
-        record_id: i64,
-    ) -> Option<Result<()>> {
-        let task_handler_list = self.inner.get_mut(&task_id)?;
+    pub(crate) fn quit_one_task_handler(&mut self, task_id: u64, record_id: i64) -> Result<()> {
+        let task_handler_list = self
+            .inner
+            .get_mut(&task_id)
+            .ok_or_else(|| anyhow!("No task-handle found (task-id: {})", task_id))?;
 
-        let mut list_mut_cursor = task_handler_list.cursor_back_mut();
+        let mut list_mut_cursor = task_handler_list.cursor_front_mut();
 
         let mut task_handler_box_ref: &mut DelayTaskHandlerBox;
         loop {
-            task_handler_box_ref = list_mut_cursor.current()?;
+            task_handler_box_ref = list_mut_cursor
+                .current()
+                .ok_or_else(|| anyhow!("No task-handle found in list (task-id: {})", task_id))?;
 
             if task_handler_box_ref.record_id > record_id {
-                return None;
+                return Err(anyhow!(
+                    "No task-handle-index found in list (task-id: {} , record-id: {})",
+                    task_id,
+                    record_id
+                ));
             }
 
             if task_handler_box_ref.record_id == record_id {
@@ -65,10 +70,17 @@ impl TaskTrace {
             list_mut_cursor.move_next();
         }
 
-        //remove current task_handler_box.
+        // remove current task_handler_box.
         list_mut_cursor
             .remove_current()
             .map(|mut task_handler_box| task_handler_box.quit())
+            .ok_or_else(|| {
+                anyhow!(
+                    "No task-handle found in list (task-id: {} , record-id: {})",
+                    task_id,
+                    record_id
+                )
+            })?
     }
 
     #[cfg(not(RUSTC_IS_NIGHTLY))]

@@ -37,7 +37,7 @@ fn async_cancel() -> Result<()> {
 
     // Build an DelayTimer that uses the Customize a tokio runtime.
     let delay_timer = DelayTimerBuilder::default()
-        .tokio_runtime(Some(tokio_rt.clone()))
+        .tokio_runtime_shared_by_custom(tokio_rt.clone())
         .build();
 
     tokio_rt.block_on(async {
