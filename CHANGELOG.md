@@ -1,3 +1,9 @@
+# Version 0.8.1
+
+v0.8.1 New features:
+
+    1. Optimization logic: After task removal, the surviving task instance resources can be cancelled normally.
+
 # Version 0.8.0
 
 v0.8.0 New features:

@@ -48,7 +48,7 @@ impl TaskTrace {
                 task_id, record_id
             )
         })?;
-      
+
         let mut list_mut_cursor = task_handler_list.cursor_front_mut();
 
         let mut task_handler_box_ref: &mut DelayTaskHandlerBox;

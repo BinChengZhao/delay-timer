@@ -400,38 +400,42 @@ impl EventHandle {
         record_id: i64,
         state: usize,
     ) -> Result<()> {
+        // The cancellation operation is executed first, and then the outside world is notified of the cancellation event.
+        // If the operation object does not exist in the middle, it should return early.
+
+        let quit_result = self.task_trace.quit_one_task_handler(task_id, record_id);
+
+        if quit_result.is_err() {
+            if INITIATIVE {
+                quit_result?;
+            } else {
+                return Ok(());
+            }
+        }
+
         if let Some(mut task_mark_ref_mut) = self.shared_header.task_flag_map.get_mut(&task_id) {
             let task_mark = task_mark_ref_mut.value_mut();
 
-            // The cancellation operation is executed first, and then the outside world is notified of the cancellation event.
-            // If the operation object does not exist in the middle, it should return early.
-
-            let quit_result = self.task_trace.quit_one_task_handler(task_id, record_id);
-
-            if quit_result.is_err() {
-                if INITIATIVE {
-                    quit_result?;
-                } else {
-                    return Ok(());
-                }
-            }
+            task_mark.dec_parallel_runnable_num();
 
             if task_mark.task_instances_chain_maintainer.is_some() {
                 // Here the user can be notified that the task instance has disappeared via `Instance`.
                 task_mark.notify_cancel_finish(record_id, state)?;
             }
 
-            task_mark.dec_parallel_runnable_num();
-
             return Ok(());
         }
 
-        Err(anyhow!(
-            "Fn : `cancel_task`, Without the `task_mark_ref_mut` for task_id :{}, record_id : {}, state : {}",
-            task_id,
-            record_id,
-            state
-        ))
+        if INITIATIVE {
+            Err(anyhow!(
+                "Fn : `cancel_task`, Without the `task_mark_ref_mut` for task_id :{}, record_id : {}, state : {}",
+                task_id,
+                record_id,
+                state
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Result<()> {
