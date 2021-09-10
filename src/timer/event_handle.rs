@@ -234,6 +234,15 @@ impl EventHandle {
                 self.cancel_task::<true>(task_id, record_id, state::instance::CANCELLED)
             }
 
+            // FIXME:
+            // When the `TimeoutTask` event fails to remove the handle, Ok(()) is returned by default.
+            // This causes the `TimeoutTask` event to be sent to the outside world by `status_report_sender`,
+            // Which is a buggy behavior.
+
+            // Redesign the return value: Result<()> -> Result<bool>
+            // Ok(_) & Err(_) for Result, means whether the processing is successful or not.
+            // `bool` means whether to synchronize the event to external.
+
             TimerEvent::TimeoutTask(task_id, record_id) => {
                 self.cancel_task::<false>(task_id, record_id, state::instance::TIMEOUT)
             }
