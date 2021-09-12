@@ -258,7 +258,7 @@ impl EventHandle {
 
             TimerEvent::FinishTask(FinishTaskBody {
                 task_id, record_id, ..
-            }) => self.finish_task(task_id, record_id).map(|_| true),
+            }) => self.finish_task(task_id, record_id),
         }
     }
 
@@ -445,10 +445,12 @@ impl EventHandle {
         }
     }
 
-    pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Result<()> {
+    pub(crate) fn finish_task(&mut self, task_id: u64, record_id: i64) -> Result<bool> {
+        // `task-handler` should exit first regardless of whether `task_mark_ref_mut` exists or not.
+        self.task_trace.quit_one_task_handler(task_id, record_id)?;
+
         if let Some(mut task_mark_ref_mut) = self.shared_header.task_flag_map.get_mut(&task_id) {
             let task_mark = task_mark_ref_mut.value_mut();
-            self.task_trace.quit_one_task_handler(task_id, record_id)?;
 
             if task_mark.task_instances_chain_maintainer.is_some() {
                 // Here the user can be notified that the task instance has disappeared via `Instance`.
@@ -457,13 +459,15 @@ impl EventHandle {
 
             task_mark.dec_parallel_runnable_num();
 
-            return Ok(());
+            return Ok(true);
         }
-        Err(anyhow!(
+
+        error!(
             "Fn : `finish_task`, Without the `task_mark_ref_mut` for task_id :{}, record_id : {}",
-            task_id,
-            record_id
-        ))
+            task_id, record_id
+        );
+
+        Ok(true)
     }
 
     pub(crate) async fn maintain_task_status(
