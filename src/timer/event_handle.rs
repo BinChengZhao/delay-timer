@@ -174,17 +174,19 @@ impl EventHandle {
 
                 let dispatch_result = self.event_dispatch(event).await;
 
-                if let Ok(public_event) = dispatch_result
-                    .map_err(|e| {
+                match dispatch_result {
+                    Ok(event_sync_mark) if event_sync_mark => {
+                        if let Ok(public_event) = public_event_result {
+                            status_report_sender
+                                .send(public_event)
+                                .await
+                                .unwrap_or_else(|e| error!("event sync error: {}", e));
+                        }
+                    }
+                    Err(e) => {
                         error!("{}", &e);
-                        e
-                    })
-                    .and(public_event_result)
-                {
-                    status_report_sender
-                        .send(public_event)
-                        .await
-                        .unwrap_or_else(|e| print!("{}", e));
+                    }
+                    _ => {}
                 }
             }
             return;
@@ -199,33 +201,35 @@ impl EventHandle {
         }
     }
 
-    pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) -> Result<()> {
+    pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) -> Result<bool> {
         match event {
             TimerEvent::StopTimer => {
                 self.shared_header.shared_motivation.store(false, Release);
-                Ok(())
+                Ok(true)
             }
 
-            TimerEvent::AddTask(task) => self
-                .add_task(task)
-                .map(|task_mark| self.record_task_mark(task_mark)),
+            TimerEvent::AddTask(task) => self.add_task(task).map(|task_mark| {
+                self.record_task_mark(task_mark);
+                true
+            }),
 
             TimerEvent::InsertTask(task, task_instances_chain_maintainer) => {
                 self.add_task(task).map(|mut task_mark| {
                     task_mark.set_task_instances_chain_maintainer(task_instances_chain_maintainer);
                     self.record_task_mark(task_mark);
+                    true
                 })
             }
 
             TimerEvent::UpdateTask(task) => {
                 self.update_task(task).await;
-                Ok(())
+                Ok(true)
             }
 
-            TimerEvent::AdvanceTask(task_id) => self.advance_task(task_id).await,
+            TimerEvent::AdvanceTask(task_id) => self.advance_task(task_id).await.map(|_| true),
 
             TimerEvent::RemoveTask(task_id) => {
-                let remove_result = self.remove_task(task_id).await;
+                let remove_result = self.remove_task(task_id).await.map(|_| true);
 
                 self.shared_header.task_flag_map.remove(&task_id);
                 remove_result
@@ -234,6 +238,14 @@ impl EventHandle {
                 self.cancel_task::<true>(task_id, record_id, state::instance::CANCELLED)
             }
 
+            // FIXED:
+            // When the `TimeoutTask` event fails to remove the handle, Ok(()) is returned by default.
+            // This causes the `TimeoutTask` event to be sent to the outside world by `status_report_sender`,
+            // Which is a buggy behavior.
+
+            // Redesign the return value: Result<()> -> Result<bool>
+            // Ok(_) & Err(_) for Result, means whether the processing is successful or not.
+            // `bool` means whether to synchronize the event to external.
             TimerEvent::TimeoutTask(task_id, record_id) => {
                 self.cancel_task::<false>(task_id, record_id, state::instance::TIMEOUT)
             }
@@ -241,17 +253,12 @@ impl EventHandle {
             TimerEvent::AppendTaskHandle(task_id, delay_task_handler_box) => {
                 self.maintain_task_status(task_id, delay_task_handler_box)
                     .await;
-                Ok(())
+                Ok(true)
             }
 
             TimerEvent::FinishTask(FinishTaskBody {
                 task_id, record_id, ..
-            }) => {
-                //TODO: maintain a outside-task-handle , through it pass the _finish_time and final-state.
-                // Provide a separate start time for the external, record_id time with a delay.
-                // Or use snowflake.real_time to generate record_id , so you don't have to add a separate field.
-                self.finish_task(task_id, record_id)
-            }
+            }) => self.finish_task(task_id, record_id).map(|_| true),
         }
     }
 
@@ -399,7 +406,7 @@ impl EventHandle {
         task_id: u64,
         record_id: i64,
         state: usize,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         // The cancellation operation is executed first, and then the outside world is notified of the cancellation event.
         // If the operation object does not exist in the middle, it should return early.
 
@@ -409,7 +416,7 @@ impl EventHandle {
             if INITIATIVE {
                 quit_result?;
             } else {
-                return Ok(());
+                return Ok(false);
             }
         }
 
@@ -423,7 +430,7 @@ impl EventHandle {
                 task_mark.notify_cancel_finish(record_id, state)?;
             }
 
-            return Ok(());
+            return Ok(true);
         }
 
         if INITIATIVE {
@@ -434,7 +441,7 @@ impl EventHandle {
                 state
             ))
         } else {
-            Ok(())
+            Ok(false)
         }
     }
 

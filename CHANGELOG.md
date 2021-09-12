@@ -1,3 +1,10 @@
+# Version 0.8.2
+
+v0.8.2 New features:
+
+    1. FIXED:
+         When the `TimeoutTask` event fails to remove the handle, Ok(()) is returned by default.
+         This causes the `TimeoutTask` event to be sent to the outside world by `status_report_sender`,Which is a buggy behavior.
 # Version 0.8.1
 
 v0.8.1 New features:
