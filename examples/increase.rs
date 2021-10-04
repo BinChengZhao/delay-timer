@@ -1,12 +1,13 @@
-use delay_timer::prelude::*;
+#![allow(deprecated)]
 
+use surf;
+
+use delay_timer::prelude::*;
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::sync::Arc;
 use std::thread::{current, park, Thread};
-
-use surf;
 
 #[derive(Debug, Clone, Copy)]
 struct SafePointer(NonNull<Arc<AtomicUsize>>);
@@ -44,7 +45,7 @@ fn main() -> AnyResult<()> {
 
     // The common task attr.
     task_builder
-        .set_frequency(Frequency::CountDown(1, "30 * * * * * *"))
+        .set_frequency_once_by_seconds(30)
         .set_maximum_running_time(90);
 
     for i in 0..1000 {
@@ -52,7 +53,7 @@ fn main() -> AnyResult<()> {
         delay_timer.add_task(task)?;
     }
 
-    task_builder.set_frequency(Frequency::CountDown(1, "58 * * * * * *"));
+    task_builder.set_frequency_count_down_by_seconds(58, 1);
     for i in 1000..1300 {
         let task = task_builder.set_task_id(i).spawn(async_body)?;
         delay_timer.add_task(task)?;
@@ -60,7 +61,7 @@ fn main() -> AnyResult<()> {
 
     let task = task_builder
         .set_task_id(8888)
-        .set_frequency(Frequency::CountDown(1, "@minutely"))
+        .set_frequency_once_by_minutes(1)
         .spawn(end_body)?;
     delay_timer.add_task(task)?;
 

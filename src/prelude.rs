@@ -17,7 +17,9 @@ pub use crate::timer::runtime_trace::state::instance;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use crate::timer::runtime_trace::task_instance::{Instance, TaskInstance, TaskInstancesChain};
 pub use crate::timer::task::TaskContext;
-pub use crate::timer::task::{Frequency, ScheduleIteratorTimeZone, Task, TaskBuilder};
+pub use crate::timer::task::{
+    FrequencyCronStr as Frequency, ScheduleIteratorTimeZone, Task, TaskBuilder,
+};
 pub use crate::timer::timer_core::{FinishOutput, FinishTaskBody, TimerEvent};
 
 pub use crate::utils::convenience::cron_expression_grammatical_candy::{
@@ -47,11 +49,12 @@ pub(crate) use crate::timer::runtime_trace::task_instance::TaskInstancesChainMai
 
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList, ChildUnify};
 pub(crate) use dashmap::DashMap;
-pub(crate) use log::{error, info};
+pub(crate) use log::{debug, error, info, trace};
 pub(crate) use smol::channel::{Receiver as AsyncReceiver, Sender as AsyncSender};
 pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
 pub(crate) use smol::Timer;
+pub(crate) use std::convert::{TryFrom, TryInto};
 pub(crate) use std::time::Duration;
 
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
@@ -67,3 +70,8 @@ cfg_tokio_support!(
 cfg_status_report!(
     pub use crate::utils::status_report::PublicEvent;
 );
+
+pub(crate) const ONE_SECOND: u64 = 1;
+pub(crate) const ONE_MINUTE: u64 = ONE_SECOND * 60;
+pub(crate) const ONE_HOUR: u64 = ONE_MINUTE * 60;
+pub(crate) const ONE_DAY: u64 = ONE_HOUR * 24;

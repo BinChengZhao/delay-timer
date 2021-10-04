@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use anyhow::Result;
 use delay_timer::prelude::*;
 use hyper::{Client, Uri};

@@ -24,6 +24,8 @@ such as Sunday at 4am to execute a backup task.
 
 ![image](https://github.com/BinChengZhao/delay-timer/blob/master/structural_drawing/DelayTImer.png)
 
+### If you're looking for a distributed task scheduling platform, check out the [delicate](https://github.com/BinChengZhao/delicate)
+
 
 ## Examples
 
@@ -240,7 +242,6 @@ Licensed under either of
 - [ ] neaten todo in code, replenish tests and benchmark.
 - [ ] batch-opration.
 - [x] report-for-server.
-- [ ] TASK-TAG.
 - [ ] Future upgrade of delay_timer to multi-wheel mode, different excutor handling different wheels e.g. subtract laps for one wheel, run task for one wheel.
 
 #### Contribution
@@ -248,8 +249,3 @@ Licensed under either of
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
-
-
-#### The author comments:
-
-#### Make an upgrade plan for smooth updates in the future, Such as stop serve  back-up ` unfinished task`  then up new version serve load task.bak, Runing.

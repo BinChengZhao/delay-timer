@@ -1,7 +1,7 @@
-use delay_timer::prelude::*;
+#![allow(deprecated)]
 
 use anyhow::Result;
-
+use delay_timer::prelude::*;
 use smol::Timer;
 use std::time::Duration;
 
@@ -52,6 +52,8 @@ fn build_task_async_print() -> Result<Task, TaskError> {
         println!("create_async_fn_body:i'success");
     });
 
+    // Allow once.
+    #[allow(deprecated)]
     task_builder
         .set_task_id(1)
         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))

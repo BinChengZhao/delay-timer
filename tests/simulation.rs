@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use delay_timer::prelude::*;
 
 use std::str::FromStr;
@@ -204,6 +205,8 @@ fn test_advance() -> AnyResult<()> {
         create_default_delay_task_handler()
     };
 
+    // Allow once.
+    #[allow(deprecated)]
     let task = TaskBuilder::default()
         .set_frequency(Frequency::CountDown(3, expression))
         .set_task_id(task_id)
@@ -263,7 +266,7 @@ fn tests_countdown() -> AnyResult<()> {
     };
 
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(3, "0/2 * * * * * *"))
+        .set_frequency_count_down_by_seconds(2, 3)
         .set_task_id(1)
         .spawn(body)?;
     delay_timer.add_task(task)?;

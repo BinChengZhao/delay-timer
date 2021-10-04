@@ -202,6 +202,8 @@ impl EventHandle {
     }
 
     pub(crate) async fn event_dispatch(&mut self, event: TimerEvent) -> Result<bool> {
+        trace!("event-dispatch: {:?}", event);
+
         match event {
             TimerEvent::StopTimer => {
                 self.shared_header.shared_motivation.store(false, Release);
@@ -286,6 +288,7 @@ impl EventHandle {
             + second_hand;
         let slot_seed: u64 = time_seed % DEFAULT_TIMER_SLOT_COUNT;
 
+        let cylinder_line = time_seed / DEFAULT_TIMER_SLOT_COUNT;
         task.set_cylinder_line(time_seed / DEFAULT_TIMER_SLOT_COUNT);
 
         // copy task_id
@@ -299,6 +302,10 @@ impl EventHandle {
             .set_task_id(task_id)
             .set_slot_mark(slot_seed)
             .set_parallel_runnable_num(0);
+        debug!(
+            "task-id: {} , next-exec-timestamp: {}, slot-seed: {}, cylinder-line: {}",
+            task_id, exec_time, slot_seed, cylinder_line
+        );
 
         Ok(task_mart)
     }

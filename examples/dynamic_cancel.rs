@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use anyhow::Result;
 use delay_timer::prelude::*;
 use smol::Timer;
@@ -85,7 +87,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 
     task_builder
         .set_task_id(1)
-        .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
+        .set_frequency_repeated_by_seconds(6)
         .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }

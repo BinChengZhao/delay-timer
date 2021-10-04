@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use delay_timer::prelude::*;
 use std::thread::sleep;
 use std::time::Duration;
