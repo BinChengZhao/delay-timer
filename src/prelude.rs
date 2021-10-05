@@ -55,8 +55,11 @@ pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
 pub(crate) use smol::Timer;
 pub(crate) use std::convert::{TryFrom, TryInto};
+pub(crate) use std::iter::StepBy;
+pub(crate) use std::ops::RangeFrom;
 pub(crate) use std::time::Duration;
 
+pub(crate) type SecondsState = StepBy<RangeFrom<u64>>;
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 

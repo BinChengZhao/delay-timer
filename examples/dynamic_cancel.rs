@@ -97,7 +97,7 @@ fn build_task_async_execute_process() -> Result<Task, TaskError> {
 
     let body = tokio_unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
     task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_frequency_repeated_by_seconds(1)
         .set_task_id(3)
         .set_maximum_running_time(10)
         .set_maximum_parallel_runnable_num(1)

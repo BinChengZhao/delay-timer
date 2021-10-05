@@ -71,7 +71,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 
     task_builder
         .set_task_id(1)
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_frequency_repeated_by_seconds(1)
         .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }
@@ -126,7 +126,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 
     task_builder
         .set_task_id(1)
-        .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
+        .set_frequency_repeated_by_seconds(6)
         .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }
@@ -158,7 +158,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
  });
 
  let task = TaskBuilder::default()
-     .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
+     .set_frequency_count_down_by_seconds(1, 9)
      .set_task_id(1)
      .set_maximum_parallel_runnable_num(3)
      .spawn(body)?;
@@ -180,7 +180,7 @@ fn build_task_customized_async_task() -> Result<Task, TaskError> {
 
     let body = generate_closure_template("delay_timer is easy to use. .".into());
     task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::LoveTime))
+        .set_frequency_repeated_by_cron_str("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100")
         .set_task_id(5)
         .set_maximum_running_time(5)
         .spawn(body)
@@ -208,21 +208,6 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
     Ok(())
 }
 
-  enum AuspiciousTime {
-      PerSevenSeconds,
-      PerEightSeconds,
-      LoveTime,
-  }
- 
-  impl Into<CandyCronStr> for AuspiciousTime {
-      fn into(self) -> CandyCronStr {
-          match self {
-              Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
-              Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
-              Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
-         }
-     }
- }
  ```
  
 There's a lot more in the [examples] directory.

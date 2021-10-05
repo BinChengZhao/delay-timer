@@ -67,7 +67,7 @@
 //!
 //!     task_builder
 //!         .set_task_id(1)
-//!         .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+//!         .set_frequency_repeated_by_seconds(1)
 //!         .set_maximum_parallel_runnable_num(2)
 //!         .spawn(body)
 //! }
@@ -123,7 +123,7 @@
 //!
 //!     task_builder
 //!         .set_task_id(1)
-//!         .set_frequency(Frequency::Repeated("*/6 * * * * * *"))
+//!         .set_frequency_repeated_by_seconds(6)
 //!         .set_maximum_parallel_runnable_num(2)
 //!         .spawn(body)
 //! }
@@ -158,7 +158,7 @@
 //! });
 //!
 //! let task = TaskBuilder::default()
-//!     .set_frequency_by_candy(CandyFrequency::CountDown(9, CandyCron::Secondly))
+//!     .set_frequency_count_down_by_seconds(1, 9)
 //!     .set_task_id(1)
 //!     .set_maximum_parallel_runnable_num(3)
 //!     .spawn(body).expect("");
@@ -193,7 +193,7 @@
 //!     let body = generate_closure_template(String::from("dynamic"));
 //!
 //!     task_builder
-//!         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerEightSeconds))
+//!         .set_frequency_repeated_by_seconds(8)
 //!         .set_task_id(2)
 //!         .set_maximum_running_time(5)
 //!         .spawn(body)
@@ -227,21 +227,6 @@
 //!     Ok(())
 //! }
 //!
-//! enum AuspiciousTime {
-//!     PerSevenSeconds,
-//!     PerEightSeconds,
-//!     LoveTime,
-//! }
-//!
-//! impl Into<CandyCronStr> for AuspiciousTime {
-//!     fn into(self) -> CandyCronStr {
-//!         match self {
-//!             Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
-//!             Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
-//!             Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
-//!         }
-//!     }
-//! }
 //! ```
 #![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![cfg_attr(RUSTC_IS_NIGHTLY, feature(linked_list_cursors))]

@@ -139,7 +139,6 @@ impl TaskMark {
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum FrequencyUnify<'a> {
-    Frequency(Frequency<'a>),
     FrequencyCronStr(FrequencyCronStr<'a>),
     FrequencySeconds(FrequencySeconds),
 }
@@ -192,38 +191,19 @@ pub(crate) enum FrequencyInner {
     /// Type of countdown for cron-expression.
     CronExpressionCountDown(u64, DelayTimerScheduleIteratorOwned),
     /// Unlimited repetition types for seconds-duration.
-    SecondsRepeated(u64),
-    /// Type of countdown for seconds-duration.
-    /// SecondsCountDown(count_down, duration)
-    SecondsCountDown(u64, u64),
+    SecondsRepeated(SecondsState),
+    /// Type of countdown for SecondsState.
+    /// SecondsCountDown(count_down, SecondsState)
+    SecondsCountDown(u64, SecondsState),
 }
-//
+
 impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyInner {
-    type Error = CronExpressionAnalyzeError;
+    type Error = FrequencyAnalyzeError;
 
     fn try_from(
         (frequency, time_zone): (FrequencyUnify<'_>, ScheduleIteratorTimeZone),
     ) -> Result<FrequencyInner, Self::Error> {
         let frequency_inner = match frequency {
-            FrequencyUnify::Frequency(Frequency::Once(cron_str)) => {
-                let task_schedule =
-                    DelayTimerScheduleIteratorOwned::analyze_cron_expression(time_zone, cron_str)?;
-
-                FrequencyInner::CronExpressionCountDown(1, task_schedule)
-            }
-            FrequencyUnify::Frequency(Frequency::Repeated(cron_str)) => {
-                let task_schedule =
-                    DelayTimerScheduleIteratorOwned::analyze_cron_expression(time_zone, cron_str)?;
-
-                FrequencyInner::CronExpressionRepeated(task_schedule)
-            }
-            FrequencyUnify::Frequency(Frequency::CountDown(count_down, cron_str)) => {
-                let task_schedule =
-                    DelayTimerScheduleIteratorOwned::analyze_cron_expression(time_zone, cron_str)?;
-
-                FrequencyInner::CronExpressionCountDown(count_down as u64, task_schedule)
-            }
-
             FrequencyUnify::FrequencyCronStr(FrequencyCronStr::Once(cron_str)) => {
                 let task_schedule =
                     DelayTimerScheduleIteratorOwned::analyze_cron_expression(time_zone, cron_str)?;
@@ -244,13 +224,29 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
             }
 
             FrequencyUnify::FrequencySeconds(FrequencySeconds::Once(seconds)) => {
-                FrequencyInner::SecondsCountDown(1, seconds)
+                if seconds == 0 {
+                    return Err(FrequencyAnalyzeError::DisInitTime);
+                }
+
+                let seconds_state: SecondsState = (get_timestamp()..).step_by(seconds as usize);
+                FrequencyInner::SecondsCountDown(1, seconds_state)
             }
             FrequencyUnify::FrequencySeconds(FrequencySeconds::Repeated(seconds)) => {
-                FrequencyInner::SecondsRepeated(seconds)
+                if seconds == 0 {
+                    return Err(FrequencyAnalyzeError::DisInitTime);
+                }
+
+                let seconds_state: SecondsState = (get_timestamp()..).step_by(seconds as usize);
+
+                FrequencyInner::SecondsRepeated(seconds_state)
             }
             FrequencyUnify::FrequencySeconds(FrequencySeconds::CountDown(count_down, seconds)) => {
-                FrequencyInner::SecondsCountDown(count_down, seconds)
+                if seconds == 0 {
+                    return Err(FrequencyAnalyzeError::DisInitTime);
+                }
+
+                let seconds_state: SecondsState = (get_timestamp()..).step_by(seconds as usize);
+                FrequencyInner::SecondsCountDown(count_down, seconds_state)
             }
         };
 
@@ -362,7 +358,7 @@ impl DelayTimerScheduleIteratorOwned {
     fn analyze_cron_expression(
         time_zone: ScheduleIteratorTimeZone,
         cron_expression: &str,
-    ) -> Result<DelayTimerScheduleIteratorOwned, CronExpressionAnalyzeError> {
+    ) -> Result<DelayTimerScheduleIteratorOwned, FrequencyAnalyzeError> {
         let indiscriminate_expression = cron_expression.trim_matches(' ').to_owned();
         let schedule_iterator_time_zone_query: ScheduleIteratorTimeZoneQuery =
             ScheduleIteratorTimeZoneQuery {
@@ -410,9 +406,11 @@ impl FrequencyInner {
         match self {
             FrequencyInner::CronExpressionCountDown(_, ref mut clock) => clock.next(),
             FrequencyInner::CronExpressionRepeated(ref mut clock) => clock.next(),
-            FrequencyInner::SecondsRepeated(duration) => Some((get_timestamp() + *duration) as i64),
-            FrequencyInner::SecondsCountDown(_, duration) => {
-                Some((get_timestamp() + *duration) as i64)
+            FrequencyInner::SecondsRepeated(seconds_state) => {
+                seconds_state.next().map(|s| s as i64)
+            }
+            FrequencyInner::SecondsCountDown(_, seconds_state) => {
+                seconds_state.next().map(|s| s as i64)
             }
         }
     }
@@ -420,11 +418,9 @@ impl FrequencyInner {
     #[warn(unused_parens)]
     fn down_count(&mut self) {
         match self {
-            FrequencyInner::CronExpressionCountDown(ref mut exec_count, _) => {
-                *exec_count -= 1u64;
-            }
             FrequencyInner::CronExpressionRepeated(_) => {}
-            FrequencyInner::SecondsRepeated(_) => todo!(),
+            FrequencyInner::SecondsRepeated(_) => {}
+            FrequencyInner::CronExpressionCountDown(ref mut exec_count, _) => *exec_count -= 1u64,
             FrequencyInner::SecondsCountDown(count_down, _) => *count_down -= 1u64,
         };
     }
@@ -546,24 +542,28 @@ pub struct Task {
 
 impl<'a> TaskBuilder<'a> {
     /// Set task Frequency.
-    /// This api will be deprecated in the future, please use `set_frequency_once_*` etc.
+    /// This api will be deprecated in the future, please use `set_frequency_once_*` | `set_frequency_count_down_*` | `set_frequency_repeated_*` etc.
     #[deprecated]
     #[inline(always)]
     pub fn set_frequency(&mut self, frequency: Frequency<'a>) -> &mut Self {
-        self.frequency = FrequencyUnify::Frequency(frequency);
+        self.frequency = FrequencyUnify::FrequencyCronStr(frequency);
         self
     }
 
     /// Set task Frequency by customized CandyCronStr.
     /// In order to build a high-performance,
     /// highly reusable `TaskBuilder` that maintains the Copy feature .
+    ///
     /// when supporting building from CandyCronStr ,
     /// here actively leaks memory for create a str-slice (because str-slice support Copy, String does not)
+    ///
     /// We need to call `free` manually before `TaskBuilder` drop or before we leave the scope.
     ///
     /// Explain:
     /// Explicitly implementing both `Drop` and `Copy` trait on a type is currently
-    /// disallowed. This feature can make some sense in theory, but the current
+    /// disallowed.
+    ///
+    /// This feature can make some sense in theory, but the current
     /// implementation is incorrect and can lead to memory unsafety (see
     /// (issue #20126), so it has been disabled for now.
 
@@ -589,7 +589,7 @@ impl<'a> TaskBuilder<'a> {
             ),
         };
 
-        self.frequency = FrequencyUnify::Frequency(frequency);
+        self.frequency = FrequencyUnify::FrequencyCronStr(frequency);
         self
     }
 
@@ -660,9 +660,9 @@ impl<'a> TaskBuilder<'a> {
     pub fn free(&mut self) {
         if self.build_by_candy_str {
             let s = match self.frequency {
-                FrequencyUnify::Frequency(Frequency::Once(s)) => s,
-                FrequencyUnify::Frequency(Frequency::Repeated(s)) => s,
-                FrequencyUnify::Frequency(Frequency::CountDown(_, s)) => s,
+                FrequencyUnify::FrequencyCronStr(Frequency::Once(s)) => s,
+                FrequencyUnify::FrequencyCronStr(Frequency::Repeated(s)) => s,
+                FrequencyUnify::FrequencyCronStr(Frequency::CountDown(_, s)) => s,
                 _ => return,
             };
 
@@ -701,6 +701,8 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: execute only once, set by seconds num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
 
     #[inline(always)]
     pub fn set_frequency_once_by_seconds(&mut self, seconds: u64) -> &mut Self {
@@ -709,6 +711,9 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: countdown execution, set by seconds num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     #[inline(always)]
     pub fn set_frequency_repeated_by_seconds(&mut self, seconds: u64) -> &mut Self {
         self.frequency = FrequencyUnify::FrequencySeconds(FrequencySeconds::Repeated(seconds));
@@ -716,6 +721,9 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: execute repeatedly, set by seconds num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     #[inline(always)]
     pub fn set_frequency_count_down_by_seconds(
         &mut self,
@@ -728,6 +736,9 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: execute only once, set by minutes num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     pub fn set_frequency_once_by_minutes(&mut self, minutes: u64) -> &mut Self {
         self.frequency =
             FrequencyUnify::FrequencySeconds(FrequencySeconds::Once(ONE_MINUTE * minutes));
@@ -735,6 +746,9 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: countdown execution, set by minutes num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     #[inline(always)]
     pub fn set_frequency_repeated_by_minutes(&mut self, minutes: u64) -> &mut Self {
         self.frequency =
@@ -743,6 +757,9 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: execute repeatedly, set by minutes num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     #[inline(always)]
     pub fn set_frequency_count_down_by_minutes(
         &mut self,
@@ -757,12 +774,17 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: execute only once, set by hours num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     pub fn set_frequency_once_by_hours(&mut self, hours: u64) -> &mut Self {
         self.frequency = FrequencyUnify::FrequencySeconds(FrequencySeconds::Once(ONE_HOUR * hours));
         self
     }
 
     /// Task execution frequency: execute repeatedly, set by hours num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
 
     #[inline(always)]
     pub fn set_frequency_repeated_by_hours(&mut self, hours: u64) -> &mut Self {
@@ -772,6 +794,8 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: countdown execution, set by hours num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
 
     #[inline(always)]
     pub fn set_frequency_count_down_by_hours(&mut self, hours: u64, count_down: u64) -> &mut Self {
@@ -783,12 +807,18 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: execute only once, set by days num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     pub fn set_frequency_once_by_days(&mut self, days: u64) -> &mut Self {
         self.frequency = FrequencyUnify::FrequencySeconds(FrequencySeconds::Once(ONE_DAY * days));
         self
     }
 
     /// Task execution frequency: execute repeatedly, set by days num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     #[inline(always)]
     pub fn set_frequency_repeated_by_days(&mut self, days: u64) -> &mut Self {
         self.frequency =
@@ -797,6 +827,9 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: countdown execution, set by days num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
+
     #[inline(always)]
     pub fn set_frequency_count_down_by_days(&mut self, days: u64, count_down: u64) -> &mut Self {
         self.frequency = FrequencyUnify::FrequencySeconds(FrequencySeconds::CountDown(
@@ -807,6 +840,8 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Task execution frequency: execute only once, set by timestamp-seconds num.
+    ///
+    /// Make sure time is greater than 1 seconds, otherwise undefined behavior will be triggered.
 
     pub fn set_frequency_once_by_timestamp_seconds(&mut self, timestamp_seconds: u64) -> &mut Self {
         let duration = timestamp_seconds
@@ -912,11 +947,14 @@ mod tests {
     #![allow(deprecated)]
 
     use super::{Task, TaskBuilder};
+    use crate::prelude::*;
+    use crate::utils::convenience::functions::create_default_delay_task_handler;
     use anyhow::Result as AnyResult;
+    use rand::prelude::*;
+    use std::iter::Iterator;
 
     #[test]
     fn test_task_valid() -> AnyResult<()> {
-        use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         // The third run returns to an invalid state.
@@ -938,8 +976,135 @@ mod tests {
     }
 
     #[test]
+    fn test_get_next_exec_timestamp_seconds() -> AnyResult<()> {
+        let mut rng = rand::thread_rng();
+        let init_seconds: u64 = rng.gen_range(1..100_00_00);
+        let mut task_builder = TaskBuilder::default();
+
+        task_builder.set_frequency_count_down_by_seconds(init_seconds, 3);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+
+        (1..100)
+            .map(|i| {
+                debug_assert_eq!(
+                    task.get_next_exec_timestamp().unwrap(),
+                    get_timestamp() + (init_seconds * (i - 1))
+                );
+            })
+            .for_each(drop);
+
+        task_builder.set_frequency_count_down_by_cron_str("* * * * * * *", 100);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+
+        (1..100)
+            .map(|_| {
+                assert!(task.down_count_and_set_vaild());
+            })
+            .for_each(drop);
+
+        assert!(!task.down_count_and_set_vaild());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_next_exec_timestamp_minutes() -> AnyResult<()> {
+        let mut rng = rand::thread_rng();
+        let init_minutes: u64 = rng.gen_range(1..100_00_00);
+        let mut task_builder = TaskBuilder::default();
+
+        task_builder.set_frequency_repeated_by_minutes(init_minutes);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+
+        (1..100)
+            .map(|i| {
+                debug_assert_eq!(
+                    task.get_next_exec_timestamp().unwrap(),
+                    get_timestamp() + (init_minutes * (i - 1) * ONE_MINUTE)
+                );
+            })
+            .for_each(drop);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_next_exec_timestamp_hours() -> AnyResult<()> {
+        let mut rng = rand::thread_rng();
+        let init_hours: u64 = rng.gen_range(1..100_00_00);
+        let mut task_builder = TaskBuilder::default();
+
+        task_builder.set_frequency_repeated_by_hours(init_hours);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+
+        (1..100)
+            .map(|i| {
+                debug_assert_eq!(
+                    task.get_next_exec_timestamp().unwrap(),
+                    get_timestamp() + (init_hours * (i - 1) * ONE_HOUR)
+                );
+            })
+            .for_each(drop);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_next_exec_timestamp_days() -> AnyResult<()> {
+        let mut rng = rand::thread_rng();
+        let init_days: u64 = rng.gen_range(1..100_00_00);
+        let mut task_builder = TaskBuilder::default();
+
+        task_builder.set_frequency_repeated_by_days(init_days);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+
+        (1..100)
+            .map(|i| {
+                debug_assert_eq!(
+                    task.get_next_exec_timestamp().unwrap(),
+                    get_timestamp() + (init_days * (i - 1) * ONE_DAY)
+                );
+            })
+            .for_each(drop);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_count_down() -> AnyResult<()> {
+        let mut task_builder = TaskBuilder::default();
+
+        // The third run returns to an invalid state.
+        task_builder.set_frequency_count_down_by_seconds(1, 3);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+
+        assert!(task.down_count_and_set_vaild());
+        assert!(task.down_count_and_set_vaild());
+        assert!(!task.down_count_and_set_vaild());
+
+        task_builder.set_frequency_count_down_by_cron_str("* * * * * * *", 3);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+
+        assert!(task.down_count_and_set_vaild());
+        assert!(task.down_count_and_set_vaild());
+        assert!(!task.down_count_and_set_vaild());
+
+        task_builder.set_frequency_once_by_seconds(10);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        assert!(!task.down_count_and_set_vaild());
+
+        task_builder.set_frequency_count_down_by_hours(10, 10);
+        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        (1i32..10i32)
+            .map(|_| assert!(task.down_count_and_set_vaild()))
+            .for_each(drop);
+        assert!(!task.down_count_and_set_vaild());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_is_can_running() -> AnyResult<()> {
-        use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         // The third run returns to an invalid state.
@@ -967,12 +1132,9 @@ mod tests {
         Ok(())
     }
 
-    // struct CandyCron
-
     #[test]
     fn test_candy_cron() -> AnyResult<()> {
         use super::{CandyCron, CandyFrequency, Task, TaskBuilder};
-        use crate::utils::convenience::functions::create_default_delay_task_handler;
         let mut task_builder = TaskBuilder::default();
 
         // The third run returns to an invalid state.
