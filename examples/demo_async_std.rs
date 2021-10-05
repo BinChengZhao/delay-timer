@@ -1,9 +1,9 @@
-use delay_timer::prelude::*;
+#![allow(deprecated)]
 
 use anyhow::Result;
-
+use delay_timer::prelude::*;
 use smol::Timer;
-use std::{ops::Deref, time::Duration};
+use std::time::Duration;
 
 // You can replace the 62 line with the command you expect to execute.
 #[async_std::main]
@@ -47,11 +47,10 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 
         println!("create_async_fn_body:i'success");
     });
-    let s = String::from("*/6 * * * * * *");
-    let s_r = (&s).deref();
+
     task_builder
         .set_task_id(1)
-        .set_frequency(Frequency::Repeated(s_r))
+        .set_frequency_repeated_by_cron_str("*/6 * * * * * *")
         .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }

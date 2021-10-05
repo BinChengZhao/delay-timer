@@ -1,6 +1,6 @@
 [package]
 name = "delay_timer"
-version = "0.8.3"
+version = "0.9.0"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
@@ -29,7 +29,7 @@ status-report = []
 
 
 [dependencies]
-cron_clock = "0.7.0"
+cron_clock = "0.8.0"
 anyhow = "^1.0.31"
 rs-snowflake = "0.5.0"
 dashmap = "^4.0.2"
@@ -47,6 +47,7 @@ thiserror = "^1.0.24"
 tokio = { version = "^1.3.0", features = ["full"] , optional = true }
 
 [dev-dependencies]
+rand = "0.8.4"
 surf = "^2.1.0"
 tokio = { version = "^1.3.0", features = ["full"] }
 hyper= {version  = "^0.14.2" , features = ["full"] }

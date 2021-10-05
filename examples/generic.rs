@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use anyhow::Result;
 use delay_timer::prelude::*;
 use smol::Timer;
@@ -43,7 +45,7 @@ fn build_generic_task_async_request<T: Animal>(animal: T) -> Result<Task, TaskEr
     });
 
     task_builder
-        .set_frequency(Frequency::CountDown(15, "* * * * * * *"))
+        .set_frequency_count_down_by_seconds(1, 15)
         .set_task_id(2)
         .set_maximum_running_time(5)
         .spawn(body)

@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use delay_timer::prelude::*;
 
 use std::str::FromStr;
@@ -20,7 +21,7 @@ fn test_instance_state() -> anyhow::Result<()> {
     });
 
     let task = TaskBuilder::default()
-        .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
+        .set_frequency_count_down_by_seconds(1, 4)
         .set_task_id(1)
         .set_maximum_parallel_runnable_num(3)
         .spawn(body)?;
@@ -62,7 +63,7 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     });
 
     let task = TaskBuilder::default()
-        .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
+        .set_frequency_count_down_by_seconds(1, 4)
         .set_task_id(1)
         .set_maximum_running_time(2)
         .set_maximum_parallel_runnable_num(3)
@@ -174,7 +175,7 @@ fn go_works() -> AnyResult<()> {
     };
 
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(3, expression))
+        .set_frequency_count_down_by_cron_str(expression, 3)
         .set_task_id(1)
         .spawn(body)?;
     delay_timer.add_task(task)?;
@@ -204,8 +205,10 @@ fn test_advance() -> AnyResult<()> {
         create_default_delay_task_handler()
     };
 
+    // Allow once.
+    #[allow(deprecated)]
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(3, expression))
+        .set_frequency_count_down_by_cron_str(expression, 3)
         .set_task_id(task_id)
         .spawn(body)?;
 
@@ -263,7 +266,7 @@ fn tests_countdown() -> AnyResult<()> {
     };
 
     let task = TaskBuilder::default()
-        .set_frequency(Frequency::CountDown(3, "0/2 * * * * * *"))
+        .set_frequency_count_down_by_seconds(2, 3)
         .set_task_id(1)
         .spawn(body)?;
     delay_timer.add_task(task)?;

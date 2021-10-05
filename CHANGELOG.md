@@ -1,3 +1,24 @@
+# Version 0.9.0 
+
+v0.9.0 New features:
+
+
+    1. Add more user-friendly api for better experience!
+    
+      1.1. Gradually deprecating TaskBuilder api `set_frequency` & `set_frequency_by_candy`.
+      
+      1.2. Add more user-friendly api such as `set_frequency_once_by_timestamp_seconds` | `set_frequency_count_down_by_days` | `set_frequency_repeated_by_cron_str` these having better experience.
+    
+
+Update dependency :
+
+    Update cron_clock .
+
+Update examples:
+
+    Change, async-std & tokio & demo & generic & increase use cases.
+
+Enriched Unit tests & documentation.
 # Version 0.8.2
 
 v0.8.2 New features:

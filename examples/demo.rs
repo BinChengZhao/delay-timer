@@ -55,7 +55,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 
     task_builder
         .set_task_id(1)
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_frequency_repeated_by_cron_str("@secondly")
         .set_maximum_parallel_runnable_num(2)
         .spawn(body)
 }
@@ -73,7 +73,7 @@ fn build_task_async_request() -> Result<Task, TaskError> {
     });
 
     task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::PerEightSeconds))
+        .set_frequency_repeated_by_seconds(8)
         .set_task_id(2)
         .set_maximum_running_time(5)
         .spawn(body)
@@ -84,7 +84,7 @@ fn build_task_async_execute_process() -> Result<Task, TaskError> {
 
     let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
     task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Minutely))
+        .set_frequency_repeated_by_minutes(1)
         .set_task_id(3)
         .set_maximum_running_time(5)
         .spawn(body)
@@ -94,6 +94,7 @@ fn build_task_customized_async_task() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = generate_closure_template("delay_timer is easy to use. .".into());
+    #[allow(deprecated)]
     task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::LoveTime))
         .set_task_id(5)
@@ -133,7 +134,7 @@ fn build_wake_task() -> Result<Task, TaskError> {
     };
 
     task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Minutely))
+        .set_frequency_repeated_by_cron_str("@minutely")
         .set_task_id(700)
         .set_maximum_running_time(50)
         .spawn(body)

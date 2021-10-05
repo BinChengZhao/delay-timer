@@ -168,7 +168,6 @@ impl Timer {
         }
     }
 
-    //TODO:cfg macro
     #[cfg(feature = "status_report")]
     pub(crate) fn set_status_report_sender(&mut self, sender: AsyncSender<i32>) {
         self.status_report_sender = Some(sender);
@@ -214,6 +213,8 @@ impl Timer {
                     continue;
                 }
             }
+
+            trace!("timestamp: {}, task_ids: {:?}", timestamp, task_ids);
 
             for task_id in task_ids {
                 let task_option: Option<Task>;
@@ -281,9 +282,10 @@ impl Timer {
                 parallel_runnable_num = task_flag_map.value().get_parallel_runnable_num();
             }
 
-            //if runnable_task.parallel_runnable_num >= task.maximum_parallel_runnable_num doesn't run it.
+            // if runnable_task.parallel_runnable_num >= task.maximum_parallel_runnable_num doesn't run it.
 
             if parallel_runnable_num >= maximum_parallel_runnable_num {
+                trace!("task-id: {}, parallel_runnable_num >= maximum_parallel_runnable_num doesn't run it", task.task_id);
                 return self.handle_task(task, timestamp, next_second_hand, false);
             }
         }
@@ -333,8 +335,8 @@ impl Timer {
 
         // Time difference + next second hand % DEFAULT_TIMER_SLOT_COUNT
         let step = task_excute_timestamp.checked_sub(timestamp).unwrap_or(1) + next_second_hand;
-        let quan = step / DEFAULT_TIMER_SLOT_COUNT;
-        task.set_cylinder_line(quan);
+        let cylinder_line = step / DEFAULT_TIMER_SLOT_COUNT;
+        task.set_cylinder_line(cylinder_line);
         let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
 
         {
@@ -359,6 +361,11 @@ impl Timer {
                 task_flag_map.value_mut().inc_parallel_runnable_num();
             }
         }
+
+        debug!(
+            "task-id: {} , next-exec-timestamp: {}, slot-seed: {}, cylinder-line: {}",
+            task_id, task_excute_timestamp, slot_seed, cylinder_line
+        );
         Ok(())
     }
 }

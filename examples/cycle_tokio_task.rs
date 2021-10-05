@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use anyhow::Result;
 use delay_timer::prelude::*;
 use hyper::{Client, Uri};
@@ -31,7 +33,7 @@ fn build_task_customized_async_task() -> Result<Task> {
     let body = generate_closure_template("'delay_timer-is-easy-to-use.'".into());
 
     Ok(task_builder
-        .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousDay::Work))
+        .set_frequency_repeated_by_cron_str("10,15,25,50 0/1 * * Jan-Dec * 2020-2100")
         .set_task_id(5)
         .set_maximum_running_time(15)
         .spawn(body)?)
@@ -72,9 +74,9 @@ pub fn generate_closure_template(
 pub async fn async_template(id: i32, name: String) -> Result<()> {
     let client = Client::new();
 
-    //The default connector does not handle TLS.
-    //Speaking to https destinations will require configuring a connector that implements TLS.
-    //So use http for test.
+    // The default connector does not handle TLS.
+    // Speaking to https destinations will require configuring a connector that implements TLS.
+    // So use http for test.
     let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
     let uri: Uri = url.parse()?;
 
@@ -87,14 +89,12 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
 }
 
 enum AuspiciousDay {
-    Work,
     Wake,
 }
 
 impl Into<CandyCronStr> for AuspiciousDay {
     fn into(self) -> CandyCronStr {
         match self {
-            Self::Work => CandyCronStr("10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
             Self::Wake => CandyCronStr("0 * * * Jan-Dec * 2020-2100".to_string()),
         }
     }

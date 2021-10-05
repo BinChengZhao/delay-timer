@@ -7,7 +7,7 @@ use crate::prelude::*;
 pub enum TaskError {
     /// Error variant for Cron expression parsing.
     #[error("Cron expression analysis error.")]
-    CronExpressionAnalyzeError(#[from] CronExpressionAnalyzeError),
+    FrequencyAnalyzeError(#[from] FrequencyAnalyzeError),
     /// Task sending failure.
     #[error("Task sending failure.")]
     DisSend(#[from] channel::TrySendError<TimerEvent>),
@@ -44,11 +44,14 @@ pub enum TaskInstanceError {
 
 /// Error enumeration for Cron expression parsing.
 #[derive(Error, Debug)]
-pub enum CronExpressionAnalyzeError {
+pub enum FrequencyAnalyzeError {
     /// Access to thread local storage failed.
     #[error("Thread local storage access failed.")]
     DisAccess(#[from] std::thread::AccessError),
     /// Irregular cron expressions that cause parsing failures.
     #[error("The cron expression was parsed incorrectly.")]
     DisParse(#[from] cron_error::Error),
+    /// The initialization time is wrong.
+    #[error("The initialization time is wrong.")]
+    DisInitTime,
 }
