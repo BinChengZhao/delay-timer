@@ -28,6 +28,6 @@ fn main() -> Result<()> {
 
     // (optional) We don't need to rerun for anything external.
     // In order to see the compilation parameters at `cargo check --verbose` time, keep it.
-    autocfg::rerun_path("build.rs");
+    autocfg::rerun_path("build/build.rs");
     Ok(())
 }
