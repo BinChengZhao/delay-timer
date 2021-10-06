@@ -1,3 +1,8 @@
+# Version 0.9.1 
+
+## Changed
+Tweak the compile script ([#24](https://github.com/BinChengZhao/delay-timer/issues/24)), thanks `chaaz` !
+
 # Version 0.9.0 
 
 v0.9.0 New features:
