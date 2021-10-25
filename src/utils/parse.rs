@@ -181,11 +181,14 @@ pub mod shell_command {
         /// Await on `ChildGuard` and get `Output`.
         pub async fn wait_with_output(mut self) -> Result<Output, CommandChildError> {
             if let Some(child) = self.child.take() {
-                return child.wait_with_output().await;
+                return child
+                    .wait_with_output()
+                    .await
+                    .map_err(|e| CommandChildError::DisCondition(e.to_string()));
             }
 
             Err(CommandChildError::DisCondition(
-                "Without child for waiting.",
+                "Without child for waiting.".to_string(),
             ))
         }
     }
