@@ -55,3 +55,11 @@ pub enum FrequencyAnalyzeError {
     #[error("The initialization time is wrong.")]
     DisInitTime,
 }
+
+/// Error enumeration for Command parsing & Child Execute.
+#[derive(Error, Debug)]
+pub enum CommandChildError {
+    /// Process execution conditions are not met.
+    #[error("Process execution conditions are not met for {0}")]
+    DisCondition(String),
+}

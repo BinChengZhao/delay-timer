@@ -160,24 +160,33 @@ pub mod shell_command {
             }
         }
     );
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     /// Guarding of process handles.
     pub struct ChildGuard<Child: ChildUnify> {
         pub(crate) child: Option<Child>,
     }
 
     impl<Child: ChildUnify> ChildGuard<Child> {
-        pub(crate) fn new(child: Child) -> Self {
+        /// Build a `ChildGuard` with `Child`.
+        pub fn new(child: Child) -> Self {
             let child = Some(child);
             Self { child }
         }
 
-        pub(crate) async fn wait_with_output(mut self) -> AnyResult<Output> {
+        /// Take inner `Child` from `ChildGuard`.
+        pub fn take_inner(mut self) -> Option<Child> {
+            self.child.take()
+        }
+
+        /// Await on `ChildGuard` and get `Output`.
+        pub async fn wait_with_output(mut self) -> Result<Output, CommandChildError> {
             if let Some(child) = self.child.take() {
                 return child.wait_with_output().await;
             }
 
-            Err(anyhow!("Without child for waiting."))
+            Err(CommandChildError::DisCondition(
+                "Without child for waiting.",
+            ))
         }
     }
 
@@ -212,7 +221,7 @@ pub mod shell_command {
     //  after which it should be split into unblock().
     pub async fn parse_and_run<Child: ChildUnify, Command: CommandUnify<Child>>(
         input: &str,
-    ) -> Result<ChildGuardList<Child>> {
+    ) -> Result<ChildGuardList<Child>, CommandChildError> {
         // Check to see if process_linked_list is also automatically dropped out of scope
         // by ERROR's early return and an internal kill method is executed.
 
@@ -226,11 +235,14 @@ pub mod shell_command {
         for mut command in commands {
             let check_redirect_result = _has_redirect_file(command);
             if check_redirect_result.is_some() {
-                command = _remove_angle_bracket_command(command)?;
+                command = _remove_angle_bracket_command(command)
+                    .map_err(|e| CommandChildError::DisCondition(e.to_string()))?;
             }
 
             let mut parts = command.trim().split_whitespace();
-            let command = parts.next().ok_or_else(|| anyhow!("Without next part"))?;
+            let command = parts
+                .next()
+                .ok_or_else(|| CommandChildError::DisCondition("Without next part".to_string()))?;
             let args = parts;
 
             // Standard input to the current process.
@@ -256,8 +268,12 @@ pub mod shell_command {
 
             let process: Child;
             let end_flag = if let Some(stdout_result) = check_redirect_result {
-                let stdout = stdout_result?;
-                process = output.stdout(stdout).spawn()?;
+                let stdout =
+                    stdout_result.map_err(|e| CommandChildError::DisCondition(e.to_string()))?;
+                process = output
+                    .stdout(stdout)
+                    .spawn()
+                    .map_err(|e| CommandChildError::DisCondition(e.to_string()))?;
                 true
             } else {
                 let stdout;
@@ -273,7 +289,10 @@ pub mod shell_command {
                 //     stdout = Stdio::inherit();
                 // };
 
-                process = output.stdout(stdout).spawn()?;
+                process = output
+                    .stdout(stdout)
+                    .spawn()
+                    .map_err(|e| CommandChildError::DisCondition(e.to_string()))?;
                 false
             };
 

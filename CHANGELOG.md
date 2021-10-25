@@ -1,3 +1,8 @@
+# Version 0.9.2
+
+## Changed
+Add a new Error enumeration `CommandChildError`!
+
 # Version 0.9.1 
 
 ## Changed
