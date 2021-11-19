@@ -207,7 +207,7 @@
 //!
 //!         let future = async move {
 //!             future_inner.await;
-//!             context.finishe_task(None).await;
+//!             context.finish_task(None).await;
 //!         };
 //!
 //!         create_delay_task_handler(async_spawn(future))

@@ -38,8 +38,8 @@ impl Slot {
         self.task_map.remove(&task_id)
     }
 
-    //Check and reduce cylinder_line，
-    //Returns a Vec. containing all task ids to be executed.(cylinder_line == 0)
+    // Check and reduce cylinder_line，
+    // Returns a Vec. containing all task ids to be executed.(cylinder_line == 0)
     pub(crate) fn arrival_time_tasks(&mut self) -> Vec<u64> {
         let mut task_id_vec = vec![];
 
@@ -50,5 +50,12 @@ impl Slot {
         }
 
         task_id_vec
+    }
+
+    // When the operation is finished with the task, shrink the container in time
+    // To avoid the overall time-wheel from occupying too much memory.
+    // FIX: https://github.com/BinChengZhao/delay-timer/issues/28
+    pub(crate) fn shrink(&mut self) {
+        self.task_map.shrink_to(64);
     }
 }

@@ -1,3 +1,15 @@
+# Version 0.10.0 
+
+## Changed
+Optimized the use of internal `time-wheel` memory. ([#28](https://github.com/BinChengZhao/delay-timer/issues/28)), thanks `elderbig` !
+
+### Details
+There is a `time-wheel` in `delay-timer`, which is the carrier of all tasks.
+
+The time wheel uses slots (time scales) as units, each slot corresponds to a hash table, when a slot is rotated to it will execute the task that is already ready internally, when the task is executed it will move from one slot to another. In order to have enough capacity to store the tasks, there may be a memory allocation here, so that by the time the whole time wheel is traversed, each internal time wheel-slot will have rich memory capacity, and when there are many tasks the memory occupied by the whole time wheel will be very large. So it will be necessary to shrink the memory in time.
+
+This change is to shrink the memory in time after each round of training slots and executing tasks to ensure that the slots have a basic and compact capacity.
+
 # Version 0.9.2
 
 ## Changed

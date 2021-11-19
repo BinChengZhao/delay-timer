@@ -25,13 +25,25 @@ pub mod functions {
     ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
         use smol::process::{Child, Command};
         move |context: TaskContext| {
+            debug!(
+                "Unblock-Process Task: {}, Record: {} Start",
+                context.task_id, context.record_id
+            );
+
             let shell_command_clone = shell_command.clone();
             create_delay_task_handler(async_spawn(async move {
                 let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
                 if let Err(err) = childs {
+                    debug!(
+                        "Unblock-Process Task: {}, Record: {} fail for: {}",
+                        context.task_id,
+                        context.record_id,
+                        err.to_string()
+                    );
+
                     context
-                        .finishe_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
+                        .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
                         .await;
                     return Err(anyhow!(err.to_string()));
                 }
@@ -40,8 +52,14 @@ pub mod functions {
 
                 let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
                 let output = last_child.wait_with_output().await?;
+
+                debug!(
+                    "Unblock-Process Task: {}, Record: {} finished",
+                    context.task_id, context.record_id
+                );
+
                 context
-                    .finishe_task(Some(FinishOutput::ProcessOutput(output)))
+                    .finish_task(Some(FinishOutput::ProcessOutput(output)))
                     .await;
 
                 Ok(())
@@ -63,7 +81,7 @@ pub mod functions {
 
                     if let Err(err) = childs {
                         context
-                            .finishe_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
+                            .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
                             .await;
                         return Err(anyhow!(err.to_string()));
                     }
@@ -73,7 +91,7 @@ pub mod functions {
                     let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
                     let output = last_child.wait_with_output().await?;
                     context
-                        .finishe_task(Some(FinishOutput::ProcessOutput(output)))
+                        .finish_task(Some(FinishOutput::ProcessOutput(output)))
                         .await;
 
                     Ok(())

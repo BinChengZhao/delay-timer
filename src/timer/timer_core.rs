@@ -151,6 +151,7 @@ pub enum TimerEvent {
 pub struct Timer {
     /// Event sender that provides events to `EventHandle` processing.
     pub(crate) timer_event_sender: TimerEventSender,
+    #[allow(dead_code)]
     status_report_sender: Option<AsyncSender<i32>>,
     pub(crate) shared_header: SharedHeader,
 }
@@ -234,6 +235,14 @@ impl Timer {
                         .await
                         .map_err(|e| error!("{}", e))
                         .ok();
+                }
+            }
+
+            {
+                // When the operation is finished with the task, shrink the container in time
+                // To avoid the overall time-wheel from occupying too much memory.
+                if let Some(mut slot_mut) = self.shared_header.wheel_queue.get_mut(&second_hand) {
+                    slot_mut.shrink();
                 }
             }
 

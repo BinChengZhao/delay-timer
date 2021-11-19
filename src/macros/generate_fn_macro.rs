@@ -14,7 +14,7 @@ macro_rules! create_async_fn_body {
                 let future_inner = async move { $async_body };
                 future_inner.await;
 
-                context.finishe_task(None).await;
+                context.finish_task(None).await;
             };
             let handle = async_spawn(f);
             create_delay_task_handler(handle)
@@ -34,7 +34,7 @@ macro_rules! create_async_fn_body {
                 let future_inner = async move { $async_body };
                 future_inner.await;
 
-                context.finishe_task(None).await;
+                context.finish_task(None).await;
             };
             let handle = async_spawn(f);
             create_delay_task_handler(handle)
@@ -53,7 +53,7 @@ cfg_tokio_support!(
                     let future_inner = async move { $async_body };
                     future_inner.await;
 
-                    context.finishe_task().await;
+                    context.finish_task().await;
                 });
                 create_delay_task_handler(handle)
             }
@@ -71,7 +71,7 @@ cfg_tokio_support!(
                         let future_inner = async move { $async_body };
                         future_inner.await;
 
-                        context.finishe_task().await;
+                        context.finish_task().await;
                     };
                     let handle = async_spawn(f);
                     create_delay_task_handler(handle)

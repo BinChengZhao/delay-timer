@@ -498,7 +498,7 @@ impl TaskContext {
     }
 
     /// Send a task-Finish signal to EventHandle.
-    pub async fn finishe_task(self, finish_output: Option<FinishOutput>) {
+    pub async fn finish_task(self, finish_output: Option<FinishOutput>) {
         if let Some(timer_event_sender) = self.timer_event_sender {
             timer_event_sender
                 .send(TimerEvent::FinishTask(FinishTaskBody {
