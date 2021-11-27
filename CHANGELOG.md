@@ -1,3 +1,8 @@
+# Version 0.10.1 
+
+## Changed
+Fix a strange compilation error that was leaked by the compiler. ([#30](https://github.com/BinChengZhao/delay-timer/issues/30)), thanks `elderbig` !
+
 # Version 0.10.0 
 
 ## Changed

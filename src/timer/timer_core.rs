@@ -217,6 +217,8 @@ impl Timer {
 
             trace!("timestamp: {}, task_ids: {:?}", timestamp, task_ids);
 
+            // Centralize task processing to avoid duplicate lock requests and releases.
+            // FIXME: https://github.com/BinChengZhao/delay-timer/issues/29
             for task_id in task_ids {
                 let task_option: Option<Task>;
 

@@ -4,7 +4,7 @@
 /// Collection of functions related to shell commands and processes.
 pub mod shell_command {
     use crate::prelude::*;
-    use anyhow::*;
+    use anyhow::Error as AnyhowError;
 
     use async_trait::async_trait;
 
@@ -329,7 +329,7 @@ pub mod shell_command {
     }
 
     #[cfg(SPLIT_INCLUSIVE_COMPATIBLE)]
-    fn _has_redirect_file(command: &str) -> Option<Result<File>> {
+    fn _has_redirect_file(command: &str) -> Option<Result<File, AnyhowError>> {
         let angle_bracket = if command.contains(">>") {
             ">>"
         } else if command.contains('>') {
@@ -346,14 +346,14 @@ pub mod shell_command {
     }
 
     //After confirming that there is a redirect file, parse the command before the command '>'.
-    fn _remove_angle_bracket_command(command: &str) -> Result<&str> {
+    fn _remove_angle_bracket_command(command: &str) -> Result<&str, AnyhowError> {
         let mut sub_command_inner = command.trim().split('>');
         sub_command_inner
             .next()
             .ok_or_else(|| anyhow!("can't parse ...."))
     }
 
-    fn create_stdio_file(angle_bracket: &str, filename: &str) -> Result<File> {
+    fn create_stdio_file(angle_bracket: &str, filename: &str) -> Result<File, AnyhowError> {
         let mut file_tmp = OpenOptions::new();
         file_tmp.write(true).create(true);
 

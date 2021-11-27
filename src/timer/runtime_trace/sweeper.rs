@@ -139,8 +139,13 @@ impl RecyclingBins {
             .unwrap_or_else(|e| error!(" `send_timer_event` : {}", e));
     }
 
+    // FIXME: https://github.com/BinChengZhao/delay-timer/issues/28
+    // Due to the large number of tasks upstream, timeout units can pile up exceptionally high.
+    // A large amount of memory may be occupied here.
     pub(crate) async fn add_recycle_unit(self: Arc<Self>) {
         'loopLayer: loop {
+            // TODO: Internal (shrink -> cycle-bins) or change the data structure.
+
             for _ in 0..200 {
                 match self.recycle_unit_sources.recv().await {
                     Ok(recycle_unit) => {
