@@ -55,7 +55,7 @@ impl Slot {
     // When the operation is finished with the task, shrink the container in time
     // To avoid the overall time-wheel from occupying too much memory.
     // FIX: https://github.com/BinChengZhao/delay-timer/issues/28
-    pub(crate) fn shrink(&mut self) {
-        self.task_map.shrink_to(64);
-    }
+    // pub(crate) fn shrink(&mut self) {
+    //     self.task_map.shrink_to(64);
+    // }
 }

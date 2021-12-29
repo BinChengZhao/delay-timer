@@ -243,9 +243,9 @@ impl Timer {
             {
                 // When the operation is finished with the task, shrink the container in time
                 // To avoid the overall time-wheel from occupying too much memory.
-                if let Some(mut slot_mut) = self.shared_header.wheel_queue.get_mut(&second_hand) {
-                    slot_mut.shrink();
-                }
+                // if let Some(mut slot_mut) = self.shared_header.wheel_queue.get_mut(&second_hand) {
+                //     slot_mut.shrink();
+                // }
             }
 
             clock.tick().await;
