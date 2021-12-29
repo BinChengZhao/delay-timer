@@ -1,7 +1,7 @@
 use anyhow::Result;
 use delay_timer::prelude::*;
-use smol::Timer;
 use std::time::Duration;
+use tokio::time::sleep;
 
 // You can replace the 66 line with the command you expect to execute.
 #[tokio::main]
@@ -10,7 +10,9 @@ async fn main() -> Result<()> {
     // You can also share a tokio runtime with delayTimer, please see api `DelayTimerBuilder::tokio_runtime` for details.
 
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
-    let delay_timer = DelayTimerBuilder::default().build();
+    let delay_timer = DelayTimerBuilder::default()
+        .tokio_runtime_by_default()
+        .build();
 
     // Develop a print job that runs in an asynchronous cycle.
     let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
@@ -41,11 +43,12 @@ async fn main() -> Result<()> {
 
 fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
+    let name = String::from("Jeery");
 
-    let body = create_async_fn_body!({
-        println!("create_async_fn_body!");
+    let body = create_async_fn_tokio_body!((name){
+        println!("{} create_async_fn_body!", name_ref);
 
-        Timer::after(Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(3)).await;
 
         println!("create_async_fn_body:i'success");
     });
