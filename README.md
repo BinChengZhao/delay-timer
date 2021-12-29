@@ -14,7 +14,7 @@ delay-timer is a task manager based on a time wheel algorithm, which makes it ea
 
 The underlying runtime is based on the optional smol and tokio, and you can build your application with either one.
 
-The minimum-supported version of `rustc` is **1.49**.
+The minimum-supported version of `rustc` is **1.56**.
 
 Except for the simple execution in a few seconds, you can also specify a specific date, 
 such as Sunday at 4am to execute a backup task.

@@ -56,6 +56,11 @@ hyper= {version  = "^0.14.2" , features = ["full"] }
 pretty_env_logger = "^0.4"
 mockall = "^0.8.2"
 env_logger = "^0.8.3"
+color-eyre = { version =  "0.5.11", features = ["capture-spantrace", "issue-url"]}
+tracing-error = { version = "0.1.2" }
+pretty_assertions = "0.6.1"
+thiserror = "1.0.19"
+ansi-parser = "0.6.5" # used for testing color schemes
 
 [dev-dependencies.async-std]
 version = "^1.9.0"
@@ -96,3 +101,6 @@ required-features = ["full"]
 #name = "demo"
 #path = "benches/demo.rs"
 #required-features = ["full"]
+
+[profile.dev.package.backtrace]
+opt-level = 3

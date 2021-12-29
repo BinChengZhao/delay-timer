@@ -49,33 +49,34 @@ cfg_tokio_support!(
     macro_rules! create_async_fn_tokio_body {
         ($async_body:block) => {
             |context| {
-                let handle = tokio_async_spawn(async move {
+                let handle = async_spawn_by_tokio(async move {
                     let future_inner = async move { $async_body };
                     future_inner.await;
 
-                    context.finish_task().await;
+                    context.finish_task(None).await;
                 });
                 create_delay_task_handler(handle)
             }
+        };
 
-            (($($capture_variable:ident),+)$async_body:block) => {
+        (($($capture_variable:ident),+)$async_body:block) => {
 
-                move |context: TaskContext| {
+            move |context: TaskContext| {
 
-                    $(
-                        concat_idents::concat_idents!(variable_ref_name = $capture_variable, "_ref" {
-                            let variable_ref_name = $capture_variable.clone();
-                        });
-                    )+
-                    let f = async move {
-                        let future_inner = async move { $async_body };
-                        future_inner.await;
+                $(
+                    concat_idents::concat_idents!(variable_ref_name = $capture_variable, "_ref" {
+                        let variable_ref_name = $capture_variable.clone();
+                    });
+                )+
 
-                        context.finish_task().await;
-                    };
-                    let handle = async_spawn(f);
-                    create_delay_task_handler(handle)
-                }
+                let handle = async_spawn_by_tokio(async move {
+                    let future_inner = async move { $async_body };
+                    future_inner.await;
+
+                    context.finish_task(None).await;
+                });
+
+                create_delay_task_handler(handle)
             }
         };
     }

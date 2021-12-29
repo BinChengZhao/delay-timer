@@ -459,6 +459,9 @@ pub struct TaskBuilder<'a> {
 
 //TODO:Future tasks will support single execution (not multiple executions in the same time frame).
 type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+// type SafeBoxAsyncFn = Box<dyn Fn() -> (impl std::future::Future + 'static + Send)>;
+// type SafeBoxSyncFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send>;
+
 
 #[derive(Debug, Clone, Default)]
 /// Task runtime context.
