@@ -31,7 +31,7 @@ pub mod functions {
             );
 
             let shell_command_clone = shell_command.clone();
-            create_delay_task_handler(async_spawn(async move {
+            create_delay_task_handler(async_spawn_by_smol(async move {
                 let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
                 if let Err(err) = childs {
@@ -67,38 +67,36 @@ pub mod functions {
         }
     }
 
-    cfg_tokio_support!(
-        use tokio::process::{Child, Command};
+    use tokio::process::{Child, Command};
 
-        /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
-        pub fn tokio_unblock_process_task_fn(
-            shell_command: String,
-        ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-            move |context: TaskContext| {
-                let shell_command_clone = shell_command.clone();
-                create_delay_task_handler(async_spawn_by_tokio(async move {
-                    let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
+    /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
+    pub fn tokio_unblock_process_task_fn(
+        shell_command: String,
+    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+        move |context: TaskContext| {
+            let shell_command_clone = shell_command.clone();
+            create_delay_task_handler(async_spawn_by_tokio(async move {
+                let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
-                    if let Err(err) = childs {
-                        context
-                            .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
-                            .await;
-                        return Err(anyhow!(err.to_string()));
-                    }
-
-                    let mut childs = childs?;
-
-                    let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
-                    let output = last_child.wait_with_output().await?;
+                if let Err(err) = childs {
                     context
-                        .finish_task(Some(FinishOutput::ProcessOutput(output)))
+                        .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
                         .await;
+                    return Err(anyhow!(err.to_string()));
+                }
 
-                    Ok(())
-                }))
-            }
+                let mut childs = childs?;
+
+                let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
+                let output = last_child.wait_with_output().await?;
+                context
+                    .finish_task(Some(FinishOutput::ProcessOutput(output)))
+                    .await;
+
+                Ok(())
+            }))
         }
-    );
+    }
 
     #[inline(always)]
     ///convert task_handler of impl DelayTaskHandler to a `Box<dyn DelayTaskHander>`.
@@ -186,7 +184,12 @@ pub fn generate_closure_template(
     a: i32,
     b: String,
 ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move || self::functions::create_delay_task_handler(async_spawn(async_template(a, b.clone())))
+    move || {
+        self::functions::create_delay_task_handler(async_spawn_by_smol(async_template(
+            a,
+            b.clone(),
+        )))
+    }
 }
 
 /// This is a demo case to demonstrate a custom asynchronous task.

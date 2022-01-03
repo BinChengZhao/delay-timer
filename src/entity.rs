@@ -28,10 +28,8 @@ use futures::executor::block_on;
 use smol::channel::unbounded;
 use snowflake::SnowflakeIdGenerator;
 
-cfg_tokio_support!(
-    use tokio::runtime::{Builder as TokioBuilder, Runtime};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-);
+use std::sync::atomic::{AtomicUsize, Ordering};
+use tokio::runtime::{Builder as TokioBuilder, Runtime};
 
 cfg_status_report!(
     use crate::utils::status_report::StatusReporter;
@@ -117,14 +115,13 @@ impl fmt::Debug for SharedHeader {
 #[derive(Clone, Default, Debug)]
 pub(crate) struct RuntimeInstance {
     // smol have no instance.
-    #[cfg(feature = "tokio-support")]
     pub(crate) inner: Option<Arc<Runtime>>,
     pub(crate) kind: RuntimeKind,
 }
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum RuntimeKind {
     Smol,
-    #[cfg(feature = "tokio-support")]
+
     Tokio,
 }
 
@@ -191,7 +188,7 @@ impl DelayTimerBuilder {
 
         match self.shared_header.runtime_instance.kind {
             RuntimeKind::Smol => self.assign_task(timer, event_handle),
-            #[cfg(feature = "tokio-support")]
+
             RuntimeKind::Tokio => self.assign_task_by_tokio(timer, event_handle),
         };
 
@@ -330,7 +327,6 @@ impl DelayTimer {
     }
 }
 
-cfg_tokio_support!(
 /// # Required features
 ///
 /// This function requires the `tokio-support` feature of the `delay_timer`
@@ -419,8 +415,6 @@ impl SharedHeader {
         self.runtime_instance.kind = RuntimeKind::Tokio;
     }
 }
-
-);
 
 cfg_status_report!(
 /// # Required features

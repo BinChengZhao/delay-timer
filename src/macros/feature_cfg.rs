@@ -1,18 +1,3 @@
-//! This macro module provides the declaration macros used for the conditional compilation of lib.
-macro_rules! cfg_tokio_support {
-    ($($item:item)*) => {
-        $(
-            // As long as the features contains tokio-support, it will compile.
-            #[cfg(feature = "tokio-support")]
-
-            // it can be compile when .toml `rustdoc-args = ["--cfg", "docsrs"]`,
-            // and features contains  tokio-support.
-            #[cfg_attr(docsrs, doc(cfg(feature = "tokio-support")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_status_report {
     ($($item:item)*) => {
         $(

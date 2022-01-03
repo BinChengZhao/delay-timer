@@ -42,11 +42,10 @@ macro_rules! create_async_fn_body {
     }
 }
 
-cfg_tokio_support!(
-    /// Create a closure that return a DelayTaskHandel by macro.
+/// Create a closure that return a DelayTaskHandel by macro.
 
-    #[macro_export]
-    macro_rules! create_async_fn_tokio_body {
+#[macro_export]
+macro_rules! create_async_fn_tokio_body {
         ($async_body:block) => {
             |context| {
                 let handle = async_spawn_by_tokio(async move {
@@ -80,4 +79,3 @@ cfg_tokio_support!(
             }
         };
     }
-);

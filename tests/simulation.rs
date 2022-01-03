@@ -312,3 +312,12 @@ fn inspect_struct() -> AnyResult<()> {
     println!("{:?}, {:?}", s.next(), s2.next());
     Ok(())
 }
+
+#[test]
+fn test_cron_clock() -> AnyResult<()> {
+    let mut s = cron_clock::Schedule::from_str("0 15 06 * * * *")?.upcoming_owned(cron_clock::Utc);
+
+    println!("{:?}", s.next());
+    println!("{:?}", s.next());
+    Ok(())
+}

@@ -461,7 +461,7 @@ pub struct TaskBuilder<'a> {
 type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
 // type SafeBoxAsyncFn = Box<dyn Fn() -> (impl std::future::Future + 'static + Send)>;
 // type SafeBoxSyncFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send>;
-
+// type A =Box<dyn Fn>;
 
 #[derive(Debug, Clone, Default)]
 /// Task runtime context.
@@ -522,6 +522,59 @@ impl fmt::Debug for SafeStructBoxedFn {
         <&Self as Pointer>::fmt(&self, f)
     }
 }
+
+// For Async Task
+struct AsyncFn<F: Fn() -> U, U: Future>(F);
+// For Sync Task
+struct SyncFn<F: Fn() -> ()>(F);
+
+// Task Abstract
+trait Operator {
+    type TokioHandle;
+    type SmolHandle;
+    type Task: 'static + Send;
+
+    fn spawn_inner(&self, task_context: TaskContext) -> Self::Task;
+    fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle;
+    fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle;
+}
+
+impl<F: Fn() -> U, U: Future + 'static + Send> Operator for AsyncFn<F, U> {
+    type TokioHandle = TokioJoinHandle<()>;
+    type SmolHandle = SmolJoinHandler<()>;
+    type Task = Box<dyn Future<Output = ()> + 'static + Send>;
+
+    fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle {
+        // let handle = spawn(task);
+        // return handle
+
+        todo!();
+    }
+
+    fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
+        // let handle = spawn(task);
+        // return handle
+
+        todo!();
+    }
+    fn spawn_inner(&self, task_context: TaskContext) -> Self::Task {
+        let user_future = (&self.0)();
+
+        Box::new(async {
+            user_future.await;
+            task_context.finish_task(None).await;
+        })
+    }
+}
+
+// impl<F: Fn()> Operator for SyncFn<F> {
+//     type Handle = u64;
+//     fn spawn(&self) -> Self::Handle {
+//         self.call();
+//         // do someting
+//         1
+//     }
+// }
 
 #[derive(Debug)]
 /// Periodic Task Structures.
@@ -648,6 +701,22 @@ impl<'a> TaskBuilder<'a> {
             valid: true,
             maximum_parallel_runnable_num: self.maximum_parallel_runnable_num,
         })
+    }
+
+    ///
+    pub fn set_async_task<
+        F: Fn() -> U + 'static + Send,
+        U: std::future::Future + 'static + Send,
+    >(
+        self,
+        body: F,
+    ) -> Result<Task, TaskError> {
+        todo!();
+    }
+
+    ///
+    pub fn set_task<F: Fn() -> () + 'static + Send>(self, body: F) -> Result<Task, TaskError> {
+        todo!();
     }
 
     /// If we call set_frequency_by_candy explicitly and generate TaskBuilder,
@@ -894,9 +963,9 @@ impl Task {
         self.maximum_running_time.map(|t| t + start_time)
     }
 
-    //single slot foreach do this.
-    //sub_cylinder_line
-    //return is can_running?
+    // single slot foreach do this.
+    // sub_cylinder_line
+    // return is can_running?
     #[inline(always)]
     pub(crate) fn sub_cylinder_line(&mut self) -> bool {
         self.cylinder_line -= 1;
@@ -911,6 +980,7 @@ impl Task {
     #[inline(always)]
     /// check if task has arrived.
     pub fn check_arrived(&mut self) -> bool {
+        trace!("check_arrived: {:?}", self);
         if self.cylinder_line == 0 {
             return self.is_can_running();
         }

@@ -122,7 +122,7 @@ pub(crate) struct RecyclingBinWorker {
 
 impl EventHandle {
     fn recycling_task(&mut self) {
-        async_spawn(
+        async_spawn_by_smol(
             self.sub_wokers
                 .recycling_bin_woker
                 .inner
@@ -130,23 +130,21 @@ impl EventHandle {
                 .add_recycle_unit(),
         )
         .detach();
-        async_spawn(self.sub_wokers.recycling_bin_woker.inner.clone().recycle()).detach();
+        async_spawn_by_smol(self.sub_wokers.recycling_bin_woker.inner.clone().recycle()).detach();
     }
 
-    cfg_tokio_support!(
-        // `async_spawn_by_tokio` 'must be called from the context of Tokio runtime configured
-        // with either `basic_scheduler` or `threaded_scheduler`'.
-        fn recycling_task_by_tokio(&mut self) {
-            async_spawn_by_tokio(
-                self.sub_wokers
-                    .recycling_bin_woker
-                    .inner
-                    .clone()
-                    .add_recycle_unit(),
-            );
-            async_spawn_by_tokio(self.sub_wokers.recycling_bin_woker.inner.clone().recycle());
-        }
-    );
+    // `async_spawn_by_tokio` 'must be called from the context of Tokio runtime configured
+    // with either `basic_scheduler` or `threaded_scheduler`'.
+    fn recycling_task_by_tokio(&mut self) {
+        async_spawn_by_tokio(
+            self.sub_wokers
+                .recycling_bin_woker
+                .inner
+                .clone()
+                .add_recycle_unit(),
+        );
+        async_spawn_by_tokio(self.sub_wokers.recycling_bin_woker.inner.clone().recycle());
+    }
 
     // handle all event.
     // TODO: Add TestUnit.
@@ -160,7 +158,7 @@ impl EventHandle {
 
         match runtime_kind {
             RuntimeKind::Smol => self.recycling_task(),
-            #[cfg(feature = "tokio-support")]
+
             RuntimeKind::Tokio => self.recycling_task_by_tokio(),
         };
     }

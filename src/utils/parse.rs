@@ -88,13 +88,10 @@ pub mod shell_command {
 
     impl_command_unify!(Command => StdChild,SmolCommand => SmolChild);
 
-    cfg_tokio_support!(
-        use tokio::process::Command as TokioCommand;
-        use tokio::process::Child as TokioChild;
-        use std::convert::TryInto;
-        impl_command_unify!(TokioCommand => TokioChild);
-
-    );
+    use std::convert::TryInto;
+    use tokio::process::Child as TokioChild;
+    use tokio::process::Command as TokioCommand;
+    impl_command_unify!(TokioCommand => TokioChild);
 
     #[async_trait]
     /// Trait abstraction of multiple library process handles.
@@ -140,26 +137,24 @@ pub mod shell_command {
         }
     }
 
-    cfg_tokio_support!(
-        #[async_trait]
-        impl ChildUnify for TokioChild {
-            async fn wait_with_output(self) -> AnyResult<Output> {
-                Ok(self.wait_with_output().await?)
-            }
-
-            async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
-                self.stdout.take().map(|s| s.try_into().ok()).flatten()
-            }
-
-            // Attempts to force the child to exit, but does not wait for the request to take effect.
-            // On Unix platforms, this is the equivalent to sending a SIGKILL.
-            // Note that on Unix platforms it is possible for a zombie process to remain after a kill is sent;
-            // to avoid this, the caller should ensure that either child.wait().await or child.try_wait() is invoked successfully.
-            fn kill(&mut self) -> AnyResult<()> {
-                Ok(self.start_kill()?)
-            }
+    #[async_trait]
+    impl ChildUnify for TokioChild {
+        async fn wait_with_output(self) -> AnyResult<Output> {
+            Ok(self.wait_with_output().await?)
         }
-    );
+
+        async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
+            self.stdout.take().map(|s| s.try_into().ok()).flatten()
+        }
+
+        // Attempts to force the child to exit, but does not wait for the request to take effect.
+        // On Unix platforms, this is the equivalent to sending a SIGKILL.
+        // Note that on Unix platforms it is possible for a zombie process to remain after a kill is sent;
+        // to avoid this, the caller should ensure that either child.wait().await or child.try_wait() is invoked successfully.
+        fn kill(&mut self) -> AnyResult<()> {
+            Ok(self.start_kill()?)
+        }
+    }
     #[derive(Debug, Default)]
     /// Guarding of process handles.
     pub struct ChildGuard<Child: ChildUnify> {

@@ -21,7 +21,7 @@ struct Clock {
 
 enum ClockInner {
     Sc(SmolClock),
-    #[cfg(feature = "tokio-support")]
+
     Tc(TokioClock),
 }
 
@@ -37,7 +37,7 @@ impl ClockInner {
             RuntimeKind::Smol => {
                 ClockInner::Sc(SmolClock::new(Instant::now(), Duration::from_secs(1)))
             }
-            #[cfg(feature = "tokio-support")]
+
             RuntimeKind::Tokio => ClockInner::Tc(TokioClock::new(
                 time::Instant::now(),
                 Duration::from_secs(1),
@@ -50,32 +50,28 @@ impl Clock {
     async fn tick(&mut self) {
         match self.inner {
             ClockInner::Sc(ref mut smol_clock) => smol_clock.tick().await,
-            #[cfg(feature = "tokio-support")]
+
             ClockInner::Tc(ref mut tokio_clock) => tokio_clock.tick().await,
         }
     }
 }
-cfg_tokio_support!(
-    use tokio::time::{Interval, interval_at, self};
+use tokio::time::{self, interval_at, Interval};
 
-    #[derive(Debug)]
-    struct TokioClock{
-        inner : Interval
+#[derive(Debug)]
+struct TokioClock {
+    inner: Interval,
+}
+
+impl TokioClock {
+    pub fn new(start: time::Instant, period: Duration) -> Self {
+        let inner = interval_at(start, period);
+        TokioClock { inner }
     }
 
-    impl TokioClock{
-
-        pub fn new(start: time::Instant, period: Duration) -> Self{
-            let inner = interval_at(start, period);
-            TokioClock{inner}
-        }
-
-        pub async fn tick(&mut self){
-            self.inner.tick().await;
-        }
+    pub async fn tick(&mut self) {
+        self.inner.tick().await;
     }
-
-);
+}
 
 #[derive(Debug)]
 struct SmolClock {
@@ -207,6 +203,12 @@ impl Timer {
             let task_ids;
 
             {
+                // TODO:
+                // Attempt to batch take out tasks and execute them,
+                // marking the status for this batch.
+                //
+                // Attempt to re-queue the `cancel` event into the channel
+                // if the user `cancel` task is running.
                 if let Some(mut slot_mut) = self.shared_header.wheel_queue.get_mut(&second_hand) {
                     task_ids = slot_mut.value_mut().arrival_time_tasks();
                 } else {

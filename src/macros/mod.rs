@@ -8,6 +8,4 @@ pub(crate) mod generate_fn_macro;
 
 pub use create_async_fn_body;
 
-cfg_tokio_support!(
-    pub use create_async_fn_tokio_body;
-);
+pub use create_async_fn_tokio_body;

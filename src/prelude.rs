@@ -33,8 +33,9 @@ pub use anyhow::{anyhow, Result as AnyResult};
 pub use cron_clock::{self, error as cron_error, FixedOffset, Local, TimeZone, Utc};
 pub use smol::channel;
 pub use smol::future as future_lite;
-pub use smol::spawn as async_spawn;
-pub use smol::unblock as unblock_spawn;
+pub use smol::spawn as async_spawn_by_smol;
+pub use smol::unblock as unblock_spawn_by_smol;
+pub use smol::Task as SmolJoinHandler;
 pub use thiserror::Error;
 
 /// State of the task run instance.
@@ -55,6 +56,7 @@ pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
 pub(crate) use smol::Timer;
 pub(crate) use std::convert::{TryFrom, TryInto};
+pub(crate) use std::future::Future;
 pub(crate) use std::iter::StepBy;
 pub(crate) use std::ops::RangeFrom;
 pub(crate) use std::time::Duration;
@@ -63,12 +65,12 @@ pub(crate) type SecondsState = StepBy<RangeFrom<u64>>;
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 
-cfg_tokio_support!(
-    pub use tokio::task::spawn as async_spawn_by_tokio;
-    pub use tokio::task::spawn_blocking as unblock_spawn_by_tokio;
-    pub use tokio::time::sleep as sleep_by_tokio;
-    pub use crate::utils::convenience::functions::tokio_unblock_process_task_fn;
-);
+pub use crate::utils::convenience::functions::tokio_unblock_process_task_fn;
+pub use tokio::task::{
+    spawn as async_spawn_by_tokio, spawn_blocking as unblock_spawn_by_tokio,
+    JoinHandle as TokioJoinHandle,
+};
+pub use tokio::time::sleep as sleep_by_tokio;
 
 cfg_status_report!(
     pub use crate::utils::status_report::PublicEvent;
