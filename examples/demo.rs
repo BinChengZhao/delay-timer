@@ -112,7 +112,7 @@ pub fn generate_closure_template(
             future_inner.await;
             context.finish_task(None).await;
         };
-        create_delay_task_handler(async_spawn(future))
+        create_delay_task_handler(async_spawn_by_smol(future))
     }
 }
 

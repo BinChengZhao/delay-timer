@@ -523,6 +523,9 @@ impl fmt::Debug for SafeStructBoxedFn {
     }
 }
 
+// FIXME: The default runtime is now `Tokio`
+// all the original `DelayTimerBuilder`s have to add a call `tokio_runtime_by_smol`.
+
 // For Async Task
 struct AsyncFn<F: Fn() -> U, U: Future>(F);
 // For Sync Task

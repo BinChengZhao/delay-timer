@@ -16,7 +16,7 @@ macro_rules! create_async_fn_body {
 
                 context.finish_task(None).await;
             };
-            let handle = async_spawn(f);
+            let handle = async_spawn_by_smol(f);
             create_delay_task_handler(handle)
         }
     };
@@ -36,7 +36,7 @@ macro_rules! create_async_fn_body {
 
                 context.finish_task(None).await;
             };
-            let handle = async_spawn(f);
+            let handle = async_spawn_by_smol(f);
             create_delay_task_handler(handle)
         }
     }

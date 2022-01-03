@@ -62,7 +62,8 @@ pub(crate) type SharedTaskFlagMap = Arc<DashMap<u64, TaskMark>>;
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct DelayTimerBuilder {
-    shared_header: SharedHeader,
+    /// RuntimeInstance (Tokio | Smol)
+    pub(crate) runtime_instance: RuntimeInstance,
     timer_event_channel: Option<(AsyncSender<TimerEvent>, AsyncReceiver<TimerEvent>)>,
     /// Whether or not to enable the status-report
     #[cfg(feature = "status-report")]
@@ -112,13 +113,13 @@ impl fmt::Debug for SharedHeader {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct RuntimeInstance {
     // smol have no instance.
     pub(crate) inner: Option<Arc<Runtime>>,
     pub(crate) kind: RuntimeKind,
 }
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RuntimeKind {
     Smol,
 
@@ -127,7 +128,46 @@ pub(crate) enum RuntimeKind {
 
 impl Default for RuntimeKind {
     fn default() -> Self {
-        RuntimeKind::Smol
+        RuntimeKind::Tokio
+    }
+}
+
+impl Default for RuntimeInstance {
+    fn default() -> Self {
+        let kind = RuntimeKind::Tokio;
+        let inner = None;
+        Self { kind, inner }
+    }
+}
+
+impl RuntimeInstance {
+    fn init_smol_runtime() -> RuntimeInstance {
+        let inner = None;
+        let kind = RuntimeKind::Smol;
+        RuntimeInstance { inner, kind }
+    }
+
+    fn init_tokio_runtime() -> RuntimeInstance {
+        let inner = Some(Arc::new(
+            Self::tokio_support().expect("init tokioRuntime is fail."),
+        ));
+        let kind = RuntimeKind::Tokio;
+        RuntimeInstance { inner, kind }
+    }
+
+    pub(crate) fn tokio_support() -> Option<Runtime> {
+        TokioBuilder::new_multi_thread()
+            .enable_all()
+            .thread_name_fn(|| {
+                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                format!("tokio-{}", id)
+            })
+            .on_thread_start(|| {
+                info!("tokio-thread started");
+            })
+            .build()
+            .ok()
     }
 }
 
@@ -162,18 +202,16 @@ impl Default for DelayTimer {
 impl DelayTimerBuilder {
     /// Build DelayTimer.
     pub fn build(mut self) -> DelayTimer {
-        self.lauch()
-            .expect("delay-timer The base task failed to launch.");
         self.init_delay_timer()
     }
 
     // Start the DelayTimer.
-    fn lauch(&mut self) -> AnyResult<()> {
+    fn lauch(&mut self, shared_header: SharedHeader) -> AnyResult<()> {
         let mut event_handle_builder = EventHandleBuilder::default();
         event_handle_builder
             .timer_event_receiver(self.get_timer_event_receiver())
             .timer_event_sender(self.get_timer_event_sender())
-            .shared_header(self.shared_header.clone());
+            .shared_header(shared_header.clone());
 
         #[cfg(feature = "status-report")]
         if self.enable_status_report {
@@ -184,12 +222,12 @@ impl DelayTimerBuilder {
             .build()
             .ok_or_else(|| anyhow!("Missing base component, can't initialize."))?;
 
-        let timer = Timer::new(self.get_timer_event_sender(), self.shared_header.clone());
+        let timer = Timer::new(self.get_timer_event_sender(), shared_header.clone());
 
-        match self.shared_header.runtime_instance.kind {
+        match self.runtime_instance.kind {
             RuntimeKind::Smol => self.assign_task(timer, event_handle),
 
-            RuntimeKind::Tokio => self.assign_task_by_tokio(timer, event_handle),
+            RuntimeKind::Tokio => self.assign_task_by_tokio(timer, event_handle, shared_header),
         };
 
         Ok(())
@@ -226,9 +264,18 @@ impl DelayTimerBuilder {
     }
 
     fn init_delay_timer(&mut self) -> DelayTimer {
+        if self.runtime_instance.kind == RuntimeKind::Tokio && self.runtime_instance.inner.is_none()
+        {
+            self.runtime_instance = RuntimeInstance::init_tokio_runtime();
+        }
+
+        let mut shared_header = SharedHeader::default();
+        shared_header.runtime_instance = self.runtime_instance.clone();
+
         let timer_event_sender = self.get_timer_event_sender();
 
-        let shared_header = self.shared_header.clone();
+        self.lauch(shared_header.clone())
+            .expect("delay-timer The base task failed to launch.");
 
         #[cfg(feature = "status-report")]
         let mut status_reporter = None;
@@ -332,13 +379,18 @@ impl DelayTimer {
 /// This function requires the `tokio-support` feature of the `delay_timer`
 /// crate to be enabled.
 impl DelayTimerBuilder {
-    fn assign_task_by_tokio(&mut self, timer: Timer, event_handle: EventHandle) {
-        self.run_async_schedule_by_tokio(timer);
-        self.run_event_handle_by_tokio(event_handle);
+    fn assign_task_by_tokio(
+        &mut self,
+        timer: Timer,
+        event_handle: EventHandle,
+        shared_header: SharedHeader,
+    ) {
+        self.run_async_schedule_by_tokio(timer, shared_header.clone());
+        self.run_event_handle_by_tokio(event_handle, shared_header);
     }
 
-    fn run_async_schedule_by_tokio(&self, mut timer: Timer) {
-        if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner {
+    fn run_async_schedule_by_tokio(&self, mut timer: Timer, shared_header: SharedHeader) {
+        if let Some(ref tokio_runtime_ref) = shared_header.runtime_instance.inner {
             let tokio_runtime = tokio_runtime_ref.clone();
             Builder::new()
                 .name("async_schedule_tokio".into())
@@ -351,8 +403,12 @@ impl DelayTimerBuilder {
         }
     }
 
-    fn run_event_handle_by_tokio(&self, mut event_handle: EventHandle) {
-        if let Some(ref tokio_runtime_ref) = self.shared_header.runtime_instance.inner {
+    fn run_event_handle_by_tokio(
+        &self,
+        mut event_handle: EventHandle,
+        shared_header: SharedHeader,
+    ) {
+        if let Some(ref tokio_runtime_ref) = shared_header.runtime_instance.inner {
             let tokio_runtime = tokio_runtime_ref.clone();
             Builder::new()
                 .name("event_handle_tokio".into())
@@ -365,54 +421,37 @@ impl DelayTimerBuilder {
         }
     }
 
+    /// With this API, `DelayTimer` use default `SmolRuntime` is generated internally.
+    pub fn tokio_runtime_by_smol(mut self) -> Self {
+        self.runtime_instance.kind = RuntimeKind::Smol;
+        self.runtime_instance.inner = None;
+
+        self
+    }
+
     /// With this API, `DelayTimer` use default `TokioRuntime` is generated internally.
-    pub fn tokio_runtime_by_default(self) -> Self {
-        self.tokio_runtime(None)
+    ///
+    /// By default the internal runtime is `Tokio`, this API does not require a user-initiated call.
+    pub fn tokio_runtime_by_default(mut self) -> Self {
+        self.runtime_instance.kind = RuntimeKind::Tokio;
+        self.runtime_instance.inner = None;
+        self
     }
 
     /// With this API, `DelayTimer` internally use the user customized and independent `TokioRuntime`.
-    pub fn tokio_runtime_by_custom(self, rt: Runtime) -> Self {
-        self.tokio_runtime(Some(Arc::new(rt)))
+    pub fn tokio_runtime_by_custom(mut self, rt: Runtime) -> Self {
+        self.runtime_instance.kind = RuntimeKind::Tokio;
+        self.runtime_instance.inner = Some(Arc::new(rt));
+
+        self
     }
 
     /// With this api, `DelayTimer` internal will share a `TokioRuntime` with the user .
-    pub fn tokio_runtime_shared_by_custom(self, rt: Arc<Runtime>) -> Self {
-        self.tokio_runtime(Some(rt))
-    }
-
-    /// With this API, `DelayTimer` internally use the user custom TokioRuntime.
-    /// If None is given, a default TokioRuntime is generated internally.
-    pub(crate) fn tokio_runtime(mut self, rt: Option<Arc<Runtime>>) -> Self {
-        self.shared_header.register_tokio_runtime(rt);
-        self
-    }
-}
-
-impl SharedHeader {
-    pub(crate) fn tokio_support() -> Option<Runtime> {
-        TokioBuilder::new_multi_thread()
-            .enable_all()
-            .thread_name_fn(|| {
-                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                format!("tokio-{}", id)
-            })
-            .on_thread_start(|| {
-                info!("tokio-thread started");
-            })
-            .build()
-            .ok()
-    }
-
-    pub(crate) fn register_tokio_runtime(&mut self, mut rt: Option<Arc<Runtime>>) {
-        if rt.is_none() {
-            rt = Some(Arc::new(
-                Self::tokio_support().expect("init tokioRuntime is fail."),
-            ));
-        }
-
-        self.runtime_instance.inner = rt;
+    pub fn tokio_runtime_shared_by_custom(mut self, rt: Arc<Runtime>) -> Self {
         self.runtime_instance.kind = RuntimeKind::Tokio;
+        self.runtime_instance.inner = Some(rt);
+
+        self
     }
 }
 

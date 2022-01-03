@@ -1,3 +1,6 @@
+// FIXME: The default runtime is now `Tokio`
+// all the original `DelayTimerBuilder`s have to add a call `tokio_runtime_by_smol`.
+
 //! DelayTimer like crontab is a cyclic task manager with latency properties,
 //! but synchronous asynchronous tasks are possible,
 //! based on an internal event manager and task scheduler,
