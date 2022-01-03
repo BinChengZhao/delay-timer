@@ -19,7 +19,7 @@ fn main() -> Result<(), Report> {
                 .tokio_runtime_shared_by_custom(rt)
                 .build();
             let mut chain;
-            for cron_str in ["0 33 11 * * * *", "0 33 12 * * * *"] {
+            for cron_str in ["0 33 12 * * * *", "0 33 13 * * * *"] {
                 chain = delay_timer.insert_task(build_task_async_print(cron_str)?)?;
                 chain.next_with_async_wait().await?;
             }

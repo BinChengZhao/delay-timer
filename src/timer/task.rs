@@ -952,6 +952,8 @@ impl Task {
         self.valid = !self.frequency.is_down_over();
     }
 
+    /// After task initialization or handled
+    /// Redefine `cylinder_line`.
     #[inline(always)]
     pub(crate) fn set_cylinder_line(&mut self, cylinder_line: u64) {
         self.cylinder_line = cylinder_line;
@@ -965,11 +967,9 @@ impl Task {
 
     // single slot foreach do this.
     // sub_cylinder_line
-    // return is can_running?
     #[inline(always)]
-    pub(crate) fn sub_cylinder_line(&mut self) -> bool {
+    pub(crate) fn sub_cylinder_line(&mut self) {
         self.cylinder_line -= 1;
-        self.is_can_running()
     }
 
     #[inline(always)]
@@ -980,11 +980,14 @@ impl Task {
     #[inline(always)]
     /// check if task has arrived.
     pub fn check_arrived(&mut self) -> bool {
-        trace!("check_arrived: {:?}", self);
+        trace!("check self: {:?}", self);
+
         if self.cylinder_line == 0 {
             return self.is_can_running();
         }
-        self.sub_cylinder_line()
+
+        self.sub_cylinder_line();
+        false
     }
 
     /// check if task has already.
