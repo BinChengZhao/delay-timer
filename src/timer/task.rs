@@ -895,9 +895,8 @@ impl Task {
     //sub_cylinder_line
     //return is can_running?
     #[inline(always)]
-    pub(crate) fn sub_cylinder_line(&mut self) -> bool {
+    pub(crate) fn sub_cylinder_line(&mut self) {
         self.cylinder_line -= 1;
-        self.is_can_running()
     }
 
     #[inline(always)]
@@ -911,7 +910,8 @@ impl Task {
         if self.cylinder_line == 0 {
             return self.is_can_running();
         }
-        self.sub_cylinder_line()
+        self.sub_cylinder_line();
+        false
     }
 
     /// check if task has already.
