@@ -457,12 +457,6 @@ pub struct TaskBuilder<'a> {
     schedule_iterator_time_zone: ScheduleIteratorTimeZone,
 }
 
-//TODO:Future tasks will support single execution (not multiple executions in the same time frame).
-type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
-// type SafeBoxAsyncFn = Box<dyn Fn() -> (impl std::future::Future + 'static + Send)>;
-// type SafeBoxSyncFn = Box<dyn Fn() -> Box<dyn DelayTaskHandler> + 'static + Send>;
-// type A =Box<dyn Fn>;
-
 #[derive(Debug, Clone, Default)]
 /// Task runtime context.
 pub struct TaskContext {
@@ -516,6 +510,14 @@ impl TaskContext {
     }
 }
 
+//TODO:Future tasks will support single execution (not multiple executions in the same time frame).
+type SafeBoxFn = Box<dyn Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync>;
+type SafeBoxRoutine = Box<
+    dyn Routine<TokioHandle = TokioJoinHandle<()>, SmolHandle = SmolJoinHandler<()>>
+        + 'static
+        + Send,
+>;
+
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
 impl fmt::Debug for SafeStructBoxedFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -523,67 +525,104 @@ impl fmt::Debug for SafeStructBoxedFn {
     }
 }
 
+pub(crate) struct SafeStructBoxRoutine(pub(crate) SafeBoxRoutine);
+impl fmt::Debug for SafeStructBoxRoutine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <&Self as Pointer>::fmt(&self, f)
+    }
+}
+// Internal closures, once created
+// Will not be changed (read-only access), so `Sync` can be implemented manually
+unsafe impl Sync for SafeStructBoxRoutine {}
+unsafe impl Sync for SafeStructBoxedFn {}
+
 // FIXME: The default runtime is now `Tokio`
 // all the original `DelayTimerBuilder`s have to add a call `tokio_runtime_by_smol`.
 
 // For Async Task
-struct AsyncFn<F: Fn() -> U, U: Future>(F);
-// For Sync Task
-struct SyncFn<F: Fn() -> ()>(F);
+#[derive(Debug, Clone)]
+struct AsyncFn<F: Fn() -> U + Send + 'static, U: Future + Send + 'static>(F);
 
-// Task Abstract
-trait Operator {
+// For Sync Task
+#[derive(Debug, Clone)]
+struct SyncFn<F: Fn() -> () + Send + 'static + Clone>(F);
+
+// Routine abstractions performed during task execution.
+pub(crate) trait Routine {
     type TokioHandle;
     type SmolHandle;
-    type Task: 'static + Send;
-
-    fn spawn_inner(&self, task_context: TaskContext) -> Self::Task;
     fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle;
     fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle;
 }
 
-impl<F: Fn() -> U, U: Future + 'static + Send> Operator for AsyncFn<F, U> {
+impl<F: Fn() -> U + 'static + Send, U: Future + 'static + Send> Routine for AsyncFn<F, U> {
     type TokioHandle = TokioJoinHandle<()>;
     type SmolHandle = SmolJoinHandler<()>;
-    type Task = Box<dyn Future<Output = ()> + 'static + Send>;
 
+    #[inline(always)]
     fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle {
-        // let handle = spawn(task);
-        // return handle
-
-        todo!();
-    }
-
-    fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
-        // let handle = spawn(task);
-        // return handle
-
-        todo!();
-    }
-    fn spawn_inner(&self, task_context: TaskContext) -> Self::Task {
         let user_future = (&self.0)();
 
-        Box::new(async {
+        async_spawn_by_tokio(async {
+            user_future.await;
+            task_context.finish_task(None).await;
+        })
+    }
+
+    #[inline(always)]
+    fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
+        let user_future = (&self.0)();
+        async_spawn_by_smol(async {
             user_future.await;
             task_context.finish_task(None).await;
         })
     }
 }
 
-// impl<F: Fn()> Operator for SyncFn<F> {
-//     type Handle = u64;
-//     fn spawn(&self) -> Self::Handle {
-//         self.call();
-//         // do someting
-//         1
-//     }
+// fn demonstrate_event_handle(){
+// within EventHandle::add_task
+// let body == if instance_kind == tokio { move || routine.spawn_by_tokio() }
+// else instance_kind == smol { move || routine.spawn_by_smol() }
+// Or
+// let body == if instance_kind == tokio { Routine::spawn_by_tokio }
+// else instance_kind == smol { Routine::spawn_by_smol }
+// within timer-core body()
 // }
+
+impl<F: Fn() -> () + 'static + Send + Clone> Routine for SyncFn<F> {
+    type TokioHandle = TokioJoinHandle<()>;
+    type SmolHandle = SmolJoinHandler<()>;
+
+    #[inline(always)]
+    fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle {
+        let fn_handle = unblock_spawn_by_tokio((&self.0).clone());
+
+        async_spawn_by_tokio(async {
+            if let Err(e) = fn_handle.await {
+                error!("{}", e);
+            }
+            task_context.finish_task(None).await;
+        })
+    }
+
+    #[inline(always)]
+    fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
+        let fn_handle = unblock_spawn_by_smol((&self.0).clone());
+        async_spawn_by_smol(async {
+            fn_handle.await;
+            task_context.finish_task(None).await;
+        })
+    }
+}
 
 #[derive(Debug)]
 /// Periodic Task Structures.
 pub struct Task {
     /// Unique task-id.
     pub task_id: u64,
+    /// Routine is the soul of the task, including the execution instructions of the task.
+    // TODO: Romove `Option` later.
+    routine: Option<SafeStructBoxRoutine>,
     /// Iter of frequencies and executive clocks.
     frequency: FrequencyInner,
     /// A Fn in box it can be run and return delayTaskHandler.
@@ -697,6 +736,7 @@ impl<'a> TaskBuilder<'a> {
 
         Ok(Task {
             task_id: self.task_id,
+            routine: None,
             frequency: frequency_inner,
             body,
             maximum_running_time: self.maximum_running_time,
@@ -707,18 +747,28 @@ impl<'a> TaskBuilder<'a> {
     }
 
     ///
-    pub fn set_async_task<
-        F: Fn() -> U + 'static + Send,
-        U: std::future::Future + 'static + Send,
-    >(
+    pub fn set_routine<F: Fn() -> () + 'static + Send + Clone>(
         self,
-        body: F,
+        routine: F,
     ) -> Result<Task, TaskError> {
+        // let routine = Box::new(routine);
         todo!();
     }
 
     ///
-    pub fn set_task<F: Fn() -> () + 'static + Send>(self, body: F) -> Result<Task, TaskError> {
+    pub fn set_async_routine<
+        F: Fn() -> U + 'static + Send,
+        U: std::future::Future + 'static + Send,
+    >(
+        self,
+        routine: F,
+    ) -> Result<Task, TaskError> {
+        // let routine = Box::new(routine);
+        todo!();
+    }
+
+    ///
+    pub fn build(mut self) -> Task {
         todo!();
     }
 
