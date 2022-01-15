@@ -307,9 +307,10 @@ impl Timer {
         task_context
             .task_id(task_id)
             .record_id(record_id)
-            .timer_event_sender(self.timer_event_sender.clone());
+            .timer_event_sender(self.timer_event_sender.clone())
+            .runtime_kind(self.shared_header.runtime_instance.kind);
 
-        let task_handler_box = (task.get_body())(task_context);
+        let task_handler_box = self.routine_exec(&(task.routine.0), task_context);
 
         let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
         let tmp_task_handler_box = delay_task_handler_box_builder
@@ -380,6 +381,22 @@ impl Timer {
             task_id, task_excute_timestamp, slot_seed, cylinder_line
         );
         Ok(())
+    }
+
+    #[inline(always)]
+    fn routine_exec(
+        &self,
+        routine: &Box<
+            dyn Routine<TokioHandle = TokioJoinHandle<()>, SmolHandle = SmolJoinHandler<()>>
+                + 'static
+                + Send,
+        >,
+        task_context: TaskContext,
+    ) -> Box<dyn DelayTaskHandler> {
+        match task_context.runtime_kind {
+            RuntimeKind::Smol => create_delay_task_handler(routine.spawn_by_smol(task_context)),
+            RuntimeKind::Tokio => create_delay_task_handler(routine.spawn_by_tokio(task_context)),
+        }
     }
 }
 

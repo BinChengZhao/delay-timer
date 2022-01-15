@@ -34,16 +34,16 @@ fn main() -> Result<(), Report> {
 fn build_task_async_print(cron_str: &'static str) -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_tokio_body!((cron_str){
-        info!("create_async_fn_body:i'success {}", cron_str_ref);
-    });
+    let body = move || async move {
+        info!("create_async_fn_body:i'success {}", cron_str);
+    };
 
     task_builder
         .set_task_id(1)
         .set_frequency_repeated_by_cron_str(cron_str)
         .set_schedule_iterator_time_zone(ScheduleIteratorTimeZone::Utc)
         .set_maximum_parallel_runnable_num(2)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 fn install_tracing() {

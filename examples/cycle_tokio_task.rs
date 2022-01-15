@@ -36,7 +36,7 @@ fn build_task_customized_async_task() -> Result<Task> {
         .set_frequency_repeated_by_cron_str("10,15,25,50 0/1 * * Jan-Dec * 2020-2100")
         .set_task_id(5)
         .set_maximum_running_time(15)
-        .spawn(body)?)
+        .spawn_async_routine(body)?)
 }
 
 fn build_wake_task() -> Result<Task> {
@@ -53,7 +53,7 @@ fn build_wake_task() -> Result<Task> {
         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousDay::Wake))
         .set_task_id(7)
         .set_maximum_running_time(50)
-        .spawn(body)?)
+        .spawn_async_routine(body)?)
 }
 
 pub fn generate_closure_template(

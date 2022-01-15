@@ -119,10 +119,13 @@ pub(crate) struct RuntimeInstance {
     pub(crate) inner: Option<Arc<Runtime>>,
     pub(crate) kind: RuntimeKind,
 }
+/// Async-Runtime Kind
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum RuntimeKind {
+pub enum RuntimeKind {
+    /// Async-Runtime `smol` compatible with the async-std
     Smol,
 
+    /// Async-Runtime `tokio`
     Tokio,
 }
 
@@ -141,6 +144,7 @@ impl Default for RuntimeInstance {
 }
 
 impl RuntimeInstance {
+    #[allow(dead_code)]
     fn init_smol_runtime() -> RuntimeInstance {
         let inner = None;
         let kind = RuntimeKind::Smol;
@@ -421,8 +425,8 @@ impl DelayTimerBuilder {
         }
     }
 
-    /// With this API, `DelayTimer` use default `SmolRuntime` is generated internally.
-    pub fn tokio_runtime_by_smol(mut self) -> Self {
+    /// With this API, `DelayTimer` use default `Smol-Runtime` is generated internally.
+    pub fn smol_runtime_by_default(mut self) -> Self {
         self.runtime_instance.kind = RuntimeKind::Smol;
         self.runtime_instance.inner = None;
 

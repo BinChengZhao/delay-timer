@@ -47,6 +47,7 @@ pub(crate) use crate::timer::runtime_trace::state;
 pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBox;
 pub(crate) use crate::timer::runtime_trace::task_handle::DelayTaskHandlerBoxBuilder;
 pub(crate) use crate::timer::runtime_trace::task_instance::TaskInstancesChainMaintainer;
+pub(crate) use crate::timer::task::Routine;
 
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList, ChildUnify};
 pub(crate) use dashmap::DashMap;

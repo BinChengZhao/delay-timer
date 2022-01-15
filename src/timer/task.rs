@@ -466,31 +466,43 @@ pub struct TaskContext {
     pub record_id: i64,
     /// Hook functions that may be used in the future.
     pub then_fn: Option<fn()>,
+    /// Async-Runtime Kind
+    pub runtime_kind: RuntimeKind,
     /// Event Sender for Timer Wheel Core.
     pub(crate) timer_event_sender: Option<TimerEventSender>,
 }
 
 impl TaskContext {
+    #[inline(always)]
     /// Get the id of task.
     pub fn task_id(&mut self, task_id: u64) -> &mut Self {
         self.task_id = task_id;
         self
     }
 
+    #[inline(always)]
     /// Get the id of the task running instance.
     pub fn record_id(&mut self, record_id: i64) -> &mut Self {
         self.record_id = record_id;
         self
     }
 
+    #[inline(always)]
     pub(crate) fn timer_event_sender(&mut self, timer_event_sender: TimerEventSender) -> &mut Self {
         self.timer_event_sender = Some(timer_event_sender);
         self
     }
 
+    #[inline(always)]
     /// Get hook functions that may be used in the future.
     pub fn then_fn(&mut self, then_fn: fn()) -> &mut Self {
         self.then_fn = Some(then_fn);
+        self
+    }
+
+    #[inline(always)]
+    pub(crate) fn runtime_kind(&mut self, runtime_kind: RuntimeKind) -> &mut Self {
+        self.runtime_kind = runtime_kind;
         self
     }
 
@@ -621,12 +633,9 @@ pub struct Task {
     /// Unique task-id.
     pub task_id: u64,
     /// Routine is the soul of the task, including the execution instructions of the task.
-    // TODO: Romove `Option` later.
-    routine: Option<SafeStructBoxRoutine>,
+    pub(crate) routine: SafeStructBoxRoutine,
     /// Iter of frequencies and executive clocks.
     frequency: FrequencyInner,
-    /// A Fn in box it can be run and return delayTaskHandler.
-    pub(crate) body: SafeStructBoxedFn,
     /// Maximum execution time (optional).
     maximum_running_time: Option<u64>,
     /// Loop the line and check how many more clock cycles it will take to execute it.
@@ -725,20 +734,20 @@ impl<'a> TaskBuilder<'a> {
         self
     }
 
-    /// Spawn a task.
-    pub fn spawn<F>(self, body: F) -> Result<Task, TaskError>
-    where
-        F: Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync,
-    {
+    /// Spawn a task with async-routine.
+    pub fn spawn_async_routine<
+        F: Fn() -> U + 'static + Send,
+        U: std::future::Future + 'static + Send,
+    >(
+        self,
+        routine: F,
+    ) -> Result<Task, TaskError> {
         let frequency_inner = (self.frequency, self.schedule_iterator_time_zone).try_into()?;
-
-        let body = SafeStructBoxedFn(Box::new(body));
 
         Ok(Task {
             task_id: self.task_id,
-            routine: None,
+            routine: SafeStructBoxRoutine(Box::new(AsyncFn(routine))),
             frequency: frequency_inner,
-            body,
             maximum_running_time: self.maximum_running_time,
             cylinder_line: 0,
             valid: true,
@@ -746,30 +755,22 @@ impl<'a> TaskBuilder<'a> {
         })
     }
 
-    ///
-    pub fn set_routine<F: Fn() -> () + 'static + Send + Clone>(
+    /// Spawn a task with sync-routine.
+    pub fn spawn_routine<F: Fn() -> () + 'static + Send + Clone>(
         self,
         routine: F,
     ) -> Result<Task, TaskError> {
-        // let routine = Box::new(routine);
-        todo!();
-    }
+        let frequency_inner = (self.frequency, self.schedule_iterator_time_zone).try_into()?;
 
-    ///
-    pub fn set_async_routine<
-        F: Fn() -> U + 'static + Send,
-        U: std::future::Future + 'static + Send,
-    >(
-        self,
-        routine: F,
-    ) -> Result<Task, TaskError> {
-        // let routine = Box::new(routine);
-        todo!();
-    }
-
-    ///
-    pub fn build(mut self) -> Task {
-        todo!();
+        Ok(Task {
+            task_id: self.task_id,
+            routine: SafeStructBoxRoutine(Box::new(SyncFn(routine))),
+            frequency: frequency_inner,
+            maximum_running_time: self.maximum_running_time,
+            cylinder_line: 0,
+            valid: true,
+            maximum_parallel_runnable_num: self.maximum_parallel_runnable_num,
+        })
     }
 
     /// If we call set_frequency_by_candy explicitly and generate TaskBuilder,
@@ -978,12 +979,6 @@ impl<'a> TaskBuilder<'a> {
     }
 }
 impl Task {
-    // get SafeBoxFn of Task to call.
-    #[inline(always)]
-    pub(crate) fn get_body(&self) -> &SafeBoxFn {
-        &(self.body).0
-    }
-
     // swap slot loction ,do this
     // down_count_and_set_vaild,will return new vaild status.
     #[inline(always)]
@@ -1088,14 +1083,14 @@ mod tests {
 
         // The third run returns to an invalid state.
         task_builder.set_frequency_count_down_by_seconds(1, 3);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
         assert!(!task.down_count_and_set_vaild());
 
         task_builder.set_frequency_count_down_by_cron_str("* * * * * * *", 3);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
@@ -1111,7 +1106,7 @@ mod tests {
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_count_down_by_seconds(init_seconds, 3);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         (1..100)
             .map(|i| {
@@ -1123,7 +1118,7 @@ mod tests {
             .for_each(drop);
 
         task_builder.set_frequency_count_down_by_cron_str("* * * * * * *", 100);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         (1..100)
             .map(|_| {
@@ -1143,7 +1138,7 @@ mod tests {
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_repeated_by_minutes(init_minutes);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         (1..100)
             .map(|i| {
@@ -1164,7 +1159,7 @@ mod tests {
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_repeated_by_hours(init_hours);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         (1..100)
             .map(|i| {
@@ -1185,7 +1180,7 @@ mod tests {
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_repeated_by_days(init_days);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         (1..100)
             .map(|i| {
@@ -1205,25 +1200,25 @@ mod tests {
 
         // The third run returns to an invalid state.
         task_builder.set_frequency_count_down_by_seconds(1, 3);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
         assert!(!task.down_count_and_set_vaild());
 
         task_builder.set_frequency_count_down_by_cron_str("* * * * * * *", 3);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         assert!(task.down_count_and_set_vaild());
         assert!(task.down_count_and_set_vaild());
         assert!(!task.down_count_and_set_vaild());
 
         task_builder.set_frequency_once_by_seconds(10);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
         assert!(!task.down_count_and_set_vaild());
 
         task_builder.set_frequency_count_down_by_hours(10, 10);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
         (1i32..10i32)
             .map(|_| assert!(task.down_count_and_set_vaild()))
             .for_each(drop);
@@ -1238,7 +1233,7 @@ mod tests {
 
         // The third run returns to an invalid state.
         task_builder.set_frequency_count_down_by_cron_str("* * * * * * *", 3);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         assert!(task.is_can_running());
 
@@ -1249,7 +1244,7 @@ mod tests {
 
         // set_frequency_count_down_by_seconds.
         task_builder.set_frequency_count_down_by_seconds(1, 1);
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         assert!(task.is_can_running());
 
@@ -1268,7 +1263,7 @@ mod tests {
 
         // The third run returns to an invalid state.
         task_builder.set_frequency_by_candy(CandyFrequency::CountDown(5, CandyCron::Minutely));
-        let mut task: Task = task_builder.spawn(|_context| create_default_delay_task_handler())?;
+        let mut task: Task = task_builder.spawn_async_routine(|| async {})?;
 
         assert!(task.is_can_running());
 
@@ -1305,5 +1300,21 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_dyn_routine() {
+        use crate::prelude::create_delay_task_handler;
+        let f = |routine: &Box<
+            dyn Routine<TokioHandle = TokioJoinHandle<()>, SmolHandle = SmolJoinHandler<()>>,
+        >,
+                 task_context: TaskContext| {
+            match task_context.runtime_kind {
+                RuntimeKind::Smol => create_delay_task_handler(routine.spawn_by_smol(task_context)),
+                RuntimeKind::Tokio => {
+                    create_delay_task_handler(routine.spawn_by_tokio(task_context))
+                }
+            }
+        };
     }
 }

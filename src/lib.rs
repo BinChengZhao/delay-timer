@@ -72,7 +72,7 @@
 //!         .set_task_id(1)
 //!         .set_frequency_repeated_by_seconds(1)
 //!         .set_maximum_parallel_runnable_num(2)
-//!         .spawn(body)
+//!         .spawn_async_routine(body)
 //! }
 //!
 //! ```
@@ -128,7 +128,7 @@
 //!         .set_task_id(1)
 //!         .set_frequency_repeated_by_seconds(6)
 //!         .set_maximum_parallel_runnable_num(2)
-//!         .spawn(body)
+//!         .spawn_async_routine(body)
 //! }
 //!
 //!
@@ -164,7 +164,7 @@
 //!     .set_frequency_count_down_by_seconds(1, 9)
 //!     .set_task_id(1)
 //!     .set_maximum_parallel_runnable_num(3)
-//!     .spawn(body).expect("");
+//!     .spawn_async_routine(body).expect("");
 //!
 //! delay_timer.add_task(task).ok();
 //!
@@ -199,7 +199,7 @@
 //!         .set_frequency_repeated_by_seconds(8)
 //!         .set_task_id(2)
 //!         .set_maximum_running_time(5)
-//!         .spawn(body)
+//!         .spawn_async_routine(body)
 //! }
 //!
 //! pub fn generate_closure_template(

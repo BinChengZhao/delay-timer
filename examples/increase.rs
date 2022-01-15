@@ -39,7 +39,7 @@ fn main() -> AnyResult<()> {
     // Waker-Task body.
     let end_body = get_wake_fn(current(), run_flag_ref);
     // Async-Task body.
-    let async_body = get_async_fn();
+    let async_body = get_async_fn;
 
     let mut task_builder = TaskBuilder::default();
 
@@ -49,44 +49,43 @@ fn main() -> AnyResult<()> {
         .set_maximum_running_time(90);
 
     for i in 0..1000 {
-        let task = task_builder.set_task_id(i).spawn(body)?;
+        let task = task_builder.set_task_id(i).spawn_routine(body)?;
         delay_timer.add_task(task)?;
     }
 
     task_builder.set_frequency_count_down_by_seconds(58, 1);
     for i in 1000..1300 {
-        let task = task_builder.set_task_id(i).spawn(async_body)?;
+        let task = task_builder
+            .set_task_id(i)
+            .spawn_async_routine(async_body)?;
         delay_timer.add_task(task)?;
     }
 
     let task = task_builder
         .set_task_id(8888)
         .set_frequency_once_by_minutes(1)
-        .spawn(end_body)?;
+        .spawn_routine(end_body)?;
     delay_timer.add_task(task)?;
 
     park();
     Ok(())
 }
 
-fn get_increase_fn(
-    run_flag_ref: SafePointer,
-) -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
-    move |_context| {
+fn get_increase_fn(run_flag_ref: SafePointer) -> impl Copy + Fn() {
+    move || {
         let local_run_flag = run_flag_ref.as_ptr();
 
         unsafe {
             (*local_run_flag).fetch_add(1, SeqCst);
         }
-        create_default_delay_task_handler()
     }
 }
 
 fn get_wake_fn(
     thread: Thread,
     run_flag_ref: SafePointer,
-) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
-    move |_context| {
+) -> impl Fn() -> () + Clone + Send + Sync + 'static {
+    move || {
         let local_run_flag = run_flag_ref.as_ptr();
         unsafe {
             println!(
@@ -96,15 +95,14 @@ fn get_wake_fn(
             );
         }
         thread.unpark();
-        create_default_delay_task_handler()
     }
 }
 
-fn get_async_fn() -> impl Copy + Fn(TaskContext) -> Box<dyn DelayTaskHandler> {
-    create_async_fn_body!({
+fn get_async_fn() -> impl std::future::Future {
+    async {
         if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
             let body_str = res.body_string().await.unwrap_or_default();
             println!("{}", body_str);
         }
-    })
+    }
 }

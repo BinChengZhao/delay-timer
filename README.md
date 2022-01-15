@@ -1,3 +1,4 @@
+# FIXME: Update demo of spawn-async-routine.
 # delay-timer  
 [![Build](https://github.com/BinChengZhao/delay-timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay-timer/actions)
@@ -73,7 +74,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
         .set_task_id(1)
         .set_frequency_repeated_by_seconds(1)
         .set_maximum_parallel_runnable_num(2)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
  ```
@@ -128,7 +129,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
         .set_task_id(1)
         .set_frequency_repeated_by_seconds(6)
         .set_maximum_parallel_runnable_num(2)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 
@@ -161,7 +162,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
      .set_frequency_count_down_by_seconds(1, 9)
      .set_task_id(1)
      .set_maximum_parallel_runnable_num(3)
-     .spawn(body)?;
+     .spawn_async_routine(body)?;
 
  delay_timer.add_task(task);
 
@@ -183,7 +184,7 @@ fn build_task_customized_async_task() -> Result<Task, TaskError> {
         .set_frequency_repeated_by_cron_str("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100")
         .set_task_id(5)
         .set_maximum_running_time(5)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 pub fn generate_closure_template(

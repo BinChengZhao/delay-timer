@@ -50,31 +50,36 @@ fn build_task_async_print() -> Result<Task, TaskError> {
     let name = String::from("someting");
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_tokio_body!((id, name){
-        async_template(id_ref ,name_ref).await.expect("Request failed.");
+    let body = move || {
+        let name_ref = name.clone();
+        async move {
+            async_template(id, name_ref).await.expect("Request failed.");
 
-        sleep(Duration::from_secs(3)).await;
+            sleep(Duration::from_secs(3)).await;
 
-        println!("create_async_fn_body:i'success");
-    });
+            println!("create_async_fn_body:i'success");
+        }
+    };
 
     task_builder
         .set_task_id(1)
         .set_frequency_repeated_by_seconds(6)
         .set_maximum_parallel_runnable_num(2)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 fn build_task_async_execute_process() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
-    task_builder
-        .set_frequency_repeated_by_seconds(1)
-        .set_task_id(3)
-        .set_maximum_running_time(10)
-        .set_maximum_parallel_runnable_num(1)
-        .spawn(body)
+    // FIXME:
+    todo!();
+    // let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
+    // task_builder
+    //     .set_frequency_repeated_by_seconds(1)
+    //     .set_task_id(3)
+    //     .set_maximum_running_time(10)
+    //     .set_maximum_parallel_runnable_num(1)
+    //     .spawn_async_routine(body)
 }
 
 pub async fn async_template(id: i32, name: String) -> Result<()> {
