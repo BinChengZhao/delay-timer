@@ -273,8 +273,10 @@ impl DelayTimerBuilder {
             self.runtime_instance = RuntimeInstance::init_tokio_runtime();
         }
 
-        let mut shared_header = SharedHeader::default();
-        shared_header.runtime_instance = self.runtime_instance.clone();
+        let shared_header = SharedHeader {
+            runtime_instance: self.runtime_instance.clone(),
+            ..Default::default()
+        };
 
         let timer_event_sender = self.get_timer_event_sender();
 

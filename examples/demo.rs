@@ -85,7 +85,7 @@ fn build_task_async_execute_process() -> Result<Task, TaskError> {
 
     // FIXME:
     todo!()
-    // let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
+
     // task_builder
     //     .set_frequency_repeated_by_minutes(1)
     //     .set_task_id(3)

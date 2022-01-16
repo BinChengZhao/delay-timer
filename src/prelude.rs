@@ -12,7 +12,6 @@
 
 pub use crate::entity::{get_timestamp, get_timestamp_micros, DelayTimer, DelayTimerBuilder};
 pub use crate::error::*;
-pub use crate::macros::*;
 pub use crate::timer::runtime_trace::state::instance;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 pub use crate::timer::runtime_trace::task_instance::{Instance, TaskInstance, TaskInstancesChain};
@@ -61,6 +60,7 @@ pub(crate) use std::future::Future;
 pub(crate) use std::iter::StepBy;
 pub(crate) use std::ops::RangeFrom;
 pub(crate) use std::time::Duration;
+pub(crate) use tracing::{info_span, instrument};
 
 pub(crate) type SecondsState = StepBy<RangeFrom<u64>>;
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;

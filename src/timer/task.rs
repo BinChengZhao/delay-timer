@@ -557,7 +557,7 @@ struct AsyncFn<F: Fn() -> U + Send + 'static, U: Future + Send + 'static>(F);
 
 // For Sync Task
 #[derive(Debug, Clone)]
-struct SyncFn<F: Fn() -> () + Send + 'static + Clone>(F);
+struct SyncFn<F: Fn() + Send + 'static + Clone>(F);
 
 // Routine abstractions performed during task execution.
 pub(crate) trait Routine {
@@ -601,7 +601,7 @@ impl<F: Fn() -> U + 'static + Send, U: Future + 'static + Send> Routine for Asyn
 // within timer-core body()
 // }
 
-impl<F: Fn() -> () + 'static + Send + Clone> Routine for SyncFn<F> {
+impl<F: Fn() + 'static + Send + Clone> Routine for SyncFn<F> {
     type TokioHandle = TokioJoinHandle<()>;
     type SmolHandle = SmolJoinHandler<()>;
 
@@ -756,7 +756,7 @@ impl<'a> TaskBuilder<'a> {
     }
 
     /// Spawn a task with sync-routine.
-    pub fn spawn_routine<F: Fn() -> () + 'static + Send + Clone>(
+    pub fn spawn_routine<F: Fn() + 'static + Send + Clone>(
         self,
         routine: F,
     ) -> Result<Task, TaskError> {
@@ -1072,7 +1072,6 @@ mod tests {
 
     use super::{Task, TaskBuilder};
     use crate::prelude::*;
-    use crate::utils::convenience::functions::create_default_delay_task_handler;
     use anyhow::Result as AnyResult;
     use rand::prelude::*;
     use std::iter::Iterator;
@@ -1240,7 +1239,8 @@ mod tests {
         task.set_cylinder_line(1);
         assert!(!task.is_can_running());
 
-        assert!(task.check_arrived());
+        assert!(!task.check_arrived());
+        assert!(task.is_can_running());
 
         // set_frequency_count_down_by_seconds.
         task_builder.set_frequency_count_down_by_seconds(1, 1);
@@ -1251,7 +1251,8 @@ mod tests {
         task.set_cylinder_line(1);
         assert!(!task.is_can_running());
 
-        assert!(task.check_arrived());
+        assert!(!task.check_arrived());
+        assert!(task.is_can_running());
 
         Ok(())
     }
@@ -1270,7 +1271,9 @@ mod tests {
         task.set_cylinder_line(1);
         assert!(!task.is_can_running());
 
-        assert!(task.check_arrived());
+        assert!(!task.check_arrived());
+        assert!(task.is_can_running());
+
         Ok(())
     }
 
@@ -1300,21 +1303,5 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[test]
-    fn test_dyn_routine() {
-        use crate::prelude::create_delay_task_handler;
-        let f = |routine: &Box<
-            dyn Routine<TokioHandle = TokioJoinHandle<()>, SmolHandle = SmolJoinHandler<()>>,
-        >,
-                 task_context: TaskContext| {
-            match task_context.runtime_kind {
-                RuntimeKind::Smol => create_delay_task_handler(routine.spawn_by_smol(task_context)),
-                RuntimeKind::Tokio => {
-                    create_delay_task_handler(routine.spawn_by_tokio(task_context))
-                }
-            }
-        };
     }
 }

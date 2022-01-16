@@ -20,56 +20,36 @@ pub mod functions {
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
     /// UnBlock execution of a command line task in delay-timer.
-    pub fn unblock_process_task_fn(
-        shell_command: String,
-    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+    #[instrument]
+    pub async fn unblock_process_task_fn(shell_command: String) {
         use smol::process::{Child, Command};
-        move |context: TaskContext| {
-            debug!(
-                "Unblock-Process Task: {}, Record: {} Start",
-                context.task_id, context.record_id
-            );
+        debug!("Unblock-Process Task start");
 
-            let shell_command_clone = shell_command.clone();
-            create_delay_task_handler(async_spawn_by_smol(async move {
-                let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
+        let shell_command_clone = shell_command.clone();
+        let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
-                if let Err(err) = childs {
-                    debug!(
-                        "Unblock-Process Task: {}, Record: {} fail for: {}",
-                        context.task_id,
-                        context.record_id,
-                        err.to_string()
-                    );
+        if let Err(err) = childs {
+            return debug!("Unblock-Process Task fail for: {}", err.to_string());
+        }
 
-                    context
-                        .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
-                        .await;
-                    return Err(anyhow!(err.to_string()));
-                }
+        let mut childs = childs.expect("");
 
-                let mut childs = childs?;
+        if let Ok(last_child) = childs.pop_back().ok_or_else(|| error!("Without child.")) {
+            let _output = last_child.wait_with_output().await;
 
-                let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
-                let output = last_child.wait_with_output().await?;
-
-                debug!(
-                    "Unblock-Process Task: {}, Record: {} finished",
-                    context.task_id, context.record_id
-                );
-
-                context
-                    .finish_task(Some(FinishOutput::ProcessOutput(output)))
-                    .await;
-
-                Ok(())
-            }))
+            // TODO: I can define a global variable `StatusReporter-Sender` and
+            // Send `process-output` data to `StatusReporter` using the method that wraps the variable.
+            //
+            // context
+            //     .finish_task(Some(FinishOutput::ProcessOutput(_output)))
+            //     .await;
         }
     }
 
     use tokio::process::{Child, Command};
 
     /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
+    #[instrument]
     pub fn tokio_unblock_process_task_fn(
         shell_command: String,
     ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
