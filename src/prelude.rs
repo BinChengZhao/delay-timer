@@ -60,7 +60,7 @@ pub(crate) use std::future::Future;
 pub(crate) use std::iter::StepBy;
 pub(crate) use std::ops::RangeFrom;
 pub(crate) use std::time::Duration;
-pub(crate) use tracing::{info_span, instrument};
+pub(crate) use tracing::{info_span, instrument, Instrument};
 
 pub(crate) type SecondsState = StepBy<RangeFrom<u64>>;
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;

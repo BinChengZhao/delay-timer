@@ -575,18 +575,37 @@ impl<F: Fn() -> U + 'static + Send, U: Future + 'static + Send> Routine for Asyn
     fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle {
         let user_future = (&self.0)();
 
-        async_spawn_by_tokio(async {
-            user_future.await;
-            task_context.finish_task(None).await;
+        async_spawn_by_tokio({
+            let task_id = task_context.task_id;
+            let record_id = task_context.record_id;
+            async {
+                user_future.await;
+                task_context.finish_task(None).await;
+            }
+            .instrument(info_span!(
+                "Task: {} record-id:{} routine-exec",
+                task_id,
+                record_id
+            ))
         })
     }
 
     #[inline(always)]
     fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
         let user_future = (&self.0)();
-        async_spawn_by_smol(async {
-            user_future.await;
-            task_context.finish_task(None).await;
+
+        async_spawn_by_smol({
+            let task_id = task_context.task_id;
+            let record_id = task_context.record_id;
+            async {
+                user_future.await;
+                task_context.finish_task(None).await;
+            }
+            .instrument(info_span!(
+                "Task: {} record-id:{} routine-exec",
+                task_id,
+                record_id
+            ))
         })
     }
 }
@@ -609,20 +628,41 @@ impl<F: Fn() + 'static + Send + Clone> Routine for SyncFn<F> {
     fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle {
         let fn_handle = unblock_spawn_by_tokio((&self.0).clone());
 
-        async_spawn_by_tokio(async {
-            if let Err(e) = fn_handle.await {
-                error!("{}", e);
+        let task_id = task_context.task_id;
+        let record_id = task_context.record_id;
+
+        async_spawn_by_tokio({
+            async {
+                if let Err(e) = fn_handle.await {
+                    error!("{}", e);
+                }
+                task_context.finish_task(None).await;
             }
-            task_context.finish_task(None).await;
+            .instrument(info_span!(
+                "Task: {} record-id:{} routine-exec",
+                task_id,
+                record_id
+            ))
         })
     }
 
     #[inline(always)]
     fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
         let fn_handle = unblock_spawn_by_smol((&self.0).clone());
-        async_spawn_by_smol(async {
-            fn_handle.await;
-            task_context.finish_task(None).await;
+
+        let task_id = task_context.task_id;
+        let record_id = task_context.record_id;
+
+        async_spawn_by_smol({
+            async {
+                fn_handle.await;
+                task_context.finish_task(None).await;
+            }
+            .instrument(info_span!(
+                "Task: {} record-id:{} routine-exec",
+                task_id,
+                record_id
+            ))
         })
     }
 }

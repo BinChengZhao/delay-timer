@@ -392,12 +392,6 @@ impl Timer {
 
         task_context: TaskContext,
     ) -> Box<dyn DelayTaskHandler> {
-        info_span!(
-            "Task: {} record-id:{} routine-exec",
-            task_context.task_id,
-            task_context.record_id
-        );
-
         match task_context.runtime_kind {
             RuntimeKind::Smol => create_delay_task_handler(routine.spawn_by_smol(task_context)),
             RuntimeKind::Tokio => create_delay_task_handler(routine.spawn_by_tokio(task_context)),

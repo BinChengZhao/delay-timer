@@ -23,7 +23,7 @@ pub mod functions {
     #[instrument]
     pub async fn unblock_process_task_fn(shell_command: String) {
         use smol::process::{Child, Command};
-        debug!("Unblock-Process Task start");
+        debug!("Unblock-Process Task start, Command {}", &shell_command);
 
         let shell_command_clone = shell_command.clone();
         let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
