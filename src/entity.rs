@@ -25,7 +25,6 @@ use std::thread::Builder;
 use std::time::SystemTime;
 
 use futures::executor::block_on;
-use smol::channel::unbounded;
 use snowflake::SnowflakeIdGenerator;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -220,6 +219,7 @@ impl DelayTimerBuilder {
         #[cfg(feature = "status-report")]
         if self.enable_status_report {
             event_handle_builder.status_report_sender(self.get_status_report_sender());
+            // TODO: init static reporter.
         }
 
         let event_handle = event_handle_builder
@@ -475,15 +475,13 @@ cfg_status_report!(
         }
 
         fn get_status_report_sender(&mut self) -> AsyncSender<PublicEvent> {
-            self.status_report_channel
-                .get_or_insert_with(unbounded::<PublicEvent>)
+            GLOBAL_STATUS_REPORTER
                 .0
                 .clone()
         }
 
         fn get_status_report_receiver(&mut self) -> AsyncReceiver<PublicEvent> {
-            self.status_report_channel
-                .get_or_insert_with(unbounded::<PublicEvent>)
+            GLOBAL_STATUS_REPORTER
                 .1
                 .clone()
         }

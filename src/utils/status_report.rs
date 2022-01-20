@@ -5,6 +5,11 @@ use std::convert::TryFrom;
 use future_lite::block_on;
 
 
+/// Global internal status-reporter.
+pub(crate) static GLOBAL_STATUS_REPORTER: Lazy<(AsyncSender<PublicEvent>, AsyncReceiver<PublicEvent>)> = Lazy::new(|| {
+    smol::channel::unbounded()
+});
+
 /// # Required features
 ///
 /// This function requires the `status-report` feature of the `delay_timer`
@@ -135,6 +140,29 @@ impl TryFrom<&TimerEvent> for PublicEvent {
 
             TimerEvent::TimeoutTask(task_id, record_id) => {
                 Ok(PublicEvent::TimeoutTask(*task_id, *record_id))
+            }
+
+            _ => Err(anyhow!("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!")),
+        }
+    }
+}
+
+impl TryFrom<TimerEvent> for PublicEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(timer_event: TimerEvent) -> Result<Self, Self::Error> {
+        match timer_event {
+            TimerEvent::RemoveTask(task_id) => Ok(PublicEvent::RemoveTask(task_id)),
+            TimerEvent::AppendTaskHandle(_, delay_task_handler_box) => {
+                Ok(PublicEvent::RunningTask(delay_task_handler_box.get_task_id(), delay_task_handler_box.get_record_id()))
+            }
+            TimerEvent::FinishTask(finish_task_body) => {
+                // TODO: Be wary, clone can involve a lot of memory and consume performance.
+                Ok(PublicEvent::FinishTask(finish_task_body.into()))
+            }
+
+            TimerEvent::TimeoutTask(task_id, record_id) => {
+                Ok(PublicEvent::TimeoutTask(task_id, record_id))
             }
 
             _ => Err(anyhow!("PublicEvent only accepts timer_event some variant( RemoveTask, CancelTask ,FinishTask )!")),

@@ -20,8 +20,19 @@ pub mod functions {
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
     /// UnBlock execution of a command line task in delay-timer.
-    #[instrument]
-    pub async fn unblock_process_task_fn(shell_command: String) {
+    ///
+    /// This method mainly teaches how to encapsulate custom `async` logic in conjunction with `delay-timer`.
+    ///
+    /// The implementation could be tweaked at any time in the future,
+    ///
+    /// And it is recommended that you do your own encapsulation based on this reference.
+    #[deprecated]
+    #[instrument(skip(unique_id_generator))]
+    pub async fn unblock_process_task_fn(
+        shell_command: String,
+        task_id: u64,
+        unique_id_generator: impl Fn() -> i64,
+    ) {
         use smol::process::{Child, Command};
         debug!("Unblock-Process Task start, Command {}", &shell_command);
 
@@ -29,26 +40,50 @@ pub mod functions {
         let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
         if let Err(err) = childs {
-            return debug!("Unblock-Process Task fail for: {}", err.to_string());
+            debug!("Unblock-Process Task fail for: {}", err.to_string());
+            return;
         }
 
         let mut childs = childs.expect("");
 
         if let Ok(last_child) = childs.pop_back().ok_or_else(|| error!("Without child.")) {
-            let _output = last_child.wait_with_output().await;
+            let finish_output = last_child
+                .wait_with_output()
+                .await
+                .ok()
+                .map(|o| FinishOutput::ProcessOutput(o));
 
-            // TODO: I can define a global variable `StatusReporter-Sender` and
-            // Send `process-output` data to `StatusReporter` using the method that wraps the variable.
-            //
-            // context
-            //     .finish_task(Some(FinishOutput::ProcessOutput(_output)))
-            //     .await;
+            #[cfg(feature = "status-report")]
+            {
+                let record_id = unique_id_generator();
+                GLOBAL_STATUS_REPORTER
+                    .0
+                    .send(TimerEvent::FinishTask(
+                        FinishTaskBody {
+                            task_id: task_id,
+                            record_id: record_id,
+                            finish_time: get_timestamp(),
+                            finish_output,
+                        }
+                        .try_into()
+                        .expect(""),
+                    ).try_into().expect(""))
+                    .await
+                    .unwrap_or_else(|e| error!("{}", e));
+            }
         }
     }
 
     use tokio::process::{Child, Command};
 
     /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
+    ///
+    /// This method mainly teaches how to encapsulate custom `async` logic in conjunction with `delay-timer`.
+    ///
+    /// The implementation could be tweaked at any time in the future,
+    ///
+    /// And it is recommended that you do your own encapsulation based on this reference.
+    #[deprecated]
     #[instrument]
     pub fn tokio_unblock_process_task_fn(
         shell_command: String,
@@ -72,6 +107,8 @@ pub mod functions {
                 context
                     .finish_task(Some(FinishOutput::ProcessOutput(output)))
                     .await;
+
+                    // FIXME: fix there.
 
                 Ok(())
             }))
