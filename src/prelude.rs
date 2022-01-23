@@ -25,7 +25,7 @@ pub use crate::utils::convenience::cron_expression_grammatical_candy::{
     CandyCron, CandyCronStr, CandyFrequency,
 };
 pub use crate::utils::convenience::functions::{
-    create_default_delay_task_handler, create_delay_task_handler, unblock_process_task_fn,
+    create_default_delay_task_handler, create_delay_task_handler,
 };
 
 pub use anyhow::{anyhow, Result as AnyResult};
@@ -60,6 +60,7 @@ pub(crate) use std::convert::{TryFrom, TryInto};
 pub(crate) use std::future::Future;
 pub(crate) use std::iter::StepBy;
 pub(crate) use std::ops::RangeFrom;
+pub(crate) use std::process::ExitStatus;
 pub(crate) use std::time::Duration;
 pub(crate) use tracing::{info_span, instrument, Instrument};
 
@@ -67,7 +68,6 @@ pub(crate) type SecondsState = StepBy<RangeFrom<u64>>;
 pub(crate) type TimerEventSender = AsyncSender<TimerEvent>;
 pub(crate) type TimerEventReceiver = AsyncReceiver<TimerEvent>;
 
-pub use crate::utils::convenience::functions::tokio_unblock_process_task_fn;
 pub use tokio::task::{
     spawn as async_spawn_by_tokio, spawn_blocking as unblock_spawn_by_tokio,
     JoinHandle as TokioJoinHandle,
@@ -78,6 +78,11 @@ cfg_status_report!(
     pub use crate::utils::status_report::PublicEvent;
     pub(crate) use crate::utils::status_report::GLOBAL_STATUS_REPORTER;
 );
+
+#[cfg(target_family = "unix")]
+pub(crate) use std::os::unix::process::ExitStatusExt;
+#[cfg(target_family = "windows")]
+pub(crate) use std::os::windows::process::ExitStatusExt;
 
 pub(crate) const ONE_SECOND: u64 = 1;
 pub(crate) const ONE_MINUTE: u64 = ONE_SECOND * 60;

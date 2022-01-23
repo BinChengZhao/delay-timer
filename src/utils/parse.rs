@@ -96,6 +96,9 @@ pub mod shell_command {
     #[async_trait]
     /// Trait abstraction of multiple library process handles.
     pub trait ChildUnify: Send + Sync {
+        /// Executes the command as a child process, waiting for it to finish and returning the status that it exited with.
+        async fn wait(self) -> AnyResult<ExitStatus>;
+
         /// Executes the command as a child process, waiting for it to finish and collecting all of its output.
         async fn wait_with_output(self) -> AnyResult<Output>;
         /// Convert stdout to stdio.
@@ -107,6 +110,9 @@ pub mod shell_command {
 
     #[async_trait]
     impl ChildUnify for StdChild {
+        async fn wait(self) -> AnyResult<ExitStatus> {
+            Ok(self.wait().await?)
+        }
         async fn wait_with_output(self) -> AnyResult<Output> {
             Ok(self.wait_with_output()?)
         }
@@ -121,6 +127,12 @@ pub mod shell_command {
 
     #[async_trait]
     impl ChildUnify for SmolChild {
+        async fn wait(mut self) -> AnyResult<ExitStatus> {
+            Ok(ExitStatus::from_raw(
+                self.status().await?.code().unwrap_or(-1),
+            ))
+        }
+
         async fn wait_with_output(self) -> AnyResult<Output> {
             Ok(self.output().await?)
         }
@@ -139,12 +151,16 @@ pub mod shell_command {
 
     #[async_trait]
     impl ChildUnify for TokioChild {
+        async fn wait(self) -> AnyResult<ExitStatus> {
+            Ok(self.wait().await?)
+        }
+
         async fn wait_with_output(self) -> AnyResult<Output> {
             Ok(self.wait_with_output().await?)
         }
 
         async fn stdout_to_stdio(&mut self) -> Option<Stdio> {
-            self.stdout.take().map(|s| s.try_into().ok()).flatten()
+            self.stdout.take().and_then(|s| s.try_into().ok())
         }
 
         // Attempts to force the child to exit, but does not wait for the request to take effect.
@@ -171,6 +187,20 @@ pub mod shell_command {
         /// Take inner `Child` from `ChildGuard`.
         pub fn take_inner(mut self) -> Option<Child> {
             self.child.take()
+        }
+
+        /// Await on `ChildGuard` and get `ExitStatus`.
+        pub async fn wait(mut self) -> Result<ExitStatus, CommandChildError> {
+            if let Some(child) = self.child.take() {
+                return child
+                    .wait()
+                    .await
+                    .map_err(|e| CommandChildError::DisCondition(e.to_string()));
+            }
+
+            Err(CommandChildError::DisCondition(
+                "Without child for waiting.".to_string(),
+            ))
         }
 
         /// Await on `ChildGuard` and get `Output`.
@@ -274,11 +304,10 @@ pub mod shell_command {
                     .map_err(|e| CommandChildError::DisCondition(e.to_string()))?;
                 true
             } else {
-                let stdout;
                 // if commands.peek().is_some() {
                 //     // there is another command piped behind this one
                 //     // prepare to send output to the next command
-                stdout = Stdio::piped();
+                let stdout = Stdio::piped();
                 // } else {
                 //     // there are no more commands piped behind this one
                 //     // send output to shell stdout

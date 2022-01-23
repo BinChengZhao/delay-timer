@@ -282,7 +282,7 @@ impl EventHandle {
         let timestamp = self.shared_header.global_time.load(Acquire);
         let time_seed: u64 = exec_time
             .checked_sub(timestamp)
-            .unwrap_or_else(|| task.task_id % DEFAULT_TIMER_SLOT_COUNT)
+            .unwrap_or(task.task_id % DEFAULT_TIMER_SLOT_COUNT)
             + second_hand;
         let slot_seed: u64 = time_seed % DEFAULT_TIMER_SLOT_COUNT;
 

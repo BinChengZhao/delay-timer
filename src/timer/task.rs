@@ -425,7 +425,7 @@ impl FrequencyInner {
         };
     }
 
-    fn is_down_over(&mut self) -> bool {
+    fn is_down_over(&self) -> bool {
         matches!(
             self,
             FrequencyInner::CronExpressionCountDown(0, _) | FrequencyInner::SecondsCountDown(0, _)

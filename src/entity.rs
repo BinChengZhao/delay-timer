@@ -67,8 +67,6 @@ pub struct DelayTimerBuilder {
     /// Whether or not to enable the status-report
     #[cfg(feature = "status-report")]
     enable_status_report: bool,
-    #[cfg(feature = "status-report")]
-    status_report_channel: Option<(AsyncSender<PublicEvent>, AsyncReceiver<PublicEvent>)>,
 }
 
 /// DelayTimer is an abstraction layer that helps users solve execution cycle synchronous/asynchronous tasks.

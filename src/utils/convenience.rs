@@ -26,50 +26,35 @@ pub mod functions {
     /// The implementation could be tweaked at any time in the future,
     ///
     /// And it is recommended that you do your own encapsulation based on this reference.
+    ///
+    /// Note: now you can't get the output of the process through status-report.
+    /// 
+    /// Please use this template to compose channels to achieve similar results.
+    
     #[deprecated]
-    #[instrument(skip(unique_id_generator))]
-    pub async fn unblock_process_task_fn(
-        shell_command: String,
-        task_id: u64,
-        unique_id_generator: impl Fn() -> i64,
-    ) {
+    #[instrument]
+    pub async fn unblock_process_task_fn(shell_command: String, task_id: u64) {
         use smol::process::{Child, Command};
-        debug!("Unblock-Process Task start, Command {}", &shell_command);
+        debug!("Unblock-Process task start, Command {}", &shell_command);
 
         let shell_command_clone = shell_command.clone();
         let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
         if let Err(err) = childs {
-            debug!("Unblock-Process Task fail for: {}", err.to_string());
+            debug!("Unblock-Process task init fail for: {}", err.to_string());
             return;
         }
 
-        let mut childs = childs.expect("");
-
-        if let Ok(last_child) = childs.pop_back().ok_or_else(|| error!("Without child.")) {
-            let finish_output = last_child
-                .wait_with_output()
-                .await
-                .ok()
-                .map(|o| FinishOutput::ProcessOutput(o));
-
-            #[cfg(feature = "status-report")]
-            {
-                let record_id = unique_id_generator();
-                GLOBAL_STATUS_REPORTER
-                    .0
-                    .send(TimerEvent::FinishTask(
-                        FinishTaskBody {
-                            task_id: task_id,
-                            record_id: record_id,
-                            finish_time: get_timestamp(),
-                            finish_output,
-                        }
-                        .try_into()
-                        .expect(""),
-                    ).try_into().expect(""))
+        if let Ok(mut childs) = childs.map_err(|e| error!("No process derived successfully: {}", e))
+        {
+            if let Ok(last_child) = childs.pop_back().ok_or_else(|| error!("Without child.")) {
+                if let Ok(status) = last_child
+                    .wait()
                     .await
-                    .unwrap_or_else(|e| error!("{}", e));
+                    .map_err(|e| error!("Unblock-Process task run fail for: {}", e))
+                {
+                    debug!("Unblock-Process task ExitStatus: {}", status);
+                }
             }
         }
     }
@@ -83,35 +68,35 @@ pub mod functions {
     /// The implementation could be tweaked at any time in the future,
     ///
     /// And it is recommended that you do your own encapsulation based on this reference.
+    /// 
+    /// Note: now you can't get the output of the process through status-report.
+    /// 
+    /// Please use this template to compose channels to achieve similar results.
     #[deprecated]
     #[instrument]
-    pub fn tokio_unblock_process_task_fn(
-        shell_command: String,
-    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-        move |context: TaskContext| {
-            let shell_command_clone = shell_command.clone();
-            create_delay_task_handler(async_spawn_by_tokio(async move {
-                let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
+    pub async fn tokio_unblock_process_task_fn(shell_command: String, task_id: u64) {
+        let shell_command_clone = shell_command.clone();
 
-                if let Err(err) = childs {
-                    context
-                        .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
-                        .await;
-                    return Err(anyhow!(err.to_string()));
+        debug!("Unblock-Process task start, Command {}", &shell_command);
+
+        let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
+
+        if let Err(err) = childs {
+            debug!("Unblock-Process task init fail for: {}", err.to_string());
+            return;
+        }
+
+        if let Ok(mut childs) = childs.map_err(|e| error!("No process derived successfully {}", e))
+        {
+            if let Ok(last_child) = childs.pop_back().ok_or_else(|| error!("Without child.")) {
+                if let Ok(status) = last_child
+                    .wait()
+                    .await
+                    .map_err(|e| error!("Unblock-Process task run fail for: {}", e))
+                {
+                    debug!("Unblock-Process task ExitStatus: {}", status);
                 }
-
-                let mut childs = childs?;
-
-                let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
-                let output = last_child.wait_with_output().await?;
-                context
-                    .finish_task(Some(FinishOutput::ProcessOutput(output)))
-                    .await;
-
-                    // FIXME: fix there.
-
-                Ok(())
-            }))
+            }
         }
     }
 
