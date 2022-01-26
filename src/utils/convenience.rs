@@ -28,9 +28,9 @@ pub mod functions {
     /// And it is recommended that you do your own encapsulation based on this reference.
     ///
     /// Note: now you can't get the output of the process through status-report.
-    /// 
+    ///
     /// Please use this template to compose channels to achieve similar results.
-    
+
     #[deprecated]
     #[instrument]
     pub async fn unblock_process_task_fn(shell_command: String, task_id: u64) {
@@ -68,9 +68,9 @@ pub mod functions {
     /// The implementation could be tweaked at any time in the future,
     ///
     /// And it is recommended that you do your own encapsulation based on this reference.
-    /// 
+    ///
     /// Note: now you can't get the output of the process through status-report.
-    /// 
+    ///
     /// Please use this template to compose channels to achieve similar results.
     #[deprecated]
     #[instrument]

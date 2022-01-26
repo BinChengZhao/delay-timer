@@ -65,7 +65,7 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     let task = TaskBuilder::default()
         .set_frequency_count_down_by_seconds(1, 4)
         .set_task_id(1)
-        .set_maximum_running_time(2)
+        .set_maximum_running_time(1)
         .set_maximum_parallel_runnable_num(3)
         .spawn_async_routine(body)?;
     let task_instance_chain = delay_timer.insert_task(task)?;

@@ -583,7 +583,7 @@ impl<F: Fn() -> U + 'static + Send, U: Future + 'static + Send> Routine for Asyn
                 task_context.finish_task(None).await;
             }
             .instrument(info_span!(
-                "Task: {} record-id:{} routine-exec",
+                "async_spawn_by_tokio: routine-exec",
                 task_id,
                 record_id
             ))
@@ -602,7 +602,7 @@ impl<F: Fn() -> U + 'static + Send, U: Future + 'static + Send> Routine for Asyn
                 task_context.finish_task(None).await;
             }
             .instrument(info_span!(
-                "Task: {} record-id:{} routine-exec",
+                "async_spawn_by_smol: routine-exec",
                 task_id,
                 record_id
             ))
@@ -639,7 +639,7 @@ impl<F: Fn() + 'static + Send + Clone> Routine for SyncFn<F> {
                 task_context.finish_task(None).await;
             }
             .instrument(info_span!(
-                "Task: {} record-id:{} routine-exec",
+                "async_spawn_by_smol: routine-exec",
                 task_id,
                 record_id
             ))
@@ -659,7 +659,7 @@ impl<F: Fn() + 'static + Send + Clone> Routine for SyncFn<F> {
                 task_context.finish_task(None).await;
             }
             .instrument(info_span!(
-                "Task: {} record-id:{} routine-exec",
+                "async_spawn_by_smol: routine-exec",
                 task_id,
                 record_id
             ))

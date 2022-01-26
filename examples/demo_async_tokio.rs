@@ -1,5 +1,7 @@
 use anyhow::Result;
 use delay_timer::prelude::*;
+#[allow(deprecated)]
+use delay_timer::utils::convenience::functions::unblock_process_task_fn;
 use hyper::{Client, Uri};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -69,17 +71,19 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 }
 
 fn build_task_async_execute_process() -> Result<Task, TaskError> {
+    let task_id = 3;
     let mut task_builder = TaskBuilder::default();
 
-    // FIXME:
-    todo!();
-    // let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
-    // task_builder
-    //     .set_frequency_repeated_by_seconds(1)
-    //     .set_task_id(3)
-    //     .set_maximum_running_time(10)
-    //     .set_maximum_parallel_runnable_num(1)
-    //     .spawn_async_routine(body)
+    let body = move || {
+        #[allow(deprecated)]
+        unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into(), task_id)
+    };
+    task_builder
+        .set_frequency_repeated_by_seconds(1)
+        .set_task_id(task_id)
+        .set_maximum_running_time(10)
+        .set_maximum_parallel_runnable_num(1)
+        .spawn_async_routine(body)
 }
 
 pub async fn async_template(id: i32, name: String) -> Result<()> {

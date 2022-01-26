@@ -1,5 +1,7 @@
 use anyhow::Result;
 use delay_timer::prelude::*;
+#[allow(deprecated)]
+use delay_timer::utils::convenience::functions::unblock_process_task_fn;
 use smol::Timer;
 use std::thread::{current, park, Thread};
 use std::time::Duration;
@@ -16,9 +18,8 @@ fn main() -> Result<()> {
     // Develop an http request task that runs in an asynchronous cycle.
     delay_timer.add_task(build_task_async_request()?)?;
 
-    // FIXME:
     // Develop a php script task that runs in an asynchronous cycle.
-    // delay_timer.add_task(build_task_async_execute_process()?)?;
+    delay_timer.add_task(build_task_async_execute_process()?)?;
 
     // Develop a task that runs in an asynchronous cycle (using a custom asynchronous template).
     delay_timer.add_task(build_task_customized_async_task()?)?;
@@ -81,16 +82,18 @@ fn build_task_async_request() -> Result<Task, TaskError> {
 }
 
 fn build_task_async_execute_process() -> Result<Task, TaskError> {
+    let task_id = 3;
     let mut task_builder = TaskBuilder::default();
 
-    // FIXME:
-    todo!()
-
-    // task_builder
-    //     .set_frequency_repeated_by_minutes(1)
-    //     .set_task_id(3)
-    //     .set_maximum_running_time(5)
-    //     .spawn_async_routine(body)
+    let body = move || {
+        #[allow(deprecated)]
+        unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into(), task_id)
+    };
+    task_builder
+        .set_frequency_repeated_by_minutes(1)
+        .set_task_id(task_id)
+        .set_maximum_running_time(5)
+        .spawn_async_routine(body)
 }
 
 fn build_task_customized_async_task() -> Result<Task, TaskError> {

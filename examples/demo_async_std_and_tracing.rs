@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use delay_timer::prelude::*;
+use delay_timer::utils::convenience::functions::unblock_process_task_fn;
 use smol::Timer;
 use std::time::Duration;
 use tracing::{info, Level};
@@ -30,16 +31,14 @@ async fn main() -> Result<()> {
 }
 
 fn build_task_async_execute_process(task_id: u64) -> Result<Task, TaskError> {
-    let _task_builder = TaskBuilder::default();
+    let mut task_builder = TaskBuilder::default();
 
-    // FIXME:
-    todo!();
     // Remind the user to set a timeout that must be reasonable.
-    // let body = unblock_process_task_fn("echo hello".into());
-    // task_builder
-    //     .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
-    //     .set_task_id(task_id)
-    //     .set_maximum_running_time(2)
-    //     .set_maximum_parallel_runnable_num(1)
-    //     .spawn_async_routine(body)
+    let body = move || unblock_process_task_fn("echo hello".into(), task_id);
+    task_builder
+        .set_frequency_by_candy(CandyFrequency::Repeated(CandyCron::Secondly))
+        .set_task_id(task_id)
+        .set_maximum_running_time(2)
+        .set_maximum_parallel_runnable_num(1)
+        .spawn_async_routine(body)
 }
