@@ -62,17 +62,17 @@ fn main() -> Result<()> {
 fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_body!({
+    let body = || async {
         println!("create_async_fn_body!");
 
         Timer::after(Duration::from_secs(3)).await;
 
         println!("create_async_fn_body:i'success");
-    });
+    };
 
     task_builder
         .set_task_id(1)
-        .set_frequency_repeated_by_seconds(1)
+        .set_frequency_repeated_by_cron_str("@secondly")
         .set_maximum_parallel_runnable_num(2)
         .spawn_async_routine(body)
 }
@@ -117,21 +117,20 @@ async fn main() -> Result<()> {
 fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_body!({
+    let body = || async {
         println!("create_async_fn_body!");
 
         Timer::after(Duration::from_secs(3)).await;
 
         println!("create_async_fn_body:i'success");
-    });
+    };
 
     task_builder
         .set_task_id(1)
-        .set_frequency_repeated_by_seconds(6)
+        .set_frequency_repeated_by_cron_str("@secondly")
         .set_maximum_parallel_runnable_num(2)
         .spawn_async_routine(body)
 }
-
 
  ```
 
@@ -150,21 +149,19 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 
 
  let delay_timer = DelayTimer::new();
-
  let share_num = Arc::new(AtomicUsize::new(0));
  let share_num_bunshin = share_num.clone();
-
- let body = create_async_fn_body!((share_num_bunshin){
-     share_num_bunshin_ref.fetch_add(1, Release);
- });
-
+ 
+ let body = move || {
+     share_num_bunshin.fetch_add(1, Release);
+ };
+ 
  let task = TaskBuilder::default()
-     .set_frequency_count_down_by_seconds(1, 9)
+     .set_frequency_count_down_by_cron_str(expression, 3)
      .set_task_id(1)
-     .set_maximum_parallel_runnable_num(3)
-     .spawn_async_routine(body)?;
+     .spawn_routine(body)?;
 
- delay_timer.add_task(task);
+ delay_timer.add_task(task)?;
 
  ```
 
@@ -177,9 +174,21 @@ fn build_task_async_print() -> Result<Task, TaskError> {
  use hyper::{Client, Uri};
 
 fn build_task_customized_async_task() -> Result<Task, TaskError> {
+    let id = 1;
+    let name = String::from("someting");
     let mut task_builder = TaskBuilder::default();
 
-    let body = generate_closure_template("delay_timer is easy to use. .".into());
+    let body = move || {
+        let name_ref = name.clone();
+        async move {
+            async_template(id, name_ref).await.expect("Request failed.");
+
+            sleep(Duration::from_secs(3)).await;
+
+            println!("create_async_fn_body:i'success");
+        }
+    };
+
     task_builder
         .set_frequency_repeated_by_cron_str("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100")
         .set_task_id(5)
@@ -187,19 +196,6 @@ fn build_task_customized_async_task() -> Result<Task, TaskError> {
         .spawn_async_routine(body)
 }
 
-pub fn generate_closure_template(
-    name: String,
-) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move |context| {
-        let future_inner = async_template(get_timestamp() as i32, name.clone());
-
-        let future = async move {
-            future_inner.await;
-            context.finish_task().await;
-        };
-        create_delay_task_handler(async_spawn(future))
-    }
-}
 
 pub async fn async_template(id: i32, name: String) -> Result<()> {
     let url = format!("https://httpbin.org/get?id={}&name={}", id, name);

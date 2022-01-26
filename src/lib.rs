@@ -184,7 +184,7 @@
 //! ```
 //! #[macro_use]
 //! use delay_timer::prelude::*;
-//!
+//! use anyhow::Result;
 //! use std::str::FromStr;
 //! use std::sync::atomic::{
 //!     AtomicUsize,
@@ -194,11 +194,12 @@
 //! use std::thread::{self, park_timeout};
 //! use std::time::Duration;
 //! use smol::Timer;
+//! use tokio::time::sleep;
 //! use hyper::{Client, Uri};
 //!
 //!
 //!
-//! fn build_task(mut task_builder: TaskBuilder) -> Result<Task, TaskError> {
+//! fn build_task(mut task_builder: TaskBuilder, name:String, id:i32) -> Result<Task, TaskError> {
 //!     let body = move || {
 //!         let name_ref = name.clone();
 //!         async move {
