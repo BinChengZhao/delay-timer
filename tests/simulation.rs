@@ -77,7 +77,19 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     assert_eq!(instance.get_state(), instance::RUNNING);
 
     // The task execution is timeout after about 3 second.
-    park_timeout(Duration::from_secs(3));
+    let timeout = Duration::from_secs(3);
+    let beginning_park = std::time::Instant::now();
+
+    let mut timeout_remaining = timeout;
+    loop {
+        // may wake spuriously, So have to do it separately.
+        park_timeout(timeout_remaining);
+        let elapsed = beginning_park.elapsed();
+        if elapsed >= timeout {
+            break;
+        }
+        timeout_remaining = timeout - elapsed;
+    }
 
     // This should be the completed state.
     assert_eq!(instance.get_state(), instance::TIMEOUT);

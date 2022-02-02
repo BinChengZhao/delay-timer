@@ -83,7 +83,6 @@ features = ["full", "test-util"]
 [[example]]
 name = "cycle_tokio_task"
 path = "examples/cycle_tokio_task.rs"
-required-features = ["tokio-support"]
 
 [[example]]
 name = "demo"
