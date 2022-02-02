@@ -129,7 +129,7 @@ pub mod shell_command {
     impl ChildUnify for SmolChild {
         async fn wait(mut self) -> AnyResult<ExitStatus> {
             Ok(ExitStatus::from_raw(
-                self.status().await?.code().unwrap_or(-1),
+                self.status().await?.code().unwrap_or(1),
             ))
         }
 
