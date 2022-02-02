@@ -1,3 +1,18 @@
+# Version 0.11.0 
+
+## Changed
+- Optimized the entire delay-timer usage by removing macros for creating asynchronous tasks and now allowing users to use a closure that returns a Future.
+
+- The default internal runtime currently used by 'Tokio', 'smol' can also be manually enabled by the user.
+
+- Updated lots of utility cases, lots of documentation, and dependency updates.
+
+- Fixed a bug where tasks were executed ahead of time.([#33](https://github.com/BinChengZhao/delay-timer/issues/33))
+
+### Details
+
+Major refactoring of 'task execution'.
+
 # Version 0.10.1 
 
 ## Changed
