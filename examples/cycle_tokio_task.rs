@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 fn build_task_customized_async_task() -> Result<Task> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = generate_closure_template("'delay_timer-is-easy-to-use.'".into());
+    let body = generate_closure_template;
 
     Ok(task_builder
         .set_frequency_repeated_by_cron_str("10,15,25,50 0/1 * * Jan-Dec * 2020-2100")
@@ -43,32 +43,22 @@ fn build_wake_task() -> Result<Task> {
     let mut task_builder = TaskBuilder::default();
 
     let thread: Thread = current();
-    let body = move |_| {
+    let body = move || {
         println!("bye bye");
         thread.unpark();
-        create_default_delay_task_handler()
     };
 
     Ok(task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousDay::Wake))
         .set_task_id(7)
         .set_maximum_running_time(50)
-        .spawn_async_routine(body)?)
+        .spawn_routine(body)?)
 }
 
-pub fn generate_closure_template(
-    name: String,
-) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move |context| {
-        let future_inner = async_template(get_timestamp() as i32, name.clone());
-
-        let future = async move {
-            future_inner.await.ok();
-            context.finish_task(None).await;
-        };
-
-        create_delay_task_handler(async_spawn_by_tokio(future))
-    }
+pub async fn generate_closure_template() {
+    let name: String = "'delay_timer-is-easy-to-use.'".into();
+    let future_inner = async_template(get_timestamp() as i32, name.clone());
+    future_inner.await.ok();
 }
 
 pub async fn async_template(id: i32, name: String) -> Result<()> {
