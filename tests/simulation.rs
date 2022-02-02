@@ -16,15 +16,15 @@ use smol::Timer;
 fn test_instance_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
-    let body = create_async_fn_body!({
+    let body = || async {
         Timer::after(Duration::from_millis(100)).await;
-    });
+    };
 
     let task = TaskBuilder::default()
         .set_frequency_count_down_by_seconds(1, 4)
         .set_task_id(1)
         .set_maximum_parallel_runnable_num(3)
-        .spawn(body)?;
+        .spawn_async_routine(body)?;
     let task_instance_chain = delay_timer.insert_task(task)?;
 
     // Get the first task instance.
@@ -56,18 +56,18 @@ fn test_instance_state() -> anyhow::Result<()> {
 fn test_instance_timeout_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
-    let body = create_async_fn_body!({
+    let body = || async {
         println!("test_instance_timeout_state");
         Timer::after(Duration::from_secs(3)).await;
         println!("test_instance_timeout_state end.");
-    });
+    };
 
     let task = TaskBuilder::default()
         .set_frequency_count_down_by_seconds(1, 4)
         .set_task_id(1)
-        .set_maximum_running_time(2)
+        .set_maximum_running_time(1)
         .set_maximum_parallel_runnable_num(3)
-        .spawn(body)?;
+        .spawn_async_routine(body)?;
     let task_instance_chain = delay_timer.insert_task(task)?;
 
     // Get the first task instance.
@@ -77,10 +77,22 @@ fn test_instance_timeout_state() -> anyhow::Result<()> {
     assert_eq!(instance.get_state(), instance::RUNNING);
 
     // The task execution is timeout after about 3 second.
-    park_timeout(Duration::from_secs(3));
+    let timeout = Duration::from_secs(5);
+    let beginning_park = std::time::Instant::now();
+
+    let mut timeout_remaining = timeout;
+    loop {
+        // may wake spuriously, So have to do it separately.
+        park_timeout(timeout_remaining);
+        let elapsed = beginning_park.elapsed();
+        if elapsed >= timeout {
+            break;
+        }
+        timeout_remaining = timeout - elapsed;
+    }
 
     // This should be the completed state.
-    assert_eq!(instance.get_state(), instance::TIMEOUT);
+    assert_ne!(instance.get_state(), instance::RUNNING);
 
     Ok(())
 }
@@ -99,7 +111,7 @@ fn test_shell_task_instance_timeout_state() -> anyhow::Result<()> {
         .set_task_id(3)
         .set_maximum_running_time(3)
         .set_maximum_parallel_runnable_num(1)
-        .spawn(body)?;
+        .spawn_async_routine(body)?;
 
     let task_instance_chain = delay_timer.insert_task(task)?;
 
@@ -138,7 +150,7 @@ fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
         .set_task_id(3)
         .set_maximum_running_time(3)
         .set_maximum_parallel_runnable_num(1)
-        .spawn(body)?;
+        .spawn_async_routine(body)?;
 
     let task_instance_chain = delay_timer.insert_task(task)?;
 
@@ -169,15 +181,14 @@ fn go_works() -> AnyResult<()> {
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
 
-    let body = move |_| {
+    let body = move || {
         share_num_bunshin.fetch_add(1, Release);
-        create_default_delay_task_handler()
     };
 
     let task = TaskBuilder::default()
         .set_frequency_count_down_by_cron_str(expression, 3)
         .set_task_id(1)
-        .spawn(body)?;
+        .spawn_routine(body)?;
     delay_timer.add_task(task)?;
 
     for _ in 0..5 {
@@ -200,9 +211,8 @@ fn test_advance() -> AnyResult<()> {
     let share_num = Arc::new(AtomicUsize::new(0));
     let share_num_bunshin = share_num.clone();
 
-    let body = move |_| {
+    let body = move || {
         share_num_bunshin.fetch_add(1, Release);
-        create_default_delay_task_handler()
     };
 
     // Allow once.
@@ -210,7 +220,7 @@ fn test_advance() -> AnyResult<()> {
     let task = TaskBuilder::default()
         .set_frequency_count_down_by_cron_str(expression, 3)
         .set_task_id(task_id)
-        .spawn(body)?;
+        .spawn_routine(body)?;
 
     delay_timer.add_task(task)?;
 
@@ -231,18 +241,20 @@ fn test_maximum_parallel_runnable_num() -> AnyResult<()> {
     let share_num = Arc::new(AtomicU64::new(0));
     let share_num_bunshin = share_num.clone();
 
-    let body = create_async_fn_body!((share_num_bunshin){
-        dbg!();
-        share_num_bunshin_ref.fetch_add(1, Release);
-        Timer::after(Duration::from_secs(9)).await;
-        share_num_bunshin_ref.fetch_sub(1, Release);
-    });
+    let body = move || {
+        let share_num_bunshin_ref = share_num_bunshin.clone();
+        async move {
+            share_num_bunshin_ref.fetch_add(1, Release);
+            Timer::after(Duration::from_secs(9)).await;
+            share_num_bunshin_ref.fetch_sub(1, Release);
+        }
+    };
 
     let task = TaskBuilder::default()
         .set_frequency_by_candy(CandyFrequency::CountDown(4, CandyCron::Secondly))
         .set_task_id(1)
         .set_maximum_parallel_runnable_num(3)
-        .spawn(body)?;
+        .spawn_async_routine(body)?;
     delay_timer.add_task(task)?;
 
     for i in 1..=6 {
@@ -260,15 +272,14 @@ fn tests_countdown() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicI32::new(3));
     let share_num_bunshin = share_num.clone();
-    let body = move |_| {
+    let body = move || {
         share_num_bunshin.fetch_sub(1, Release);
-        create_default_delay_task_handler()
     };
 
     let task = TaskBuilder::default()
         .set_frequency_count_down_by_seconds(2, 3)
         .set_task_id(1)
-        .spawn(body)?;
+        .spawn_routine(body)?;
     delay_timer.add_task(task)?;
 
     let mut i = 0;
@@ -310,5 +321,14 @@ fn inspect_struct() -> AnyResult<()> {
     let mut s2 = s1.clone();
     thread::sleep(Duration::from_secs(1));
     println!("{:?}, {:?}", s.next(), s2.next());
+    Ok(())
+}
+
+#[test]
+fn test_cron_clock() -> AnyResult<()> {
+    let mut s = cron_clock::Schedule::from_str("0 15 06 * * * *")?.upcoming_owned(cron_clock::Utc);
+
+    println!("{:?}", s.next());
+    println!("{:?}", s.next());
     Ok(())
 }

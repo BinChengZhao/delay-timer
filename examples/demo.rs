@@ -1,5 +1,7 @@
 use anyhow::Result;
 use delay_timer::prelude::*;
+#[allow(deprecated)]
+use delay_timer::utils::convenience::functions::unblock_process_task_fn;
 use smol::Timer;
 use std::thread::{current, park, Thread};
 use std::time::Duration;
@@ -45,75 +47,71 @@ fn main() -> Result<()> {
 fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_body!({
+    let body = || async {
         println!("create_async_fn_body!");
 
         Timer::after(Duration::from_secs(3)).await;
 
         println!("create_async_fn_body:i'success");
-    });
+    };
 
     task_builder
         .set_task_id(1)
         .set_frequency_repeated_by_cron_str("@secondly")
         .set_maximum_parallel_runnable_num(2)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 fn build_task_async_request() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_body!({
+    let body = || async {
         if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
             dbg!(res.body_string().await.unwrap_or_default());
 
             Timer::after(Duration::from_secs(3)).await;
             dbg!("Task2 is done.");
         }
-    });
+    };
 
     task_builder
         .set_frequency_repeated_by_seconds(8)
         .set_task_id(2)
         .set_maximum_running_time(5)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 fn build_task_async_execute_process() -> Result<Task, TaskError> {
+    let task_id = 3;
     let mut task_builder = TaskBuilder::default();
 
-    let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
+    let body = move || {
+        #[allow(deprecated)]
+        unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into(), task_id)
+    };
     task_builder
         .set_frequency_repeated_by_minutes(1)
-        .set_task_id(3)
+        .set_task_id(task_id)
         .set_maximum_running_time(5)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 fn build_task_customized_async_task() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = generate_closure_template("delay_timer is easy to use. .".into());
+    let name = String::from("build_task_customized_async_task");
+    let body = move || {
+        let name = name.clone();
+        async move {
+            async_template(get_timestamp() as i32, name).await;
+        }
+    };
     #[allow(deprecated)]
     task_builder
         .set_frequency_by_candy(CandyFrequency::Repeated(AuspiciousTime::LoveTime))
         .set_task_id(5)
         .set_maximum_running_time(5)
-        .spawn(body)
-}
-
-pub fn generate_closure_template(
-    name: String,
-) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move |context| {
-        let future_inner = async_template(get_timestamp() as i32, name.clone());
-
-        let future = async move {
-            future_inner.await;
-            context.finish_task(None).await;
-        };
-        create_delay_task_handler(async_spawn(future))
-    }
+        .spawn_async_routine(body)
 }
 
 pub async fn async_template(id: i32, name: String) {
@@ -127,17 +125,16 @@ fn build_wake_task() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let thread: Thread = current();
-    let body = move |_| {
+    let body = move || {
         println!("bye bye");
         thread.unpark();
-        create_default_delay_task_handler()
     };
 
     task_builder
         .set_frequency_repeated_by_cron_str("@minutely")
         .set_task_id(700)
         .set_maximum_running_time(50)
-        .spawn(body)
+        .spawn_routine(body)
 }
 
 // Custom cron-expression syntax sugar mapping.

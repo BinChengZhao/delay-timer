@@ -1,7 +1,10 @@
 use anyhow::Result;
 use delay_timer::prelude::*;
-use smol::Timer;
+#[allow(deprecated)]
+use delay_timer::utils::convenience::functions::unblock_process_task_fn;
+use hyper::{Client, Uri};
 use std::time::Duration;
+use tokio::time::sleep;
 
 // You can replace the 66 line with the command you expect to execute.
 #[tokio::main]
@@ -10,7 +13,9 @@ async fn main() -> Result<()> {
     // You can also share a tokio runtime with delayTimer, please see api `DelayTimerBuilder::tokio_runtime` for details.
 
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
-    let delay_timer = DelayTimerBuilder::default().build();
+    let delay_timer = DelayTimerBuilder::default()
+        .tokio_runtime_by_default()
+        .build();
 
     // Develop a print job that runs in an asynchronous cycle.
     let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
@@ -20,6 +25,9 @@ async fn main() -> Result<()> {
 
     // Get the running instance of task 1.
     let task_instance = task_instance_chain.next_with_async_wait().await?;
+
+    // Wating request done then cancel it (It's just a custom logic).
+    sleep(Duration::from_secs(1)).await;
 
     // Cancel running task instances.
     task_instance.cancel_with_async_wait().await?;
@@ -40,31 +48,57 @@ async fn main() -> Result<()> {
 }
 
 fn build_task_async_print() -> Result<Task, TaskError> {
+    let id = 1;
+    let name = String::from("someting");
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_body!({
-        println!("create_async_fn_body!");
+    let body = move || {
+        let name_ref = name.clone();
+        async move {
+            async_template(id, name_ref).await.expect("Request failed.");
 
-        Timer::after(Duration::from_secs(3)).await;
+            sleep(Duration::from_secs(3)).await;
 
-        println!("create_async_fn_body:i'success");
-    });
+            println!("create_async_fn_body:i'success");
+        }
+    };
 
     task_builder
         .set_task_id(1)
         .set_frequency_repeated_by_seconds(6)
         .set_maximum_parallel_runnable_num(2)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 fn build_task_async_execute_process() -> Result<Task, TaskError> {
+    let task_id = 3;
     let mut task_builder = TaskBuilder::default();
 
-    let body = unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
+    let body = move || {
+        #[allow(deprecated)]
+        unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into(), task_id)
+    };
     task_builder
         .set_frequency_repeated_by_seconds(1)
-        .set_task_id(3)
+        .set_task_id(task_id)
         .set_maximum_running_time(10)
         .set_maximum_parallel_runnable_num(1)
-        .spawn(body)
+        .spawn_async_routine(body)
+}
+
+pub async fn async_template(id: i32, name: String) -> Result<()> {
+    let client = Client::new();
+
+    // The default connector does not handle TLS.
+    // Speaking to https destinations will require configuring a connector that implements TLS.
+    // So use http for test.
+    let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
+    let uri: Uri = url.parse()?;
+
+    let res = client.get(uri).await?;
+    println!("Response: {}", res.status());
+    // Concatenate the body stream into a single buffer...
+    let buf = hyper::body::to_bytes(res).await?;
+    println!("body: {:?}", buf);
+    Ok(())
 }

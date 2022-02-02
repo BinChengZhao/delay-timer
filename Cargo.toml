@@ -1,6 +1,6 @@
 [package]
 name = "delay_timer"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
@@ -21,10 +21,8 @@ name = "delay_timer"
 
 [features]
 default = []
-full = ["tokio-full"]
 
-tokio-full = ["tokio-support","status-report"]
-tokio-support = ["tokio"]
+full = ["status-report"]
 status-report = []
 
 
@@ -34,28 +32,33 @@ anyhow = "^1.0.31"
 rs-snowflake = "0.5.0"
 dashmap = "^4.0.2"
 lru = "^0.6.5"
+once_cell = "1.9.0"
 futures = "^0.3.13"
 smol = "^1.2.5"
-concat-idents = "1.1.2"
+concat-idents = "1.1.3"
 async-trait = "^0.1.48"
 event-listener = "^2.5.1"
 log = "^0.4.14"
+tracing = "0.1.29"
 thiserror = "^1.0.24"
 
 
-# Optional
-tokio = { version = "^1.3.0", features = ["full"] , optional = true }
+tokio = { version = "^1.3.0", features = ["full"] }
 
 [dev-dependencies]
 rand = "0.8.4"
 surf = "^2.1.0"
-tracing = "0.1.29"
+tracing-error = { version = "0.1.2" }
 tracing-subscriber = "0.2.0"
 tokio = { version = "^1.3.0", features = ["full"] }
 hyper= {version  = "^0.14.2" , features = ["full"] }
 pretty_env_logger = "^0.4"
 mockall = "^0.8.2"
 env_logger = "^0.8.3"
+color-eyre = { version =  "0.5.11", features = ["capture-spantrace", "issue-url"]}
+pretty_assertions = "0.6.1"
+thiserror = "1.0.19"
+ansi-parser = "0.6.5" # used for testing color schemes
 
 [dev-dependencies.async-std]
 version = "^1.9.0"
@@ -80,7 +83,6 @@ features = ["full", "test-util"]
 [[example]]
 name = "cycle_tokio_task"
 path = "examples/cycle_tokio_task.rs"
-required-features = ["tokio-support"]
 
 [[example]]
 name = "demo"
@@ -96,3 +98,6 @@ required-features = ["full"]
 #name = "demo"
 #path = "benches/demo.rs"
 #required-features = ["full"]
+
+[profile.dev.package.backtrace]
+opt-level = 3

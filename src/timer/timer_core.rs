@@ -21,7 +21,7 @@ struct Clock {
 
 enum ClockInner {
     Sc(SmolClock),
-    #[cfg(feature = "tokio-support")]
+
     Tc(TokioClock),
 }
 
@@ -37,7 +37,7 @@ impl ClockInner {
             RuntimeKind::Smol => {
                 ClockInner::Sc(SmolClock::new(Instant::now(), Duration::from_secs(1)))
             }
-            #[cfg(feature = "tokio-support")]
+
             RuntimeKind::Tokio => ClockInner::Tc(TokioClock::new(
                 time::Instant::now(),
                 Duration::from_secs(1),
@@ -50,32 +50,28 @@ impl Clock {
     async fn tick(&mut self) {
         match self.inner {
             ClockInner::Sc(ref mut smol_clock) => smol_clock.tick().await,
-            #[cfg(feature = "tokio-support")]
+
             ClockInner::Tc(ref mut tokio_clock) => tokio_clock.tick().await,
         }
     }
 }
-cfg_tokio_support!(
-    use tokio::time::{Interval, interval_at, self};
+use tokio::time::{self, interval_at, Interval};
 
-    #[derive(Debug)]
-    struct TokioClock{
-        inner : Interval
+#[derive(Debug)]
+struct TokioClock {
+    inner: Interval,
+}
+
+impl TokioClock {
+    pub fn new(start: time::Instant, period: Duration) -> Self {
+        let inner = interval_at(start, period);
+        TokioClock { inner }
     }
 
-    impl TokioClock{
-
-        pub fn new(start: time::Instant, period: Duration) -> Self{
-            let inner = interval_at(start, period);
-            TokioClock{inner}
-        }
-
-        pub async fn tick(&mut self){
-            self.inner.tick().await;
-        }
+    pub async fn tick(&mut self) {
+        self.inner.tick().await;
     }
-
-);
+}
 
 #[derive(Debug)]
 struct SmolClock {
@@ -207,6 +203,12 @@ impl Timer {
             let task_ids;
 
             {
+                // TODO:
+                // Attempt to batch take out tasks and execute them,
+                // marking the status for this batch.
+                //
+                // Attempt to re-queue the `cancel` event into the channel
+                // if the user `cancel` task is running.
                 if let Some(mut slot_mut) = self.shared_header.wheel_queue.get_mut(&second_hand) {
                     task_ids = slot_mut.value_mut().arrival_time_tasks();
                 } else {
@@ -305,9 +307,10 @@ impl Timer {
         task_context
             .task_id(task_id)
             .record_id(record_id)
-            .timer_event_sender(self.timer_event_sender.clone());
+            .timer_event_sender(self.timer_event_sender.clone())
+            .runtime_kind(self.shared_header.runtime_instance.kind);
 
-        let task_handler_box = (task.get_body())(task_context);
+        let task_handler_box = self.routine_exec(&*(task.routine.0), task_context);
 
         let delay_task_handler_box_builder = DelayTaskHandlerBoxBuilder::default();
         let tmp_task_handler_box = delay_task_handler_box_builder
@@ -378,6 +381,21 @@ impl Timer {
             task_id, task_excute_timestamp, slot_seed, cylinder_line
         );
         Ok(())
+    }
+
+    #[inline(always)]
+    fn routine_exec(
+        &self,
+        routine: &(dyn Routine<TokioHandle = TokioJoinHandle<()>, SmolHandle = SmolJoinHandler<()>>
+              + 'static
+              + Send),
+
+        task_context: TaskContext,
+    ) -> Box<dyn DelayTaskHandler> {
+        match task_context.runtime_kind {
+            RuntimeKind::Smol => create_delay_task_handler(routine.spawn_by_smol(task_context)),
+            RuntimeKind::Tokio => create_delay_task_handler(routine.spawn_by_tokio(task_context)),
+        }
     }
 }
 

@@ -171,7 +171,7 @@ impl RecyclingBins {
             RuntimeKind::Smol => {
                 Timer::after(duration).await;
             }
-            #[cfg(feature = "tokio-support")]
+
             RuntimeKind::Tokio => {
                 sleep_by_tokio(duration).await;
             }

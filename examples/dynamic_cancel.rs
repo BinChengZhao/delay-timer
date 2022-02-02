@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use delay_timer::prelude::*;
+use delay_timer::utils::convenience::functions::tokio_unblock_process_task_fn;
 use smol::Timer;
 use tokio::runtime::Runtime;
 
@@ -77,29 +78,32 @@ fn async_cancel() -> Result<()> {
 fn build_task_async_print() -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
-    let body = create_async_fn_body!({
+    let body = || async {
         println!("create_async_fn_body!");
 
         Timer::after(Duration::from_secs(3)).await;
 
         println!("create_async_fn_body:i'success");
-    });
+    };
 
     task_builder
         .set_task_id(1)
         .set_frequency_repeated_by_seconds(6)
         .set_maximum_parallel_runnable_num(2)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 fn build_task_async_execute_process() -> Result<Task, TaskError> {
+    let task_id = 3;
     let mut task_builder = TaskBuilder::default();
 
-    let body = tokio_unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into());
+    let body = move || {
+        tokio_unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn_async_routine.php >> ./try_spawn_async_routine.txt".into(), task_id)
+    };
     task_builder
         .set_frequency_repeated_by_seconds(1)
-        .set_task_id(3)
+        .set_task_id(task_id)
         .set_maximum_running_time(10)
         .set_maximum_parallel_runnable_num(1)
-        .spawn(body)
+        .spawn_async_routine(body)
 }

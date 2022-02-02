@@ -23,7 +23,7 @@ fn bench_task_spwan(b: &mut Bencher) {
 
     // String parsing to corn-expression -> iterator is the most time-consuming operation about 1500ns ~ 3500 ns.
     // The iterator is used to find out when the next execution should take place, in about 500 ns.
-    b.iter(|| task_builder.spawn(body.clone()));
+    b.iter(|| task_builder.spawn_async_routine(body.clone()));
 }
 
 #[bench]
@@ -40,12 +40,12 @@ fn bench_maintain_task(b: &mut Bencher) {
         .set_maximum_running_time(5)
         .set_task_id(1);
 
-    // `task_builder.spawn(body)` is about 1500 ns .
+    // `task_builder.spawn_async_routine(body)` is about 1500 ns .
     // So maintain_task takes (result of bench - task_spawn)ns.  about 1000ns.
     b.iter(|| {
         block_on({
             async {
-                if let Ok(task) = task_builder.spawn(body) {
+                if let Ok(task) = task_builder.spawn_async_routine(body) {
                     timer.maintain_task(task, 1, 1).await.ok();
                 }
             }
@@ -57,7 +57,7 @@ fn bench_maintain_task(b: &mut Bencher) {
 fn bench_try_wait(b: &mut Bencher) {
     use std::process::Command;
 
-    if let Ok(mut child) = Command::new("ps").spawn() {
+    if let Ok(mut child) = Command::new("ps").spawn_async_routine() {
         b.iter(|| child.try_wait());
     }
 }

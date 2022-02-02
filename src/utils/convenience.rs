@@ -20,85 +20,85 @@ pub mod functions {
     use crate::timer::runtime_trace::task_handle::DelayTaskHandler;
 
     /// UnBlock execution of a command line task in delay-timer.
-    pub fn unblock_process_task_fn(
-        shell_command: String,
-    ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
+    ///
+    /// This method mainly teaches how to encapsulate custom `async` logic in conjunction with `delay-timer`.
+    ///
+    /// The implementation could be tweaked at any time in the future,
+    ///
+    /// And it is recommended that you do your own encapsulation based on this reference.
+    ///
+    /// Note: now you can't get the output of the process through status-report.
+    ///
+    /// Please use this template to compose channels to achieve similar results.
+
+    #[deprecated]
+    #[instrument]
+    pub async fn unblock_process_task_fn(shell_command: String, task_id: u64) {
         use smol::process::{Child, Command};
-        move |context: TaskContext| {
-            debug!(
-                "Unblock-Process Task: {}, Record: {} Start",
-                context.task_id, context.record_id
-            );
+        debug!("Unblock-Process task start, Command {}", &shell_command);
 
-            let shell_command_clone = shell_command.clone();
-            create_delay_task_handler(async_spawn(async move {
-                let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
+        let shell_command_clone = shell_command.clone();
+        let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
-                if let Err(err) = childs {
-                    debug!(
-                        "Unblock-Process Task: {}, Record: {} fail for: {}",
-                        context.task_id,
-                        context.record_id,
-                        err.to_string()
-                    );
+        if let Err(err) = childs {
+            debug!("Unblock-Process task init fail for: {}", err.to_string());
+            return;
+        }
 
-                    context
-                        .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
-                        .await;
-                    return Err(anyhow!(err.to_string()));
+        if let Ok(mut childs) = childs.map_err(|e| error!("No process derived successfully: {}", e))
+        {
+            if let Ok(last_child) = childs.pop_back().ok_or_else(|| error!("Without child.")) {
+                if let Ok(status) = last_child
+                    .wait()
+                    .await
+                    .map_err(|e| error!("Unblock-Process task run fail for: {}", e))
+                {
+                    debug!("Unblock-Process task ExitStatus: {}", status);
                 }
-
-                let mut childs = childs?;
-
-                let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
-                let output = last_child.wait_with_output().await?;
-
-                debug!(
-                    "Unblock-Process Task: {}, Record: {} finished",
-                    context.task_id, context.record_id
-                );
-
-                context
-                    .finish_task(Some(FinishOutput::ProcessOutput(output)))
-                    .await;
-
-                Ok(())
-            }))
+            }
         }
     }
 
-    cfg_tokio_support!(
-        use tokio::process::{Child, Command};
+    use tokio::process::{Child, Command};
 
-        /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
-        pub fn tokio_unblock_process_task_fn(
-            shell_command: String,
-        ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-            move |context: TaskContext| {
-                let shell_command_clone = shell_command.clone();
-                create_delay_task_handler(async_spawn_by_tokio(async move {
-                    let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
+    /// UnBlock execution of a command line task in delay-timer `Runtime` based on tokio.
+    ///
+    /// This method mainly teaches how to encapsulate custom `async` logic in conjunction with `delay-timer`.
+    ///
+    /// The implementation could be tweaked at any time in the future,
+    ///
+    /// And it is recommended that you do your own encapsulation based on this reference.
+    ///
+    /// Note: now you can't get the output of the process through status-report.
+    ///
+    /// Please use this template to compose channels to achieve similar results.
+    #[deprecated]
+    #[instrument]
+    pub async fn tokio_unblock_process_task_fn(shell_command: String, task_id: u64) {
+        let shell_command_clone = shell_command.clone();
 
-                    if let Err(err) = childs {
-                        context
-                            .finish_task(Some(FinishOutput::ExceptionOutput(err.to_string())))
-                            .await;
-                        return Err(anyhow!(err.to_string()));
-                    }
+        debug!("Unblock-Process task start, Command {}", &shell_command);
 
-                    let mut childs = childs?;
+        let childs = parse_and_run::<Child, Command>(&shell_command_clone).await;
 
-                    let last_child = childs.pop_back().ok_or_else(|| anyhow!("Without child."))?;
-                    let output = last_child.wait_with_output().await?;
-                    context
-                        .finish_task(Some(FinishOutput::ProcessOutput(output)))
-                        .await;
+        if let Err(err) = childs {
+            debug!("Unblock-Process task init fail for: {}", err.to_string());
+            return;
+        }
 
-                    Ok(())
-                }))
+        if let Ok(mut childs) = childs.map_err(|e| error!("No process derived successfully {}", e))
+        {
+            if let Ok(last_child) = childs.pop_back().ok_or_else(|| error!("Without child.")) {
+                if let Ok(status) = last_child
+                    .wait()
+                    .await
+                    .map_err(|e| error!("Unblock-Process task run fail for: {}", e))
+                {
+                    debug!("Unblock-Process task ExitStatus: {}", status);
+                }
             }
         }
-    );
+    }
 
     #[inline(always)]
     ///convert task_handler of impl DelayTaskHandler to a `Box<dyn DelayTaskHander>`.
@@ -186,7 +186,12 @@ pub fn generate_closure_template(
     a: i32,
     b: String,
 ) -> impl Fn() -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-    move || self::functions::create_delay_task_handler(async_spawn(async_template(a, b.clone())))
+    move || {
+        self::functions::create_delay_task_handler(async_spawn_by_smol(async_template(
+            a,
+            b.clone(),
+        )))
+    }
 }
 
 /// This is a demo case to demonstrate a custom asynchronous task.

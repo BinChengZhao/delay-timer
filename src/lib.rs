@@ -1,3 +1,5 @@
+// all the original `DelayTimerBuilder`s have to add a call `tokio_runtime_by_smol`.
+
 //! DelayTimer like crontab is a cyclic task manager with latency properties,
 //! but synchronous asynchronous tasks are possible,
 //! based on an internal event manager and task scheduler,
@@ -55,21 +57,21 @@
 //! }
 //!
 //! fn build_task_async_print() -> Result<Task, TaskError> {
-//!     let mut task_builder = TaskBuilder::default();
+//!    let mut task_builder = TaskBuilder::default();
 //!
-//!     let body = create_async_fn_body!({
-//!         println!("create_async_fn_body!");
+//!    let body = || async {
+//!        println!("create_async_fn_body!");
 //!
-//!         Timer::after(Duration::from_secs(3)).await;
+//!        Timer::after(Duration::from_secs(3)).await;
 //!
-//!         println!("create_async_fn_body:i'success");
-//!     });
+//!        println!("create_async_fn_body:i'success");
+//!    };
 //!
-//!     task_builder
-//!         .set_task_id(1)
-//!         .set_frequency_repeated_by_seconds(1)
-//!         .set_maximum_parallel_runnable_num(2)
-//!         .spawn(body)
+//!    task_builder
+//!        .set_task_id(1)
+//!        .set_frequency_repeated_by_seconds(1)
+//!        .set_maximum_parallel_runnable_num(2)
+//!        .spawn_async_routine(body)
 //! }
 //!
 //! ```
@@ -113,19 +115,19 @@
 //! fn build_task_async_print() -> Result<Task, TaskError> {
 //!     let mut task_builder = TaskBuilder::default();
 //!
-//!     let body = create_async_fn_body!({
+//!     let body = || async {
 //!         println!("create_async_fn_body!");
 //!
 //!         Timer::after(Duration::from_secs(3)).await;
 //!
 //!         println!("create_async_fn_body:i'success");
-//!     });
+//!     };
 //!
 //!     task_builder
 //!         .set_task_id(1)
 //!         .set_frequency_repeated_by_seconds(6)
 //!         .set_maximum_parallel_runnable_num(2)
-//!         .spawn(body)
+//!         .spawn_async_routine(body)
 //! }
 //!
 //!
@@ -151,17 +153,21 @@
 //! let share_num = Arc::new(AtomicUsize::new(0));
 //! let share_num_bunshin = share_num.clone();
 //!
-//! let body = create_async_fn_body!((share_num_bunshin){
-//!     share_num_bunshin_ref.fetch_add(1, Release);
-//!     Timer::after(Duration::from_secs(9)).await;
-//!     share_num_bunshin_ref.fetch_sub(1, Release);
-//! });
+//! let body = move || {
+//!     let share_num_bunshin_ref = share_num_bunshin.clone();
+//!     async move {
+//!         share_num_bunshin_ref.fetch_add(1, Release);
+//!         Timer::after(Duration::from_secs(9)).await;
+//!         share_num_bunshin_ref.fetch_sub(1, Release);
+//!     }
+//! };
+//!
 //!
 //! let task = TaskBuilder::default()
 //!     .set_frequency_count_down_by_seconds(1, 9)
 //!     .set_task_id(1)
 //!     .set_maximum_parallel_runnable_num(3)
-//!     .spawn(body).expect("");
+//!     .spawn_async_routine(body).expect("");
 //!
 //! delay_timer.add_task(task).ok();
 //!
@@ -175,7 +181,7 @@
 //! ```
 //! #[macro_use]
 //! use delay_timer::prelude::*;
-//!
+//! use anyhow::Result;
 //! use std::str::FromStr;
 //! use std::sync::atomic::{
 //!     AtomicUsize,
@@ -185,47 +191,47 @@
 //! use std::thread::{self, park_timeout};
 //! use std::time::Duration;
 //! use smol::Timer;
+//! use tokio::time::sleep;
 //! use hyper::{Client, Uri};
 //!
 //!
 //!
-//! fn build_task(mut task_builder: TaskBuilder) -> Result<Task, TaskError> {
-//!     let body = generate_closure_template(String::from("dynamic"));
+//! fn build_task(mut task_builder: TaskBuilder, name:String, id:i32) -> Result<Task, TaskError> {
+//!     let body = move || {
+//!         let name_ref = name.clone();
+//!         async move {
+//!             async_template(id, name_ref).await.expect("Request failed.");
+//!
+//!             sleep(Duration::from_secs(3)).await;
+//!
+//!             println!("create_async_fn_body:i'success");
+//!         }
+//!     };
 //!
 //!     task_builder
 //!         .set_frequency_repeated_by_seconds(8)
 //!         .set_task_id(2)
 //!         .set_maximum_running_time(5)
-//!         .spawn(body)
+//!         .spawn_async_routine(body)
 //! }
 //!
-//! pub fn generate_closure_template(
-//!     name: String,
-//! ) -> impl Fn(TaskContext) -> Box<dyn DelayTaskHandler> + 'static + Send + Sync {
-//!     move |context| {
-//!         let future_inner = async_template(get_timestamp() as i32, name.clone());
 //!
-//!         let future = async move {
-//!             future_inner.await;
-//!             context.finish_task(None).await;
-//!         };
-//!
-//!         create_delay_task_handler(async_spawn(future))
-//!     }
-//! }
-//!
-//! pub async fn async_template(id: i32, name: String) -> AnyResult<()> {
-//!     let client = Client::new();
-//!
-//!     let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
-//!     let uri: Uri = url.parse()?;
-//!     let res = client.get(uri).await?;
-//!     println!("Response: {}", res.status());
-//!     // Concatenate the body stream into a single buffer...
-//!     let buf = hyper::body::to_bytes(res).await?;
-//!     println!("body: {:?}", buf);
-//!     Ok(())
-//! }
+//!  pub async fn async_template(id: i32, name: String) -> Result<()> {
+//!      let client = Client::new();
+//!  
+//!      // The default connector does not handle TLS.
+//!      // Speaking to https destinations will require configuring a connector that implements TLS.
+//!      // So use http for test.
+//!      let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
+//!      let uri: Uri = url.parse()?;
+//!  
+//!      let res = client.get(uri).await?;
+//!      println!("Response: {}", res.status());
+//!      // Concatenate the body stream into a single buffer...
+//!      let buf = hyper::body::to_bytes(res).await?;
+//!      println!("body: {:?}", buf);
+//!      Ok(())
+//!  }
 //!
 //! ```
 #![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]

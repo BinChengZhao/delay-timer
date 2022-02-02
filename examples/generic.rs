@@ -31,24 +31,27 @@ fn build_generic_task_async_request<T: Animal>(animal: T) -> Result<Task, TaskEr
     let other_animal = Cat;
     let int_animal = 1;
 
-    let body = create_async_fn_body!((animal, other_animal, int_animal){
-        if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
-            dbg!(res.body_string().await.unwrap_or_default());
-            animal_ref.call();
-            other_animal_ref.call();
-            <i32 as Animal>::call(&int_animal_ref);
+    let body = move || {
+        let animal_ref = animal.clone();
+        let other_animal_ref = other_animal.clone();
+        async move {
+            if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
+                dbg!(res.body_string().await.unwrap_or_default());
+                animal_ref.call();
+                other_animal_ref.call();
+                <i32 as Animal>::call(&int_animal);
 
-
-            Timer::after(Duration::from_secs(3)).await;
-            dbg!("Task2 is done.");
+                Timer::after(Duration::from_secs(3)).await;
+                dbg!("Task2 is done.");
+            }
         }
-    });
+    };
 
     task_builder
         .set_frequency_count_down_by_seconds(1, 15)
         .set_task_id(2)
         .set_maximum_running_time(5)
-        .spawn(body)
+        .spawn_async_routine(body)
 }
 
 trait ThreadSafe: Any + Sized + Clone + Send + Sync + 'static {}
