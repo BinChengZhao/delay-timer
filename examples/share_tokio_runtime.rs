@@ -3,7 +3,6 @@ use delay_timer::prelude::*;
 use tokio::runtime::Runtime;
 use tracing::{info, instrument};
 
-// FIXME: https://github.com/BinChengZhao/delay-timer/issues/33
 fn main() -> Result<(), Report> {
     install_tracing();
     color_eyre::install()?;

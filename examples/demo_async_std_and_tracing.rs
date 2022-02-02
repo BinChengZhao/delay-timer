@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
         // completes the builder.
         .init();
 
-    let delay_timer = DelayTimerBuilder::default().build();
+    let delay_timer = DelayTimerBuilder::default().smol_runtime_by_default().build();
     for i in 0..1000 {
         delay_timer.add_task(build_task_async_execute_process(i)?)?;
     }

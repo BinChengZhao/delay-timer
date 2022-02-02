@@ -1,4 +1,3 @@
-# FIXME: Update demo of spawn-async-routine.
 # delay-timer  
 [![Build](https://github.com/BinChengZhao/delay-timer/workflows/Build%20and%20test/badge.svg)](
 https://github.com/BinChengZhao/delay-timer/actions)

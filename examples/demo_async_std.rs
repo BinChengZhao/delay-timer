@@ -10,7 +10,7 @@ use std::time::Duration;
 #[async_std::main]
 async fn main() -> Result<()> {
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
-    let delay_timer = DelayTimerBuilder::default().build();
+    let delay_timer = DelayTimerBuilder::default().smol_runtime_by_default().build();
 
     // Develop a print job that runs in an asynchronous cycle.
     let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
