@@ -3,6 +3,7 @@
 use crate::prelude::*;
 use std::convert::TryFrom;
 use future_lite::block_on;
+use once_cell::sync::Lazy;
 
 
 /// Global internal status-reporter.

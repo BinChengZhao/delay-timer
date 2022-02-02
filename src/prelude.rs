@@ -51,7 +51,6 @@ pub(crate) use crate::timer::task::Routine;
 pub(crate) use crate::utils::parse::shell_command::{ChildGuard, ChildGuardList, ChildUnify};
 pub(crate) use dashmap::DashMap;
 pub(crate) use log::{debug, error, info, trace};
-pub(crate) use once_cell::sync::Lazy;
 pub(crate) use smol::channel::{unbounded, Receiver as AsyncReceiver, Sender as AsyncSender};
 pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
