@@ -128,9 +128,17 @@ pub mod shell_command {
     #[async_trait]
     impl ChildUnify for SmolChild {
         async fn wait(mut self) -> AnyResult<ExitStatus> {
-            Ok(ExitStatus::from_raw(
-                self.status().await?.code().unwrap_or(1),
-            ))
+            #[cfg(target_family = "windows")]
+            {
+                return Ok(ExitStatus::from_raw(
+                    self.status().await?.code().unwrap_or(1) as u32,
+                ));
+            }
+
+            #[cfg(target_family = "unix")]
+            return Ok(ExitStatus::from_raw(
+                self.status().await?.code().unwrap_or(-1),
+            ));
         }
 
         async fn wait_with_output(self) -> AnyResult<Output> {
