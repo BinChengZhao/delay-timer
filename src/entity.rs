@@ -177,7 +177,7 @@ impl Default for SharedHeader {
         let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
         let task_flag_map = Arc::new(DashMap::new());
         let second_hand = Arc::new(AtomicU64::new(0));
-        let global_time = Arc::new(AtomicU64::new(get_timestamp()));
+        let global_time = Arc::new(AtomicU64::new(timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
         let runtime_instance = RuntimeInstance::default();
         let id_generator = Arc::new(AsyncMutex::new(SnowflakeIdGenerator::new(1, 1)));
@@ -510,7 +510,7 @@ cfg_status_report!(
 // to get rid of system interference,
 // and this change can also be applied to snowflake-rs.
 /// get current OS SystemTime.
-pub fn get_timestamp() -> u64 {
+pub fn timestamp() -> u64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs(),
         Err(_) => panic!("SystemTime before UNIX EPOCH!"),
@@ -522,7 +522,7 @@ pub fn get_timestamp() -> u64 {
 // to get rid of system interference,
 // and this change can also be applied to snowflake-rs.
 /// get current OS SystemTime.
-pub fn get_timestamp_micros() -> u128 {
+pub fn timestamp_micros() -> u128 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_micros(),
         Err(_) => panic!("SystemTime before UNIX EPOCH!"),

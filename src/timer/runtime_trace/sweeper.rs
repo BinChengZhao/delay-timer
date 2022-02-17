@@ -98,7 +98,7 @@ impl RecyclingBins {
         loop {
             let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
 
-            let now: u64 = get_timestamp();
+            let now: u64 = timestamp();
             let mut duration: Option<Duration> = None;
             for _ in 0..200 {
                 if let Some(recycle_flag) = (&recycle_unit_heap).peek().map(|r| r.0.deadline <= now)
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_task_valid() -> AnyResult<()> {
-        use super::{get_timestamp, RecycleUnit, RecyclingBins, RuntimeKind, TimerEvent};
+        use super::{timestamp, RecycleUnit, RecyclingBins, RuntimeKind, TimerEvent};
         use smol::{
             block_on,
             channel::{unbounded, TryRecvError},
@@ -216,7 +216,7 @@ mod tests {
             })
         });
 
-        let deadline = get_timestamp() + 5;
+        let deadline = timestamp() + 5;
 
         for i in 1..10 {
             recycle_unit_sender.try_send(RecycleUnit::new(deadline, i, (i * i) as i64))?;

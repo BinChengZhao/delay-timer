@@ -103,7 +103,7 @@ fn build_task_customized_async_task() -> Result<Task, TaskError> {
     let body = move || {
         let name = name.clone();
         async move {
-            async_template(get_timestamp() as i32, name).await;
+            async_template(timestamp() as i32, name).await;
         }
     };
     #[allow(deprecated)]

@@ -90,7 +90,7 @@ fn get_wake_fn(
         unsafe {
             println!(
                 "end time {}, result {}",
-                get_timestamp(),
+                timestamp(),
                 (*local_run_flag).load(SeqCst)
             );
         }

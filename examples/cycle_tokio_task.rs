@@ -57,7 +57,7 @@ fn build_wake_task() -> Result<Task> {
 
 pub async fn generate_closure_template() {
     let name: String = "'delay_timer-is-easy-to-use.'".into();
-    let future_inner = async_template(get_timestamp() as i32, name.clone());
+    let future_inner = async_template(timestamp() as i32, name.clone());
     future_inner.await.ok();
 }
 

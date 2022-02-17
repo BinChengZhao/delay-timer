@@ -10,7 +10,7 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
-pub use crate::entity::{get_timestamp, get_timestamp_micros, DelayTimer, DelayTimerBuilder};
+pub use crate::entity::{timestamp, timestamp_micros, DelayTimer, DelayTimerBuilder};
 pub use crate::error::*;
 pub use crate::timer::runtime_trace::state::instance;
 pub use crate::timer::runtime_trace::task_handle::DelayTaskHandler;

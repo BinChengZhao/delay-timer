@@ -63,6 +63,7 @@ pub mod shell_command {
     /// Abstraction of command methods in multiple libraries.
     pub trait CommandUnify<Child: ChildUnify>: Sized {
         /// Constructs a new Command for launching the program at path program.
+        // FIXME:
         fn new<S: AsRef<OsStr>>(program: S) -> Self {
             Self::new(program.as_ref())
         }
