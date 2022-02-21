@@ -1,3 +1,13 @@
+# Version 0.11.1
+
+## Changed
+
+- Optimize internal code for better clarity and expression.
+
+- Fixed a bug where task execution time is unstable.([#36](https://github.com/BinChengZhao/delay-timer/issues/36))
+
+### Details
+
 # Version 0.11.0 
 
 ## Changed
