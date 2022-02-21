@@ -101,17 +101,16 @@ impl RecyclingBins {
             let now: u64 = timestamp();
             let mut duration: Option<Duration> = None;
             for _ in 0..200 {
-                if let Some(recycle_flag) = (&recycle_unit_heap).peek().map(|r| r.0.deadline <= now)
-                {
+                if let Some(recycle_flag) = recycle_unit_heap.peek().map(|r| r.0.deadline <= now) {
                     if !recycle_flag {
-                        duration = (&recycle_unit_heap)
+                        duration = recycle_unit_heap
                             .peek()
                             .map(|r| r.0.deadline - now)
                             .map(Duration::from_secs);
                         break;
                     }
 
-                    if let Some(recycle_unit) = (&mut recycle_unit_heap).pop().map(|v| v.0) {
+                    if let Some(recycle_unit) = recycle_unit_heap.pop().map(|v| v.0) {
                         //handle send-error.
                         self.send_timer_event(TimerEvent::TimeoutTask(
                             recycle_unit.task_id,
@@ -151,7 +150,7 @@ impl RecyclingBins {
                     Ok(recycle_unit) => {
                         let mut recycle_unit_heap = self.recycle_unit_heap.lock().await;
 
-                        (&mut recycle_unit_heap).push(Reverse(recycle_unit));
+                        recycle_unit_heap.push(Reverse(recycle_unit));
                     }
 
                     Err(_) => {

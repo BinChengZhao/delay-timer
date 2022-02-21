@@ -570,7 +570,7 @@ impl<F: Fn() -> U + 'static + Send, U: Future + 'static + Send> Routine for Asyn
 
     #[inline(always)]
     fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle {
-        let user_future = (&self.0)();
+        let user_future = self.0();
 
         async_spawn_by_tokio({
             let task_id = task_context.task_id;
@@ -589,7 +589,7 @@ impl<F: Fn() -> U + 'static + Send, U: Future + 'static + Send> Routine for Asyn
 
     #[inline(always)]
     fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
-        let user_future = (&self.0)();
+        let user_future = self.0();
 
         async_spawn_by_smol({
             let task_id = task_context.task_id;
@@ -623,7 +623,7 @@ impl<F: Fn() + 'static + Send + Clone> Routine for SyncFn<F> {
 
     #[inline(always)]
     fn spawn_by_tokio(&self, task_context: TaskContext) -> Self::TokioHandle {
-        let fn_handle = unblock_spawn_by_tokio((&self.0).clone());
+        let fn_handle = unblock_spawn_by_tokio(self.0.clone());
 
         let task_id = task_context.task_id;
         let record_id = task_context.record_id;
@@ -645,7 +645,7 @@ impl<F: Fn() + 'static + Send + Clone> Routine for SyncFn<F> {
 
     #[inline(always)]
     fn spawn_by_smol(&self, task_context: TaskContext) -> Self::SmolHandle {
-        let fn_handle = unblock_spawn_by_smol((&self.0).clone());
+        let fn_handle = unblock_spawn_by_smol(self.0.clone());
 
         let task_id = task_context.task_id;
         let record_id = task_context.record_id;
