@@ -54,7 +54,7 @@ pub(crate) use log::{debug, error, info, trace};
 pub(crate) use smol::channel::{unbounded, Receiver as AsyncReceiver, Sender as AsyncSender};
 pub(crate) use smol::future::yield_now;
 pub(crate) use smol::lock::Mutex as AsyncMutex;
-pub(crate) use smol::Timer;
+pub(crate) use smol::Timer as AsyncTimer;
 pub(crate) use std::convert::{TryFrom, TryInto};
 pub(crate) use std::future::Future;
 pub(crate) use std::iter::StepBy;

@@ -426,8 +426,8 @@ impl Timer {
 
 mod tests {
 
-    #[test]
-    fn test_next_position() {
+    #[tokio::test]
+    async fn test_next_position() {
         use super::{SharedHeader, Timer, TimerEvent};
         use smol::channel::unbounded;
         use std::sync::atomic::Ordering;

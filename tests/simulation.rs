@@ -12,8 +12,8 @@ use std::time::Duration;
 use smol::Timer;
 
 // TODO: Please turn on `--features=full` before test.
-#[test]
-fn test_instance_state() -> anyhow::Result<()> {
+#[tokio::test]
+async fn test_instance_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
     let body = || async {
@@ -52,8 +52,8 @@ fn test_instance_state() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_instance_timeout_state() -> anyhow::Result<()> {
+#[tokio::test]
+async fn test_instance_timeout_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
     let body = || async {
@@ -171,8 +171,8 @@ fn test_shell_task_instance_complete_state() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn go_works() -> AnyResult<()> {
+#[tokio::test]
+async fn go_works() -> AnyResult<()> {
     // Coordinates the inner-Runtime with the external(test-thread) clock.
     let expression = "0/2 * * * * * *";
     let park_time = 2_100_000u64;
@@ -235,8 +235,8 @@ fn test_advance() -> AnyResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_maximum_parallel_runnable_num() -> AnyResult<()> {
+#[tokio::test]
+async fn test_maximum_parallel_runnable_num() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicU64::new(0));
     let share_num_bunshin = share_num.clone();
@@ -267,8 +267,8 @@ fn test_maximum_parallel_runnable_num() -> AnyResult<()> {
     Ok(())
 }
 
-#[test]
-fn tests_countdown() -> AnyResult<()> {
+#[tokio::test]
+async fn tests_countdown() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicI32::new(3));
     let share_num_bunshin = share_num.clone();
@@ -330,7 +330,7 @@ fn test_cron_clock() -> AnyResult<()> {
         cron_clock::Schedule::from_str("0 10 22 * * Monday,Tuesday,Wednesday,Thursday,Friday *")?
             .upcoming_owned(cron_clock::Utc);
 
-    for i in 0..10 {
+    for _ in 0..10 {
         println!("{:?}", s.next());
     }
 

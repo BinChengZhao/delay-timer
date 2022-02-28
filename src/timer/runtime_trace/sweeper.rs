@@ -168,7 +168,7 @@ impl RecyclingBins {
         let duration = duration.unwrap_or_else(|| Duration::from_secs(3));
         match self.runtime_kind {
             RuntimeKind::Smol => {
-                Timer::after(duration).await;
+                AsyncTimer::after(duration).await;
             }
 
             RuntimeKind::Tokio => {

@@ -224,18 +224,18 @@ impl DelayTimerBuilder {
             .build()
             .ok_or_else(|| anyhow!("Missing base component, can't initialize."))?;
 
-        let timer = Timer::new(self.get_timer_event_sender(), shared_header.clone());
-
         match self.runtime_instance.kind {
-            RuntimeKind::Smol => self.assign_task(timer, event_handle),
+            RuntimeKind::Smol => self.assign_task(event_handle, shared_header),
 
-            RuntimeKind::Tokio => self.assign_task_by_tokio(timer, event_handle, shared_header),
+            RuntimeKind::Tokio => self.assign_task_by_tokio(event_handle, shared_header),
         };
 
         Ok(())
     }
 
-    fn assign_task(&self, timer: Timer, event_handle: EventHandle) {
+    fn assign_task(&mut self, event_handle: EventHandle, shared_header: SharedHeader) {
+        let timer = Timer::new(self.get_timer_event_sender(), shared_header.clone());
+
         self.run_async_schedule(timer);
 
         self.run_event_handle(event_handle);
@@ -383,23 +383,22 @@ impl DelayTimer {
 /// This function requires the `tokio-support` feature of the `delay_timer`
 /// crate to be enabled.
 impl DelayTimerBuilder {
-    fn assign_task_by_tokio(
-        &mut self,
-        timer: Timer,
-        event_handle: EventHandle,
-        shared_header: SharedHeader,
-    ) {
-        self.run_async_schedule_by_tokio(timer, shared_header.clone());
+    fn assign_task_by_tokio(&mut self, event_handle: EventHandle, shared_header: SharedHeader) {
+        self.run_async_schedule_by_tokio(shared_header.clone());
         self.run_event_handle_by_tokio(event_handle, shared_header);
     }
 
-    fn run_async_schedule_by_tokio(&self, mut timer: Timer, shared_header: SharedHeader) {
+    fn run_async_schedule_by_tokio(&mut self, shared_header: SharedHeader) {
+        let shared_header_by_timer = shared_header.clone();
+        let timer_event_sender = self.get_timer_event_sender();
+
         if let Some(ref tokio_runtime_ref) = shared_header.runtime_instance.inner {
             let tokio_runtime = tokio_runtime_ref.clone();
             Builder::new()
                 .name("async_schedule_tokio".into())
                 .spawn(move || {
                     tokio_runtime.block_on(async {
+                        let mut timer = Timer::new(timer_event_sender, shared_header_by_timer);
                         timer.async_schedule().await;
                     })
                 })

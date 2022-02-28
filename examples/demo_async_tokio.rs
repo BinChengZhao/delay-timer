@@ -13,9 +13,7 @@ async fn main() -> Result<()> {
     // You can also share a tokio runtime with delayTimer, please see api `DelayTimerBuilder::tokio_runtime` for details.
 
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
-    let delay_timer = DelayTimerBuilder::default()
-        .tokio_runtime_by_default()
-        .build();
+    let delay_timer = DelayTimerBuilder::default().build();
 
     // Develop a print job that runs in an asynchronous cycle.
     let task_instance_chain = delay_timer.insert_task(build_task_async_print()?)?;
