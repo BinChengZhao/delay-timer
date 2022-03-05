@@ -6,7 +6,7 @@ use crate::entity::timestamp;
 use crate::entity::RuntimeKind;
 
 use std::mem::replace;
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::time::Duration;
 use std::time::Instant;
 
@@ -180,12 +180,7 @@ impl Timer {
     /// Offset the current slot by one when reading it,
     /// so event_handle can be easily inserted into subsequent slots.
     pub(crate) fn next_position(&mut self) -> u64 {
-        self.shared_header
-            .second_hand
-            .fetch_update(Release, Relaxed, |x| {
-                Some((x + 1) % DEFAULT_TIMER_SLOT_COUNT)
-            })
-            .unwrap_or_else(|e| e)
+        self.shared_header.second_hand.next().unwrap_or_else(|e| e)
     }
 
     /// Time goes on, the clock ticks.
@@ -270,7 +265,7 @@ impl Timer {
 
     /// Access to the second-hand
     pub(crate) fn second_hand(&self) -> u64 {
-        self.shared_header.second_hand.load(Acquire)
+        self.shared_header.second_hand.current_second_hand()
     }
 
     /// Send timer-event to event-handle.
@@ -440,6 +435,7 @@ mod tests {
         timer
             .shared_header
             .second_hand
+            .inner
             .store(3599, Ordering::SeqCst);
         assert_eq!(timer.next_position(), 3599);
         assert_eq!(timer.next_position(), 0);

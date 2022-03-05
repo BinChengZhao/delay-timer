@@ -273,17 +273,20 @@ impl EventHandle {
 
     // Add task to wheel_queue  slot
     fn add_task(&mut self, mut task: Box<Task>) -> AnyResult<TaskMark> {
-        let second_hand = self.shared_header.second_hand.load(Acquire);
+        let second_hand = self.shared_header.second_hand.current_second_hand();
 
         let exec_time: u64 = task
             .get_next_exec_timestamp()
             .ok_or_else(|| anyhow!("can't get_next_exec_timestamp in {}", &task.task_id))?;
 
         let timestamp = self.shared_header.global_time.load(Acquire);
+
+        // Put task on next slot.
         let time_seed: u64 = exec_time
             .checked_sub(timestamp)
             .unwrap_or(task.task_id % DEFAULT_TIMER_SLOT_COUNT)
-            + second_hand;
+            + second_hand
+            + 1;
         let slot_seed: u64 = time_seed % DEFAULT_TIMER_SLOT_COUNT;
 
         let cylinder_line = time_seed / DEFAULT_TIMER_SLOT_COUNT;
@@ -357,7 +360,7 @@ impl EventHandle {
         };
         task.clear_cylinder_line();
 
-        let slot_seed = self.shared_header.second_hand.load(Acquire) + 1;
+        let slot_seed = self.shared_header.second_hand.current_second_hand() + 1;
 
         if let Some(mut slot) = self.shared_header.wheel_queue.get_mut(&slot_seed) {
             slot.value_mut().add_task(task);

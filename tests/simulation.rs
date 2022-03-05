@@ -12,11 +12,12 @@ use std::time::Duration;
 use smol::Timer;
 
 // TODO: Please turn on `--features=full` before test.
-#[tokio::test]
-async fn test_instance_state() -> anyhow::Result<()> {
+#[test]
+fn test_instance_state() -> anyhow::Result<()> {
     let delay_timer = DelayTimer::new();
 
     let body = || async {
+        println!("create_async_fn_body:i'success");
         Timer::after(Duration::from_millis(100)).await;
     };
 
@@ -25,16 +26,19 @@ async fn test_instance_state() -> anyhow::Result<()> {
         .set_task_id(1)
         .set_maximum_parallel_runnable_num(3)
         .spawn_async_routine(body)?;
+
     let task_instance_chain = delay_timer.insert_task(task)?;
 
     // Get the first task instance.
     let instance = task_instance_chain.next_with_wait()?;
+
 
     // The task was still running when the instance was first obtained.
     assert_eq!(instance.get_state(), instance::RUNNING);
 
     // Unsolicited mission cancellation.
     instance.cancel_with_wait()?;
+
     assert_eq!(instance.get_state(), instance::CANCELLED);
 
     // Get the second task instance.
@@ -267,8 +271,8 @@ async fn test_maximum_parallel_runnable_num() -> AnyResult<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn tests_countdown() -> AnyResult<()> {
+#[test]
+fn tests_countdown() -> AnyResult<()> {
     let delay_timer = DelayTimer::new();
     let share_num = Arc::new(AtomicI32::new(3));
     let share_num_bunshin = share_num.clone();

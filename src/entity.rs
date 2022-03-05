@@ -38,14 +38,31 @@ cfg_status_report!(
 pub(crate) type SharedMotivation = Arc<AtomicBool>;
 // Global IdGenerator.
 pub(crate) type SharedIdGenerator = Arc<AsyncMutex<SnowflakeIdGenerator>>;
-// Global sencond hand.
-pub(crate) type SencondHand = Arc<AtomicU64>;
 // Global Timestamp.
 pub(crate) type GlobalTime = Arc<AtomicU64>;
 // Shared task-wheel for operate.
 pub(crate) type SharedTaskWheel = Arc<DashMap<u64, Slot>>;
 // The slot currently used for storing global tasks.
 pub(crate) type SharedTaskFlagMap = Arc<DashMap<u64, TaskMark>>;
+
+/// Global sencond hand.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SencondHand {
+    pub(crate) inner: Arc<AtomicU64>,
+}
+
+impl SencondHand {
+    pub(crate) fn current_second_hand(&self) -> u64 {
+        self.inner.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn next(&self) -> Result<u64, u64> {
+        self.inner
+            .fetch_update(Ordering::Release, Ordering::Relaxed, |x| {
+                Some((x + 1) % DEFAULT_TIMER_SLOT_COUNT)
+            })
+    }
+}
 
 /// Builds DelayTimer with custom configuration values.
 ///
@@ -176,7 +193,7 @@ impl Default for SharedHeader {
     fn default() -> Self {
         let wheel_queue = EventHandle::init_task_wheel(DEFAULT_TIMER_SLOT_COUNT);
         let task_flag_map = Arc::new(DashMap::new());
-        let second_hand = Arc::new(AtomicU64::new(0));
+        let second_hand = SencondHand::default();
         let global_time = Arc::new(AtomicU64::new(timestamp()));
         let shared_motivation = Arc::new(AtomicBool::new(true));
         let runtime_instance = RuntimeInstance::default();
@@ -234,7 +251,7 @@ impl DelayTimerBuilder {
     }
 
     fn assign_task(&mut self, event_handle: EventHandle, shared_header: SharedHeader) {
-        let timer = Timer::new(self.get_timer_event_sender(), shared_header.clone());
+        let timer = Timer::new(self.get_timer_event_sender(), shared_header);
 
         self.run_async_schedule(timer);
 
