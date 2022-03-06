@@ -5,10 +5,20 @@ use delay_timer::prelude::*;
 use delay_timer::utils::convenience::functions::unblock_process_task_fn;
 use smol::Timer;
 use std::time::Duration;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 // You can replace the 62 line with the command you expect to execute.
 #[async_std::main]
 async fn main() -> Result<()> {
+    // a builder for `FmtSubscriber`.
+    FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.
+        .with_max_level(Level::DEBUG)
+        // completes the builder.
+        .init();
+
     // Build an DelayTimer that uses the default configuration of the Smol runtime internally.
     let delay_timer = DelayTimerBuilder::default()
         .smol_runtime_by_default()
@@ -22,6 +32,7 @@ async fn main() -> Result<()> {
 
     // Get the running instance of task 1.
     let task_instance = task_instance_chain.next_with_async_wait().await?;
+    Timer::after(Duration::from_secs(1)).await;
 
     // Cancel running task instances.
     task_instance.cancel_with_async_wait().await?;
@@ -53,7 +64,7 @@ fn build_task_async_print() -> Result<Task, TaskError> {
 
     task_builder
         .set_task_id(1)
-        .set_frequency_repeated_by_cron_str("*/6 * * * * * *")
+        .set_frequency_repeated_by_cron_str("* * * * * * *")
         .set_maximum_parallel_runnable_num(2)
         .spawn_async_routine(body)
 }

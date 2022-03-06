@@ -223,7 +223,12 @@ impl Timer {
                 }
             }
 
-            trace!("timestamp: {}, task_ids: {:?}", current_timestamp, task_ids);
+            trace!(
+                "second_hand: {}, timestamp: {}, task_ids: {:?}",
+                second_hand,
+                current_timestamp,
+                task_ids
+            );
 
             // Centralize task processing to avoid duplicate lock requests and releases.
             // FIXME: https://github.com/BinChengZhao/delay-timer/issues/29

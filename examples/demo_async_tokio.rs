@@ -5,10 +5,20 @@ use delay_timer::utils::convenience::functions::unblock_process_task_fn;
 use hyper::{Client, Uri};
 use std::time::Duration;
 use tokio::time::sleep;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 // You can replace the 66 line with the command you expect to execute.
 #[tokio::main]
 async fn main() -> Result<()> {
+    // a builder for `FmtSubscriber`.
+    FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.
+        .with_max_level(Level::DEBUG)
+        // completes the builder.
+        .init();
+
     // In addition to the mixed (smol & tokio) runtime
     // You can also share a tokio runtime with delayTimer, please see api `DelayTimerBuilder::tokio_runtime` for details.
 
@@ -74,7 +84,7 @@ fn build_task_async_execute_process() -> Result<Task, TaskError> {
 
     let body = move || {
         #[allow(deprecated)]
-        unblock_process_task_fn("php /home/open/project/rust/repo/myself/delay_timer/examples/try_spawn.php >> ./try_spawn.txt".into(), task_id)
+        unblock_process_task_fn("/opt/homebrew/bin/php /Users/bincheng_paopao/project/repo/rust/myself/delay-timer/examples/try_spawn.php >> ./try_spawn.txt".into(), task_id)
     };
     task_builder
         .set_frequency_repeated_by_seconds(1)

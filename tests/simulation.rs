@@ -32,7 +32,6 @@ fn test_instance_state() -> anyhow::Result<()> {
     // Get the first task instance.
     let instance = task_instance_chain.next_with_wait()?;
 
-
     // The task was still running when the instance was first obtained.
     assert_eq!(instance.get_state(), instance::RUNNING);
 

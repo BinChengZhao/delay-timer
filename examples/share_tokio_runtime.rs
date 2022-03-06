@@ -18,8 +18,8 @@ fn main() -> Result<(), Report> {
                 .tokio_runtime_shared_by_custom(rt)
                 .build();
             let mut chain;
-            for cron_str in ["0 33 12 * * * *", "0 33 13 * * * *"] {
-                chain = delay_timer.insert_task(build_task_async_print(cron_str)?)?;
+            for (id, cron_str) in [(1, "0 1 6 * * * *"), (2, "0 10 6 * * * *")] {
+                chain = delay_timer.insert_task(build_task_async_print(id, cron_str)?)?;
                 chain.next_with_async_wait().await?;
             }
 
@@ -30,7 +30,7 @@ fn main() -> Result<(), Report> {
     Ok(read_config()?)
 }
 
-fn build_task_async_print(cron_str: &'static str) -> Result<Task, TaskError> {
+fn build_task_async_print(id: u64, cron_str: &'static str) -> Result<Task, TaskError> {
     let mut task_builder = TaskBuilder::default();
 
     let body = move || async move {
@@ -38,7 +38,7 @@ fn build_task_async_print(cron_str: &'static str) -> Result<Task, TaskError> {
     };
 
     task_builder
-        .set_task_id(1)
+        .set_task_id(id)
         .set_frequency_repeated_by_cron_str(cron_str)
         .set_schedule_iterator_time_zone(ScheduleIteratorTimeZone::Utc)
         .set_maximum_parallel_runnable_num(2)
