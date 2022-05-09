@@ -228,7 +228,8 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
                     return Err(FrequencyAnalyzeError::DisInitTime);
                 }
 
-                let seconds_state: SecondsState = (timestamp()..).step_by(seconds as usize);
+                let seconds_state: SecondsState =
+                    ((timestamp() + seconds)..).step_by(seconds as usize);
                 FrequencyInner::SecondsCountDown(1, seconds_state)
             }
             FrequencyUnify::FrequencySeconds(FrequencySeconds::Repeated(seconds)) => {
@@ -236,7 +237,8 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
                     return Err(FrequencyAnalyzeError::DisInitTime);
                 }
 
-                let seconds_state: SecondsState = (timestamp()..).step_by(seconds as usize);
+                let seconds_state: SecondsState =
+                    ((timestamp() + seconds)..).step_by(seconds as usize);
 
                 FrequencyInner::SecondsRepeated(seconds_state)
             }
@@ -245,7 +247,8 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
                     return Err(FrequencyAnalyzeError::DisInitTime);
                 }
 
-                let seconds_state: SecondsState = (timestamp()..).step_by(seconds as usize);
+                let seconds_state: SecondsState =
+                    ((timestamp() + seconds)..).step_by(seconds as usize);
                 FrequencyInner::SecondsCountDown(count_down, seconds_state)
             }
         };

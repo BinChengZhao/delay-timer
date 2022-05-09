@@ -373,10 +373,10 @@ impl Timer {
         // when-on-slot61-exec: (task_excute_timestamp - timestamp + next_second_hand) % slot_seed == 61
 
         // Time difference + next second hand % DEFAULT_TIMER_SLOT_COUNT
-        let step = task_excute_timestamp.checked_sub(timestamp).unwrap_or(1) + next_second_hand;
+        let step = task_excute_timestamp.checked_sub(timestamp).unwrap_or(1);
         let cylinder_line = step / DEFAULT_TIMER_SLOT_COUNT;
         task.set_cylinder_line(cylinder_line);
-        let slot_seed = step % DEFAULT_TIMER_SLOT_COUNT;
+        let slot_seed = (step + next_second_hand) % DEFAULT_TIMER_SLOT_COUNT;
 
         {
             let mut slot_mut = self

@@ -1,6 +1,6 @@
 [package]
 name = "delay_timer"
-version = "0.11.1"
+version = "0.11.2"
 authors = ["binchengZhao <binchengZhao@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/BinChengZhao/delay-timer"
@@ -29,7 +29,7 @@ status-report = []
 [dependencies]
 cron_clock = "0.8.0"
 anyhow = "^1.0.31"
-rs-snowflake = "0.5.0"
+rs-snowflake = "0.6.0"
 dashmap = "^4.0.2"
 lru = "^0.6.5"
 once_cell = "1.9.0"
