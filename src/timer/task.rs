@@ -228,7 +228,8 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
                     return Err(FrequencyAnalyzeError::DisInitTime);
                 }
 
-                let seconds_state: SecondsState = (timestamp()..).step_by(seconds as usize);
+                let seconds_state: SecondsState =
+                    ((timestamp() + seconds)..).step_by(seconds as usize);
                 FrequencyInner::SecondsCountDown(1, seconds_state)
             }
             FrequencyUnify::FrequencySeconds(FrequencySeconds::Repeated(seconds)) => {
@@ -236,7 +237,8 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
                     return Err(FrequencyAnalyzeError::DisInitTime);
                 }
 
-                let seconds_state: SecondsState = (timestamp()..).step_by(seconds as usize);
+                let seconds_state: SecondsState =
+                    ((timestamp() + seconds)..).step_by(seconds as usize);
 
                 FrequencyInner::SecondsRepeated(seconds_state)
             }
@@ -245,7 +247,8 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
                     return Err(FrequencyAnalyzeError::DisInitTime);
                 }
 
-                let seconds_state: SecondsState = (timestamp()..).step_by(seconds as usize);
+                let seconds_state: SecondsState =
+                    ((timestamp() + seconds)..).step_by(seconds as usize);
                 FrequencyInner::SecondsCountDown(count_down, seconds_state)
             }
         };
@@ -1148,7 +1151,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_seconds * (i - 1))
+                    timestamp() + (init_seconds * i)
                 );
             })
             .for_each(drop);
@@ -1180,7 +1183,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_minutes * (i - 1) * ONE_MINUTE)
+                    timestamp() + (init_minutes * i * ONE_MINUTE)
                 );
             })
             .for_each(drop);
@@ -1201,7 +1204,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_hours * (i - 1) * ONE_HOUR)
+                    timestamp() + (init_hours * i * ONE_HOUR)
                 );
             })
             .for_each(drop);
@@ -1222,7 +1225,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_days * (i - 1) * ONE_DAY)
+                    timestamp() + (init_days * i * ONE_DAY)
                 );
             })
             .for_each(drop);
