@@ -1151,7 +1151,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_seconds * (i - 1))
+                    timestamp() + (init_seconds * i)
                 );
             })
             .for_each(drop);
@@ -1183,7 +1183,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_minutes * (i - 1) * ONE_MINUTE)
+                    timestamp() + (init_minutes * i * ONE_MINUTE)
                 );
             })
             .for_each(drop);
@@ -1204,7 +1204,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_hours * (i - 1) * ONE_HOUR)
+                    timestamp() + (init_hours * i * ONE_HOUR)
                 );
             })
             .for_each(drop);
@@ -1225,7 +1225,7 @@ mod tests {
             .map(|i| {
                 debug_assert_eq!(
                     task.get_next_exec_timestamp().unwrap(),
-                    timestamp() + (init_days * (i - 1) * ONE_DAY)
+                    timestamp() + (init_days * i * ONE_DAY)
                 );
             })
             .for_each(drop);
