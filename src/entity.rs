@@ -182,7 +182,7 @@ impl RuntimeInstance {
                 format!("tokio-{}", id)
             })
             .on_thread_start(|| {
-                info!("tokio-thread started");
+                debug!("tokio-thread started");
             })
             .build()
             .ok()
@@ -263,7 +263,7 @@ impl DelayTimerBuilder {
             .name("async_schedule".into())
             .spawn(move || {
                 smol::block_on(async {
-                    info!(" `async_schedule` start.");
+                    debug!(" `async_schedule` start.");
                     timer.async_schedule().await;
                 })
             })
@@ -275,7 +275,7 @@ impl DelayTimerBuilder {
             .name("event_handle".into())
             .spawn(move || {
                 block_on(async {
-                    info!(" `event_handle` start.");
+                    debug!(" `event_handle` start.");
                     event_handle.lauch().await;
                 })
             })
