@@ -473,6 +473,7 @@ pub struct TaskContext {
     pub runtime_kind: RuntimeKind,
     /// Event Sender for Timer Wheel Core.
     pub(crate) timer_event_sender: Option<TimerEventSender>,
+    pub(crate) could_send_finish_event: Option<AsyncReceiver<()>>,
 }
 
 impl TaskContext {
@@ -497,6 +498,15 @@ impl TaskContext {
     }
 
     #[inline(always)]
+    pub(crate) fn could_send_finish_event(
+        &mut self,
+        could_send_finish_event: AsyncReceiver<()>,
+    ) -> &mut Self {
+        self.could_send_finish_event = Some(could_send_finish_event);
+        self
+    }
+
+    #[inline(always)]
     /// Get hook functions that may be used in the future.
     pub fn then_fn(&mut self, then_fn: fn()) -> &mut Self {
         self.then_fn = Some(then_fn);
@@ -512,6 +522,10 @@ impl TaskContext {
     /// Send a task-Finish signal to EventHandle.
     pub async fn finish_task(self, finish_output: Option<FinishOutput>) {
         if let Some(timer_event_sender) = self.timer_event_sender {
+            // Wait for the TimerEvent::AppendTaskHandle event to be sent.
+            if let Some(ref wait) = self.could_send_finish_event {
+                let _ = wait.recv().await;
+            }
             timer_event_sender
                 .send(TimerEvent::FinishTask(FinishTaskBody {
                     task_id: self.task_id,

@@ -323,11 +323,14 @@ impl Timer {
             }
         }
 
+        let (s, r) = channel::bounded::<()>(1);
+
         let mut task_context = TaskContext::default();
         task_context
             .task_id(task_id)
             .record_id(record_id)
             .timer_event_sender(self.timer_event_sender.clone())
+            .could_send_finish_event(r)
             .runtime_kind(self.shared_header.runtime_instance.kind);
 
         let task_handler_box = self.routine_exec(&*(task.routine.0), task_context);
@@ -341,6 +344,8 @@ impl Timer {
             .spawn(task_handler_box);
 
         self.send_timer_event(task_id, tmp_task_handler_box).await;
+        // The TimerEvent::AppendTaskHandle event should always be sent before The TimerEvent::FinishTask event.
+        let _ = s.try_send(());
 
         let task_valid = task.down_count_and_set_vaild();
         if !task_valid {
