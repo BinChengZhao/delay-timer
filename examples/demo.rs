@@ -5,7 +5,6 @@ use delay_timer::utils::convenience::functions::unblock_process_task_fn;
 use smol::Timer;
 use std::thread::{current, park, Thread};
 use std::time::Duration;
-use surf;
 
 // cargo run --package delay_timer --example demo --features=full
 
@@ -115,7 +114,7 @@ fn build_task_customized_async_task() -> Result<Task, TaskError> {
 }
 
 pub async fn async_template(id: i32, name: String) {
-    let url = format!("https://httpbin.org/get?id={}&name={}", id, name);
+    let url = format!("https://httpbin.org/get?id={id}&name={name}");
     if let Ok(mut res) = surf::get(url).await {
         dbg!(res.body_string().await.unwrap_or_default());
     }
@@ -146,13 +145,15 @@ enum AuspiciousTime {
     PerDayFiveAclock,
 }
 
-impl Into<CandyCronStr> for AuspiciousTime {
-    fn into(self) -> CandyCronStr {
-        match self {
-            Self::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
-            Self::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
-            Self::LoveTime => CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string()),
-            Self::PerDayFiveAclock => CandyCronStr("01 00 1 * * * *".to_string()),
+impl From<AuspiciousTime> for CandyCronStr {
+    fn from(val: AuspiciousTime) -> Self {
+        match val {
+            AuspiciousTime::PerSevenSeconds => CandyCronStr("0/7 * * * * * *".to_string()),
+            AuspiciousTime::PerEightSeconds => CandyCronStr("0/8 * * * * * *".to_string()),
+            AuspiciousTime::LoveTime => {
+                CandyCronStr("0,10,15,25,50 0/1 * * Jan-Dec * 2020-2100".to_string())
+            }
+            AuspiciousTime::PerDayFiveAclock => CandyCronStr("01 00 1 * * * *".to_string()),
         }
     }
 }

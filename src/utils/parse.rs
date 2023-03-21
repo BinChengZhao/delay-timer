@@ -273,7 +273,7 @@ pub mod shell_command {
                     .map_err(|e| CommandChildError::DisCondition(e.to_string()))?;
             }
 
-            let mut parts = command.trim().split_whitespace();
+            let mut parts = command.split_whitespace();
             let command = parts
                 .next()
                 .ok_or_else(|| CommandChildError::DisCondition("Without next part".to_string()))?;

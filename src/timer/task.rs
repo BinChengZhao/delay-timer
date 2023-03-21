@@ -220,7 +220,7 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
                 let task_schedule =
                     DelayTimerScheduleIteratorOwned::analyze_cron_expression(time_zone, cron_str)?;
 
-                FrequencyInner::CronExpressionCountDown(count_down as u64, task_schedule)
+                FrequencyInner::CronExpressionCountDown(count_down, task_schedule)
             }
 
             FrequencyUnify::FrequencySeconds(FrequencySeconds::Once(seconds)) => {
@@ -847,7 +847,7 @@ impl<'a> TaskBuilder<'a> {
             };
 
             unsafe {
-                Box::from_raw(std::mem::transmute::<&str, *mut str>(s));
+                drop(Box::from_raw(std::mem::transmute::<&str, *mut str>(s)));
             }
         }
     }
@@ -1155,7 +1155,7 @@ mod tests {
     #[test]
     fn test_get_next_exec_timestamp_seconds() -> AnyResult<()> {
         let mut rng = rand::thread_rng();
-        let init_seconds: u64 = rng.gen_range(1..100_00_00);
+        let init_seconds: u64 = rng.gen_range(1..1_000_000);
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_count_down_by_seconds(init_seconds, 3);
@@ -1187,7 +1187,7 @@ mod tests {
     #[test]
     fn test_get_next_exec_timestamp_minutes() -> AnyResult<()> {
         let mut rng = rand::thread_rng();
-        let init_minutes: u64 = rng.gen_range(1..100_00_00);
+        let init_minutes: u64 = rng.gen_range(1..1_000_000);
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_repeated_by_minutes(init_minutes);
@@ -1208,7 +1208,7 @@ mod tests {
     #[test]
     fn test_get_next_exec_timestamp_hours() -> AnyResult<()> {
         let mut rng = rand::thread_rng();
-        let init_hours: u64 = rng.gen_range(1..100_00_00);
+        let init_hours: u64 = rng.gen_range(1..1_000_000);
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_repeated_by_hours(init_hours);
@@ -1229,7 +1229,7 @@ mod tests {
     #[test]
     fn test_get_next_exec_timestamp_days() -> AnyResult<()> {
         let mut rng = rand::thread_rng();
-        let init_days: u64 = rng.gen_range(1..100_00_00);
+        let init_days: u64 = rng.gen_range(1..1_000_000);
         let mut task_builder = TaskBuilder::default();
 
         task_builder.set_frequency_repeated_by_days(init_days);

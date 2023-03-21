@@ -288,7 +288,7 @@ fn tests_countdown() -> AnyResult<()> {
     let mut i = 0;
 
     loop {
-        i = i + 1;
+        i += 1;
         park_timeout(Duration::from_secs(3));
 
         if i == 6 {

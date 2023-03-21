@@ -67,14 +67,14 @@ pub async fn async_template(id: i32, name: String) -> Result<()> {
     // The default connector does not handle TLS.
     // Speaking to https destinations will require configuring a connector that implements TLS.
     // So use http for test.
-    let url = format!("http://httpbin.org/get?id={}&name={}", id, name);
+    let url = format!("http://httpbin.org/get?id={id}&name={name}");
     let uri: Uri = url.parse()?;
 
     let res = client.get(uri).await?;
     println!("Response: {}", res.status());
     // Concatenate the body stream into a single buffer...
     let buf = hyper::body::to_bytes(res).await?;
-    println!("body: {:?}", buf);
+    println!("body: {buf:?}");
     Ok(())
 }
 
@@ -82,10 +82,10 @@ enum AuspiciousDay {
     Wake,
 }
 
-impl Into<CandyCronStr> for AuspiciousDay {
-    fn into(self) -> CandyCronStr {
-        match self {
-            Self::Wake => CandyCronStr("0 * * * Jan-Dec * 2020-2100".to_string()),
+impl From<AuspiciousDay> for CandyCronStr {
+    fn from(val: AuspiciousDay) -> Self {
+        match val {
+            AuspiciousDay::Wake => CandyCronStr("0 * * * Jan-Dec * 2020-2100".to_string()),
         }
     }
 }

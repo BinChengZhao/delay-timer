@@ -6,7 +6,6 @@ use smol::Timer;
 use std::any::{type_name, Any};
 use std::thread::park_timeout;
 use std::time::Duration;
-use surf;
 
 // cargo run --package delay_timer --example generic --features=full
 
@@ -33,7 +32,7 @@ fn build_generic_task_async_request<T: Animal>(animal: T) -> Result<Task, TaskEr
 
     let body = move || {
         let animal_ref = animal.clone();
-        let other_animal_ref = other_animal.clone();
+        let other_animal_ref = other_animal;
         async move {
             if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
                 dbg!(res.body_string().await.unwrap_or_default());

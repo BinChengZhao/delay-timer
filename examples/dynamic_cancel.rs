@@ -14,7 +14,7 @@ fn main() -> Result<()> {
     // Dynamically cancel in the context of `synchronization`.
     sync_cancel()?;
 
-    println!("");
+    println!();
     // Dynamic cancellation in `asynchronous` contexts.
     async_cancel()
 }

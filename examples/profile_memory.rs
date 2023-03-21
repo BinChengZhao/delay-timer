@@ -21,16 +21,16 @@ impl RequstBody {
     }
 }
 
-impl Into<CandyCronStr> for RequstBody {
-    fn into(self) -> CandyCronStr {
-        CandyCronStr(self.cron_expression)
+impl From<RequstBody> for CandyCronStr {
+    fn from(val: RequstBody) -> Self {
+        CandyCronStr(val.cron_expression)
     }
 }
 
 // LD_PRELOAD=../../tools-bin/libmemory_profiler.so ./target/debug/examples/profile_memory
 // ../../tools-bin/memory-profiler-cli server memory-profiling_*.dat
 fn main() {
-    let capacity: usize = 256_00;
+    let capacity: usize = 25_600;
     let mut task_builder_vec: Vec<TaskBuilder> = Vec::with_capacity(capacity);
 
     for _ in 0..capacity {

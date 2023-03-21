@@ -35,7 +35,7 @@ impl StatusReporter {
 
     /// Async get `PublicEvent` via `StatusReporter`.
     pub async fn next_public_event_with_async_wait(&self) -> Result<PublicEvent, channel::RecvError> {
-        Ok(self.inner.recv().await?)
+        self.inner.recv().await
     }
 
     pub(crate) fn new(inner: AsyncReceiver<PublicEvent>) -> Self {

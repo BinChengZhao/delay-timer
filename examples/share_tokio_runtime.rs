@@ -27,7 +27,7 @@ fn main() -> Result<(), Report> {
         }
     })?;
 
-    Ok(read_config()?)
+    read_config()
 }
 
 fn build_task_async_print(id: u64, cron_str: &'static str) -> Result<Task, TaskError> {

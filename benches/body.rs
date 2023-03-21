@@ -1,5 +1,5 @@
 #![feature(test)]
-#![deny(warnings)]
+#![allow(deprecated)]
 
 extern crate test;
 
@@ -13,7 +13,7 @@ use test::Bencher;
 
 #[bench]
 fn bench_task_spwan(b: &mut Bencher) {
-    let body = move |_| create_default_delay_task_handler();
+    let body = move || async {};
 
     let mut task_builder = TaskBuilder::default();
     task_builder
@@ -23,16 +23,16 @@ fn bench_task_spwan(b: &mut Bencher) {
 
     // String parsing to corn-expression -> iterator is the most time-consuming operation about 1500ns ~ 3500 ns.
     // The iterator is used to find out when the next execution should take place, in about 500 ns.
-    b.iter(|| task_builder.spawn_async_routine(body.clone()));
+    b.iter(|| task_builder.spawn_async_routine(body));
 }
 
 #[bench]
 fn bench_maintain_task(b: &mut Bencher) {
     let (timer_event_sender, _timer_event_receiver) = unbounded::<TimerEvent>();
     let shared_header = SharedHeader::default();
-    let mut timer = Timer::new(timer_event_sender.clone(), shared_header);
+    let mut timer = Timer::new(timer_event_sender, shared_header);
 
-    let body = move |_| create_default_delay_task_handler();
+    let body = move || async {};
 
     let mut task_builder = TaskBuilder::default();
     task_builder
@@ -57,12 +57,12 @@ fn bench_maintain_task(b: &mut Bencher) {
 fn bench_try_wait(b: &mut Bencher) {
     use std::process::Command;
 
-    if let Ok(mut child) = Command::new("ps").spawn_async_routine() {
+    if let Ok(mut child) = Command::new("ps").spawn() {
         b.iter(|| child.try_wait());
     }
 }
 
 #[bench]
 fn bench_timestamp(b: &mut Bencher) {
-    b.iter(|| timestamp());
+    b.iter(timestamp);
 }

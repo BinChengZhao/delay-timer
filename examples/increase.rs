@@ -1,7 +1,5 @@
 #![allow(deprecated)]
 
-use surf;
-
 use delay_timer::prelude::*;
 use std::ops::Deref;
 use std::ptr::NonNull;
@@ -84,7 +82,7 @@ fn get_increase_fn(run_flag_ref: SafePointer) -> impl Copy + Fn() {
 fn get_wake_fn(
     thread: Thread,
     run_flag_ref: SafePointer,
-) -> impl Fn() -> () + Clone + Send + Sync + 'static {
+) -> impl Fn() + Clone + Send + Sync + 'static {
     move || {
         let local_run_flag = run_flag_ref.as_ptr();
         unsafe {
@@ -102,7 +100,7 @@ fn get_async_fn() -> impl std::future::Future {
     async {
         if let Ok(mut res) = surf::get("https://httpbin.org/get").await {
             let body_str = res.body_string().await.unwrap_or_default();
-            println!("{}", body_str);
+            println!("{body_str}");
         }
     }
 }

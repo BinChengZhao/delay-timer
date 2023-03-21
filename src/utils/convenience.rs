@@ -226,9 +226,9 @@ mod tests {
 
         struct CustomizationCandyCron(i32);
 
-        impl Into<CandyCronStr> for CustomizationCandyCron {
-            fn into(self) -> CandyCronStr {
-                let s = match self.0 {
+        impl From<CustomizationCandyCron> for CandyCronStr {
+            fn from(val: CustomizationCandyCron) -> Self {
+                let s = match val.0 {
                     0 => "1 1 1 1 1 1 1",
                     1 => "0 59 23 18 11 3 2100",
                     _ => "* * * * * * *",

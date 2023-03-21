@@ -179,7 +179,7 @@ impl RuntimeInstance {
             .thread_name_fn(|| {
                 static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
                 let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                format!("tokio-{}", id)
+                format!("tokio-{id}")
             })
             .on_thread_start(|| {
                 debug!("tokio-thread started");
