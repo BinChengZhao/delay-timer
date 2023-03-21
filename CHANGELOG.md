@@ -1,3 +1,11 @@
+# Version 0.11.4
+
+## Changed
+
+- Fixed a bug, When the task instance is running too fast, The TimerEvent::FinishTask event will be sent before The TimerEvent::AppendTaskHandle event. Subsequent task instances will not run again.([#45](https://github.com/BinChengZhao/delay-timer/issues/45))
+- Thanks: ([@gamife](https://github.com/gamife))
+### Details
+
 # Version 0.11.1
 
 ## Changed
