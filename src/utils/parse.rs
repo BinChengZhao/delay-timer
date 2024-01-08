@@ -342,7 +342,7 @@ pub mod shell_command {
     //By Option(Some(Result<T>)), determine if there is an output stdio..
     //By Result<T>(OK(t)), determine if there is success open file.
     #[cfg(not(SPLIT_INCLUSIVE_COMPATIBLE))]
-    fn _has_redirect_file(command: &str) -> Option<Result<File>> {
+    fn _has_redirect_file(command: &str) -> Option<Result<File, AnyhowError>> {
         let angle_bracket = if command.contains(">>") {
             ">>"
         } else if command.contains('>') {

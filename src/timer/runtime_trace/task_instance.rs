@@ -196,7 +196,10 @@ impl TaskInstancesChainMaintainer {
         self.inner_sender
             .send(instance.clone())
             .await
-            .map_or((), |_| {});
+            .map_err(|e| {
+                tracing::error!("push_instance error: {:?}", e);
+            })
+            .ok();
         self.inner_list.push_back(instance);
     }
 }

@@ -21,8 +21,9 @@ fn main() -> Result<()> {
         }
     }
 
-    // Check for a minimum version
-    if version()? >= Version::parse("1.51.0")? {
+    // When the rustc version is >= 1.51.0 and < 1.75.0, we can use the
+    let version = version()?;
+    if version >= Version::parse("1.51.0")? && version < Version::parse("1.75.0")? {
         println!("cargo:rustc-cfg=SPLIT_INCLUSIVE_COMPATIBLE");
     }
 
