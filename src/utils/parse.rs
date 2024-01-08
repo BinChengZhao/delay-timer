@@ -351,11 +351,11 @@ pub mod shell_command {
             return None;
         };
 
-        if let Some(filename) = command.trim().rsplit(angle_bracket).next() {
-            Some(create_stdio_file(angle_bracket, filename))
-        } else {
-            None
-        }
+        command
+            .trim()
+            .rsplit(angle_bracket)
+            .next()
+            .map(|filename| create_stdio_file(angle_bracket, filename))
     }
 
     #[cfg(SPLIT_INCLUSIVE_COMPATIBLE)]

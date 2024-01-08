@@ -258,11 +258,12 @@ impl<'a> TryFrom<(FrequencyUnify<'a>, ScheduleIteratorTimeZone)> for FrequencyIn
 }
 
 /// Set the time zone for the time of the expression iteration.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default)]
 pub enum ScheduleIteratorTimeZone {
     /// Utc specifies the UTC time zone. It is most efficient.
     Utc,
     /// Local specifies the system local time zone.
+    #[default]
     Local,
     /// FixedOffset specifies an arbitrary, fixed time zone such as UTC+09:00 or UTC-10:30. This often results from the parsed textual date and time. Since it stores the most information and does not depend on the system environment, you would want to normalize other TimeZones into this type.
     FixedOffset(FixedOffset),
@@ -280,12 +281,6 @@ impl ScheduleIteratorTimeZone {
             ScheduleIteratorTimeZone::FixedOffset(offset) => Ok(*offset),
             _ => Err(anyhow!("No variant of FixedOffset.")),
         }
-    }
-}
-
-impl Default for ScheduleIteratorTimeZone {
-    fn default() -> Self {
-        ScheduleIteratorTimeZone::Local
     }
 }
 
@@ -547,6 +542,7 @@ type SafeBoxRoutine = Box<
         + Send,
 >;
 
+#[allow(dead_code)]
 pub(crate) struct SafeStructBoxedFn(pub(crate) SafeBoxFn);
 impl fmt::Debug for SafeStructBoxedFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -134,19 +134,14 @@ pub(crate) struct RuntimeInstance {
     pub(crate) kind: RuntimeKind,
 }
 /// Async-Runtime Kind
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum RuntimeKind {
     /// Async-Runtime `smol` compatible with the async-std
     Smol,
 
     /// Async-Runtime `tokio`
+    #[default]
     Tokio,
-}
-
-impl Default for RuntimeKind {
-    fn default() -> Self {
-        RuntimeKind::Tokio
-    }
 }
 
 impl Default for RuntimeInstance {
